@@ -3,6 +3,7 @@ import numpy as np
 import rasterio as rio
 from rasterio.windows import Window, transform
 
+
 # TO-DO: Figure out how to handle nodata in satellite images
 
 class make_tiles:
@@ -31,10 +32,11 @@ class make_tiles:
             # The 2 loops together creates a window which is used to create tile from the image.
             for i in range(0, tiff_width, tile_width):
                 for j in range(0, tiff_height, tile_height):
-                    if (i + tile_width <= tiff_width) and (j + tile_height <= tiff_height):  # a check to keep the window within the image
-                        window = Window(col_off=i, row_off=j, width=tile_width, height=tile_height)   # the tile window
+                    if (i + tile_width <= tiff_width) and (
+                            j + tile_height <= tiff_height):  # a check to keep the window within the image
+                        window = Window(col_off=i, row_off=j, width=tile_width, height=tile_height)  # the tile window
 
-                        tile_arr = tiff.read(window=window)   # reading the image as an array for the tile window
+                        tile_arr = tiff.read(window=window)  # reading the image as an array for the tile window
 
                         tile_name = f'{year}_tile_{tile_no}' if month is None else f'{year}_{month}_tile_{tile_no}'  # tile name
 
@@ -68,11 +70,11 @@ class make_tiles:
                                 crs=tiff.crs,
                                 transform=window_transform,
                                 nodata=self.nodata
-                                     ) as dst:
+                        ) as dst:
 
-                                for id in range(0, tile_arr.shape[0]):  # looping for each band of the windowed/tiled array
-                                    dst.write_band(id + 1, tile_arr[id])
-                                    dst.set_band_description(id + 1, band_key_list[id])
+                            for id in range(0, tile_arr.shape[0]):  # looping for each band of the windowed/tiled array
+                                dst.write_band(id + 1, tile_arr[id])
+                                dst.set_band_description(id + 1, band_key_list[id])
 
                         tile_no += 1
 
@@ -126,6 +128,7 @@ class make_tiles:
             perc_counts_all_bands.append(perc_no_data)
 
         return perc_counts_all_bands
+
 
 mk_tt = make_tiles(tiff_path=r'F:\GW_westUS\Data_main\rasters\multibands\2003.tif',
                    band_key_list=['peff', 'precip', 'sand'])

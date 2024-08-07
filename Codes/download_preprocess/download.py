@@ -50,7 +50,7 @@ model_res = 0.01976293625031605786  # in deg, ~2 km
 WestUS_shape = '../../Data_main/ref_shapes/WestUS_states.shp'
 WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
 GEE_merging_refraster_large_grids = '../../Data_main/ref_rasters/GEE_merging_refraster_larger_grids.tif'
-
+gee_grid_shape_large = '../../Data_main/ref_shapes/WestUS_gee_grid_large.shp'
 
 def get_data_GEE_saveTopath(url_and_file_path):
     """
@@ -494,7 +494,7 @@ def cloudMask_landsat(data_name, imcol, start_date, end_date, geometry_bounds):
 
 
 def download_soil_datasets(data_name, download_dir, merge_keyword,
-                           gee_grid_shape='../../Data_main/ref_shapes/WestUS_gee_grid_large.shp',
+                           gee_grid_shape=gee_grid_shape_large,
                            refraster_westUS=WestUS_raster,
                            refraster_gee_merge=GEE_merging_refraster_large_grids, westUS_shape=WestUS_shape):
     """
@@ -641,7 +641,7 @@ def download_tree_cover_data(data_name, download_dir, merge_keyword,
 
 
 def download_DEM_Slope_data(data_name, download_dir, merge_keyword,
-                            gee_grid_shape='../../Data_main/ref_shapes/WestUS_gee_grid_large.shp',
+                            gee_grid_shape=gee_grid_shape_large,
                             refraster_westUS=WestUS_raster,
                             refraster_gee_merge=GEE_merging_refraster_large_grids,
                             westUS_shape=WestUS_shape,
@@ -803,10 +803,10 @@ def download_gee_data_yearly(data_name, download_dir, year_list, month_range, me
                     download_data = nir.subtract(swir1).divide(nir.add(swir1))
 
                 elif data_name in ['Landsat5_GCVI', 'Landsat8_GCVI']:
-                    nir = cloudMask_MODIS(data_name, start_date, end_date, 0, 1, gee_extent).select(band[0]). \
-                        reduce(reducer).multiply(scale_factor).toFloat()
-                    green = cloudMask_MODIS(data_name, start_date, end_date, 0, 1, gee_extent).select(band[1]). \
-                        reduce(reducer).multiply(scale_factor).toFloat()
+                    nir = cloudMask_landsat(data_name, data, start_date, end_date, gee_extent).select(band[0]). \
+                        reduce(reducer).multiply(scale_factor[0]).add(scale_factor[1]).toFloat()
+                    green = cloudMask_landsat(data_name, data, start_date, end_date, gee_extent).select(band[1]). \
+                        reduce(reducer).multiply(scale_factor[0]).add(scale_factor[1]).toFloat()
                     download_data = nir.divide(green).subtract(1)
 
                 elif data_name == 'USDA_CDL':

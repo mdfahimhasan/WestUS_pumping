@@ -38,6 +38,10 @@ WestUS_shape = '../../Data_main/shapefiles/Western_US_ref_shapes/WestUS_states.s
 WestUS_raster = '../../Data_main/reference_rasters/Western_US_refraster_2km.tif'
 GEE_merging_refraster_large_grids = '../../Data_main/reference_rasters/GEE_merging_refraster_larger_grids.tif'
 
+gee_grid_shape_large = '../../Data_main/ref_shapes/WestUS_gee_grid_large.shp'
+gee_grid_shape_for30m_IrrMapper = '../../Data_main/ref_shapes/WestUS_gee_grid_for30m_IrrMapper.shp'
+gee_grid_shape_for30m_LANID = '../../Data_main/ref_shapes/WestUS_gee_grid_for30m_LANID.shp'
+
 
 def get_openet_gee_dict(data_name):
     ee.Initialize(opt_url='https://earthengine-highvolume.googleapis.com')
@@ -96,9 +100,9 @@ def get_openet_gee_dict(data_name):
     # In most cases the end date is shifted a month later to cover the end month's data
 
     month_start_date_dict = {
-        'OpenET_ensemble': datetime(2016, 1, 1),
-        'Irrig_crop_OpenET_IrrMapper': datetime(2016, 1, 1),
-        'Irrig_crop_OpenET_LANID': datetime(2016, 1, 1),
+        'OpenET_ensemble': datetime(2013, 1, 1),
+        'Irrig_crop_OpenET_IrrMapper': datetime(2013, 1, 1),
+        'Irrig_crop_OpenET_LANID': datetime(2013, 1, 1),
         'USDA_CDL': datetime(2008, 1, 1),  # CONUS/West US full coverage starts from 2008
         'IrrMapper': datetime(1986, 1, 1),
         'LANID': None,
@@ -108,9 +112,9 @@ def get_openet_gee_dict(data_name):
     }
 
     month_end_date_dict = {
-        'OpenET_ensemble': datetime(2022, 12, 1),
-        'Irrig_crop_OpenET_IrrMapper': datetime(2023, 1, 1),
-        'Irrig_crop_OpenET_LANID': datetime(2023, 1, 1),
+        'OpenET_ensemble': datetime(2024, 1, 1),
+        'Irrig_crop_OpenET_IrrMapper': datetime(2024, 1, 1),
+        'Irrig_crop_OpenET_LANID': datetime(2024, 1, 1),
         'USDA_CDL': datetime(2023, 1, 1),
         'IrrMapper': datetime(2024, 1, 1),
         'LANID': None,
@@ -120,9 +124,9 @@ def get_openet_gee_dict(data_name):
     }
 
     year_start_date_dict = {
-        'OpenET_ensemble': datetime(2016, 1, 1),
-        'Irrig_crop_OpenET_IrrMapper': datetime(2016, 1, 1),
-        'Irrig_crop_OpenET_LANID': datetime(2016, 1, 1),
+        'OpenET_ensemble': datetime(2013, 1, 1),
+        'Irrig_crop_OpenET_IrrMapper': datetime(2013, 1, 1),
+        'Irrig_crop_OpenET_LANID': datetime(2013, 1, 1),
         'USDA_CDL': datetime(2008, 1, 1),  # CONUS/West US full coverage starts from 2008
         'IrrMapper': datetime(1986, 1, 1),
         'LANID': None,
@@ -132,9 +136,9 @@ def get_openet_gee_dict(data_name):
     }
 
     year_end_date_dict = {
-        'OpenET_ensemble': datetime(2023, 1, 1),
-        'Irrig_crop_OpenET_IrrMapper': datetime(2023, 1, 1),
-        'Irrig_crop_OpenET_LANID': datetime(2023, 1, 1),
+        'OpenET_ensemble': datetime(2024, 1, 1),
+        'Irrig_crop_OpenET_IrrMapper': datetime(2024, 1, 1),
+        'Irrig_crop_OpenET_LANID': datetime(2024, 1, 1),
         'USDA_CDL': datetime(2023, 1, 1),
         'IrrMapper': datetime(2024, 1, 1),
         'LANID': None,
@@ -1156,9 +1160,10 @@ def download_openET_data(data_list, download_dir, year_list, month_range,
 
 
 def download_all_openET_datasets(year_list, month_range,
-                                 grid_shape_for_2km_ensemble,
-                                 grid_shape_for30m_irrmapper, grid_shape_for30m_lanid,
                                  openET_data_list, data_download_dir,
+                                 grid_shape_for_2km_ensemble=gee_grid_shape_large,
+                                 grid_shape_for30m_irrmapper=gee_grid_shape_for30m_IrrMapper,
+                                 grid_shape_for30m_lanid=gee_grid_shape_for30m_LANID,
                                  GEE_merging_refraster=GEE_merging_refraster_large_grids,
                                  westUS_refraster=WestUS_raster, westUS_shape=WestUS_shape,
                                  skip_download_OpenET_data=True,
@@ -1168,13 +1173,6 @@ def download_all_openET_datasets(year_list, month_range,
 
     :param year_list: List of year_list to download data for. We will use data for [2010, 2015] in the model.
     :param month_range: Tuple of month ranges to download data for, e.g., for months 1-12 use (1, 12).
-    :param grid_shape_for_2km_ensemble: File path of larger grids to download data for Western US.
-    :param grid_shape_for30m_irrmapper: File path of smaller grids to download data for IrrMapper extent and cropET from
-                                        openET (this datasets are processed at 30m res in GEE, so smaller grids are
-                                        required).
-    :param grid_shape_for30m_lanid: File path of smaller grids to download data for LANID (for 6 central states) extent
-                                    and cropET from openET (this datasets are processed at 30m res in GEE, so smaller
-                                    grids are required).
     :param openET_data_list: List of data to download by processing openET dataset.
                              Datasets currently downloaded by this code:
                                 ['Irrig_crop_OpenET_IrrMapper', 'Irrig_crop_OpenET_LANID',
@@ -1183,6 +1181,13 @@ def download_all_openET_datasets(year_list, month_range,
                                 'Rainfed_Frac_IrrMapper', 'Rainfed_Frac_LANID',
                                 'OpenET_ensemble', 'OpenET_indiv_models_annual']
     :param data_download_dir: Directory path to download and save data.
+    :param grid_shape_for_2km_ensemble: File path of larger grids to download data for Western US.
+    :param grid_shape_for30m_irrmapper: File path of smaller grids to download data for IrrMapper extent and cropET from
+                                    openET (this datasets are processed at 30m res in GEE, so smaller grids are
+                                    required).
+    :param grid_shape_for30m_lanid: File path of smaller grids to download data for LANID (for 6 central states) extent
+                                    and cropET from openET (this datasets are processed at 30m res in GEE, so smaller
+                                    grids are required).
     :param GEE_merging_refraster: Reference raster to mosaic openET ensemble 2km dataset.
     :param westUS_refraster: Western US reference raster.
     :param westUS_shape: Western US shapefile.

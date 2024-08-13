@@ -4,13 +4,14 @@ from Codes.download_preprocess.preprocess import make_multiband_datasets
 
 # # Data download
 skip_download_gee_data = True
-skip_download_OpenET_data = False
+skip_download_OpenET_data = True
 
 gee_data_list = ['Landsat5_NDVI', 'Landsat8_NDVI', 'Landsat5_NDMI',
                  'Landsat8_NDMI', 'Landsat5_GCVI', 'Landsat8_GCVI','GRIDMET_RET',
                  'Field_capacity', 'Sand_content', 'Clay_content']
 
-openET_data_list = ['Irrig_crop_OpenET_IrrMapper', 'Irrig_crop_OpenET_LANID',
+openET_data_list = ['Irrig_crop_OpenET_IrrMapper',
+                    'Irrig_crop_OpenET_LANID',
                     'Irrigation_Frac_IrrMapper', 'Irrigation_Frac_LANID']
 
 years = [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,

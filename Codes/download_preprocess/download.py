@@ -34,7 +34,7 @@ from Codes.utils.raster_ops import read_raster_arr_object, clip_resample_reproje
 # # earthengine authenticate --auth_mode=notebook
 # # source: https://gis.stackexchange.com/questions/445457/gcloud-command-not-found-when-authenticating-google-earth-engine
 # # This command works for both windows in linux. In linux, once the environment is activated, no need to start python.
-# # instead, use the command in the command line > copy the link in windows browser > paste the verification code in linux command line again to complete verification.
+# # instead, use the command in the command line > **copy the link in windows browser** > paste the verification code in linux command line again to complete verification.
 # # The errors are stemming from earthengine-api version which is associated with python version.
 # # previously, in linux, earthengine authenticate --quiet command used to work.
 

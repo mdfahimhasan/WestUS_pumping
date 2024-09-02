@@ -65,56 +65,85 @@ dataloader_creator = DataLoaderCreator(tile_dir, batch_size=64)
 dataloader = dataloader_creator.get_dataloader()
 
 
-class CNN_regression(torch.nn.Module):
+class UNet_regression(nn.Module):
     """
-    A Convolutional Neural Network (CNN) Class for regression tasks.
+    Initializes a U-Net like CNN with specified architecture for regression task.
+
+    UNet structure detail: 1. https://pytorch.org/hub/mateuszbuda_brain-segmentation-pytorch_unet/
+                           2. https://www.geeksforgeeks.org/u-net-architecture-explained/
     """
 
-    def __init__(self, n_features, filters, kernels, stride=1, padding='same', activation_func='relu'):
+    def __init__(self, n_features, filters, kernels, stride=1, padding='same', activation_func='relu',
+                 pooling='maxpool'):
         """
         Initializes a CNN with specified architecture.
 
-        :param n_features: int. Number of channels in the input image.
+        :param n_features: int. Number of channels in the input image, including the NaN mask channel at the end of each image.
         :param filters: list. Number of filters in each convolutional layer.
         :param kernels: list. Kernel size for each convolutional layer.
         :param activation_func: str. Type of activation function ('relu', 'leakyrelu').
+        :param pooling: str. Pooling option ('maxpool', 'avgpool')
         """
-        super(CNN_regression, self).__init__()
+        super(UNet_regression, self).__init__()
 
+        # device
         self.device = 'cuda'  # running the code on GPU
         print(f'Model running on {self.device}....')
 
-        # dictionary of available activation and pooling options
+        # activation
         self.activations = {'relu': nn.ReLU(),
                             'leakyrelu': nn.LeakyReLU(negative_slope=0.01)}  # neg slope of leakyRelu is by default
 
-        # setting some initial properties of the model based on user input
         activation = self.activations.get(activation_func, nn.ReLU())  # Default to ReLU if not specified
-        stride = 1 if padding == 'same' else stride  # by default stride =1 for padding = 'same'; adding statement to show it
-        in_channels = n_features  # at the beginning the in_channels will be equal to the number of features in the stacked data
 
-        # the CNN steps goes like - conv -> BN -> activation -> pooling
-        # note that, the current model uses padding = 'same' and AdaptiveAvgPool2d to maintain original input dimension
-        # throughout the network
-        self.layers = nn.ModuleList()  # will hold the model components
+        # polling
+        self.poolings = {'maxpool': nn.MaxPool2d(2),
+                         'avgpool': nn.AvgPool2d(2)}
+        pooling = self.poolings.get(pooling, nn.MaxPool2d(2))  # by default MaxPool2d if not specified
+
+        # stride
+        stride = 1 if padding == 'same' else stride  # by default stride = 1 for padding = 'same'; adding statement to show it
+
+        # input channels
+        # n_features includes an additional channel for the NaN mask, which informs the network about the validity of input data throughout processing.
+        in_channels = n_features
+
+        # the UNet (CNN type model) has a encoder-decoder structure
+        # encoder steps: conv -> BN -> activation -> pooling
+        self.encoder_layers = nn.ModuleList()  # will hold the model components
+
+        self.encoder_pools = nn.ModuleList()  # separate list for pooling layers
 
         for out_channels, kernel_size in zip(filters, kernels):
-            self.layers.append(nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding))
-            self.layers.append(nn.BatchNorm2d(out_channels))
-            self.layers.append(activation)
-
-            #  *** nn.AdaptiveAvgPool2d *** here an adaptive average pooling layer is placed which comes from the forward function (due to changing input size)
+            self.encoder_layers.append(nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding))
+            self.encoder_layers.append(nn.BatchNorm2d(out_channels))
+            self.encoder_layers.append(activation)
+            self.encoder_pools.append(pooling)  # downsampling
 
             in_channels = out_channels  # at the end of each block, the in_channels of the next block is set as equal to the out_channel of the previous block
 
-        # Final layer. out_channels and kernel size is set to 1 are used for channel reduction and linear transformation across channels
-        # while preserving the original dimension of the image
-        self.final_conv = nn.Conv2d(in_channels=filters[-1], out_channels=1, kernel_size=1, stride=1, padding=0)
+        # skip connections will link encoder outputs to corresponding decoder layers #
+        # skip connections feed high-resolution features from encoder to decoder for better reconstruction during upsampling
+
+        # decoder steps: conv -> BN -> upsample
+        self.decoder_layers = nn.ModuleList()
+        reversed_filters = filters[::-1]  # reversing the filters for decoder
+        for i, (out_channels, kernel_size) in enumerate(zip(reversed_filters, kernels[::-1])):
+            self.decoder_layers.append(nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding))
+            self.decoder_layers.append(nn.BatchNorm2d(out_channels))
+            self.decoder_layers.append(activation)
+            if i < len(reversed_filters) - 1:   # apply upsampling except on the last decoder layer
+                self.decoder_layers.append(nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True))  # double the spatial dimensions to reverse downsampling
+
+            in_channels = out_channels  # at the end of each block, the in_channels of the next block is set as equal to the out_channel
+
+        # final output layer
+        self.final_conv = nn.Conv2d(in_channels=reversed_filters[-1], out_channels=1, kernel_size=1, stride=1, padding=0)
 
         # weight initialization
         self.initialize_weights()
 
-        # transfers the model to 'cuda' if device='cuda'
+        # transfers the model to 'cuda' (GPU)
         self.to(self.device)
 
     def initialize_weights(self):
@@ -140,18 +169,51 @@ class CNN_regression(torch.nn.Module):
 
     def forward(self, x):
         """
-        Forward pass through the network, maintains original input dimensions.
+        Forward pass through the network, includes skip connections.
         """
-        for layer in self.layers:
+        # # # # # # # # # # # # # # # # # # # # # # # # nan data handling # # # # # # # # # # # # # # # # # # # # # # #
+        # This model integrates a NaN mask as the final channel of each input tensor, which identifies invalid or missing data areas.
+        # First, the mask (1 - valid values, 0 - nan values) goes into the model with other input features.
+        # Finally, it is applied before the final convolution layer to guarantee that only valid data contributes to the
+        # model's predictions, thereby enhancing the reliability and accuracy of the results.
+        # later, we also estimate loss without incorporating the nan pixels to ensure that the model doesn't learn from those values.
+        # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+        # extracting the nan mask (the last channel of each input) will be applied before final convolution
+        nan_mask = x[:, -1:, :, :]  # Extract the mask
+
+        # initiating empty list to store outputs for skip connections
+        encoder_outputs = []
+
+        # encoder
+        for i, layer in enumerate(self.encoder_layers):
             x = layer(x)
+            if isinstance(layer, nn.ReLU) or isinstance(layer, nn.LeakyReLU):  # save output just after activation but before pooling
+                encoder_outputs.append(x)
+            if i < len(self.encoder_pools):  # apply pooling after saving the output
+                x = self.encoder_pools[i](x)
 
-            ## ***********************adjust
-            output_size = (x.size(2), x.size(3))  # Extracting current feature map size (H, W)
-            ## ***********************adjust
-            x = nn.AdaptiveAvgPool2d(output_size)(x)  # Applying adaptive pooling dynamically
+        # decoder
+        encoder_outputs = encoder_outputs[::-1]  # reverse to use first saved encoder output last in decoding
+        for i, layer in enumerate(self.decoder_layers):
+            x = layer(x)
+            if isinstance(layer, nn.Upsample):  # add skip connection
+                # The encoder outputs have been reversed, so using the pop(0) to get the corresponding layer's encoder_output/
+                # pop(0) removes the first element in each decoder step, so we can keep using it to get the relevant encoder_output/
+                # Then, using torch.cat() to concatenate along the channel dimension.
+                # This helps reintroducing the details that might have lost during the downsampling in the encoder phase.
+                skip_connection = encoder_outputs.pop(0)
+                x = torch.cat((x, skip_connection), dim=1)
 
+        # apply the NaN mask before the final convolution to zero out invalid areas,
+        # ensuring that the model's predictions are solely based on valid data points.
+        x = x * nan_mask
+
+        # final output layer
         x = self.final_conv(x)
+
         return x
 
     def __repr__(self):
-        return f'{self.__class__.__name__}({self.layers}, final_conv={self.final_conv})'
+        return f'{self.__class__.__name__}(encoder_layers={self.encoder_layers}, decoder_layers={self.decoder_layers},' \
+               f'final_conv={self.final_conv})'

@@ -1,112 +1,16 @@
 import os
+import numpy as np
 from glob import glob
 from osgeo import gdal
-
-from Codes.utils.raster_ops import create_multiband_raster, clip_resample_reproject_raster,\
-    mean_rasters, sum_rasters
+import rasterio as rio
 from Codes.utils.system_ops import makedirs
+from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster, clip_resample_reproject_raster,\
+                                   mean_rasters, sum_rasters
 
 no_data_value = -9999
 model_res = 0.01976293625031605786  # in deg, ~2 km
 WestUS_shape = '../../Data_main/ref_shapes/WestUS_states.shp'
 WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
-
-
-def org_vars(list_of_temporal_var_dirs, years_list, list_of_static_var_dirs=None, month_range=None):
-    """
-    Arranges the variables (their paths) in an order that all input variables/features of a year/month or static
-    will be in a nested list inside the main output list.
-
-    :param month_range: Month range, as (4, 10), for which variables/datasets are available.
-                        Default set to None as our primary target is annual datasets.
-    :param list_of_temporal_var_dirs: List of main directory files of the temporal variables.
-    :param years_list: A list of years for which variables/datasets are available.
-    :param list_of_static_var_dirs: List of main directory files of the static variables. Default set to None.
-
-    :return: A list that consists of multiple nested lists. Each nested list contains the file paths of all variables
-             of a particular year and month.
-    """
-    # # processing temporal variables
-    if month_range is None:  # if the datasets are annual
-        all_data_paths = []  # final list to append the data paths
-
-        # 1st loop for each year and 2nd loop for each dataset
-        for year in years_list:
-            data_paths = []
-
-            for var in list_of_temporal_var_dirs:
-                data = glob(os.path.join(var, f'*{year}.*tif'))
-
-                data_paths.extend(data)
-
-            all_data_paths.append(data_paths)
-
-    else:  # if the datasets are monthly
-        all_data_paths = []  # final list to append the data paths
-
-        # 1st loop for each year, 2nd loop for each month, and 2nd loop for each dataset
-        for year in years_list:
-            months = list(range(month_range[0], month_range[1] + 1))
-
-            for mon in months:
-                data_paths = []
-                for var in list_of_temporal_var_dirs:
-                    data = glob(os.path.join(var, f'*{year}_{mon}.*tif'))
-
-                    data_paths.extend(data)
-
-                all_data_paths.append(data_paths)
-
-    # # processing static variables
-    if list_of_static_var_dirs is not None:
-        for var in list_of_static_var_dirs:
-            data = glob(os.path.join(var, '*.tif'))[0]
-
-            for nes_list in all_data_paths:
-                nes_list.append(data)
-
-    return all_data_paths
-
-
-def make_multiband_datasets(list_of_temporal_var_dirs, list_of_static_var_dirs, band_key_list, output_dir,
-                            years_list, month_range=None):
-    """
-    Make multi-band raster dataset from individual temporal/static attributes.
-
-    :param list_of_temporal_var_dirs: List of directories of temporal attributes/datasets.
-    :param list_of_static_var_dirs: List of directories of static attributes/datasets.
-    :param band_key_list: keyword to add as band names in the multi-band dataset.
-    :param output_dir: Path of output dir where the multi-band datasets will be stored.
-    :param years_list: List of years to process the datasets.
-    :param month_range: Range of months to process the data for, e.g., (4, 10) for growing season months.
-                        Default set to None to process annual datasets only.
-    :return: None.
-    """
-    makedirs([output_dir])
-
-    # arranging the variables (their paths) in an order so that all input variables of a year/month will be in a
-    # nested list inside the main output list
-    data_paths_lists = org_vars(list_of_temporal_var_dirs=list_of_temporal_var_dirs,
-                                list_of_static_var_dirs=list_of_static_var_dirs,
-                                years_list=years_list, month_range=month_range)
-
-    global output_file_path
-    for paths in data_paths_lists:
-        # setting output name
-        if len(os.path.basename(paths[0]).split('.')[0].split('_')[-1]) == 4:  # check for annual data
-            year = os.path.basename(paths[0]).split('.')[0].split('_')[-1]
-            output_file_path = os.path.join(output_dir, f'{year}.tif')
-
-        elif len(os.path.basename(paths[0]).split('.')[0].split('_')[-1]) <= 2:  # check for monthly data
-            year = os.path.basename(paths[0]).split('.')[0].split('_')[-2]
-            month = os.path.basename(paths[0]).split('.')[0].split('_')[-1]
-            output_file_path = os.path.join(output_dir, f'{year}_{month}.tif')
-
-        elif not os.path.basename(paths[0]).split('.')[0].split('_')[0].isdigit():  # check if static data. basically checking if the last name is a digit or not.
-                                                                                    # if not a digit, then the code enters this condition
-            output_file_path = output_file_path
-
-        create_multiband_raster(input_files_list=paths, band_key_list=band_key_list, output_file=output_file_path)
 
 
 def convert_prism_data_to_tif(input_dir, output_dir, keyword='prism_precip'):
@@ -240,4 +144,167 @@ def process_prism_data(prism_bil_dir, prism_tif_dir, output_dir_prism_monthly, o
 
     else:
         pass
+
+
+def org_vars(list_of_temporal_var_dirs, years_list, list_of_static_var_dirs=None, month_range=None):
+    """
+    Arranges the variables (their paths) in an order that all input variables/features of a year/month or static
+    will be in a nested list inside the main output list.
+
+    :param month_range: Month range, as (4, 10), for which variables/datasets are available.
+                        Default set to None as our primary target is annual datasets.
+    :param list_of_temporal_var_dirs: List of main directory files of the temporal variables.
+    :param years_list: A list of years for which variables/datasets are available.
+    :param list_of_static_var_dirs: List of main directory files of the static variables. Default set to None.
+
+    :return: A list that consists of multiple nested lists. Each nested list contains the file paths of all variables
+             of a particular year and month.
+    """
+    # # processing temporal variables
+    if month_range is None:  # if the datasets are annual
+        all_data_paths = []  # final list to append the data paths
+
+        # 1st loop for each year and 2nd loop for each dataset
+        for year in years_list:
+            data_paths = []
+
+            for var in list_of_temporal_var_dirs:
+                data = glob(os.path.join(var, f'*{year}.*tif'))
+
+                data_paths.extend(data)
+
+            all_data_paths.append(data_paths)
+
+    else:  # if the datasets are monthly
+        all_data_paths = []  # final list to append the data paths
+
+        # 1st loop for each year, 2nd loop for each month, and 2nd loop for each dataset
+        for year in years_list:
+            months = list(range(month_range[0], month_range[1] + 1))
+
+            for mon in months:
+                data_paths = []
+                for var in list_of_temporal_var_dirs:
+                    data = glob(os.path.join(var, f'*{year}_{mon}.*tif'))
+
+                    data_paths.extend(data)
+
+                all_data_paths.append(data_paths)
+
+    # # processing static variables
+    if list_of_static_var_dirs is not None:
+        for var in list_of_static_var_dirs:
+            data = glob(os.path.join(var, '*.tif'))[0]
+
+            for nes_list in all_data_paths:
+                nes_list.append(data)
+
+    return all_data_paths
+
+
+def create_multiband_raster(input_files_list, band_key_list, output_file, nodata=no_data_value):
+    """
+    Create a multi-band image from a list of images.
+
+    *** The output files can be arranged with temporal bands (each representing a particular time's dataset)
+        or feature (each band representing a variable)
+
+    :param input_files_list: List of image file paths to be included in the multi-band image.
+    :param band_key_list: List of strings that will be added before the band names while saving.
+                          Should be in the same serial as input_files_list
+
+    :param output_file: Filepath of output raster.
+    :param nodata: Default set to -9999.
+
+    :return: None
+    """
+    # reading first dataset to extract essential metadata
+    raster_arr, raster_file = read_raster_arr_object(input_files_list[0])
+    height, width = raster_arr.shape[0], raster_arr.shape[1]
+
+    # opening the output file in write mode and saving each band
+    with rio.open(
+            output_file,
+            'w',
+            driver='GTiff',
+            height=height,
+            width=width,
+            dtype=raster_arr.dtype,
+            count=len(input_files_list),
+            crs=raster_file.crs,
+            transform=raster_file.transform,
+            nodata=nodata
+    ) as dst:
+        for id, (layer, layer_name) in enumerate(zip(input_files_list, band_key_list), start=1):
+            with rio.open(layer) as src:
+
+                dst.write_band(id, src.read(1))
+                dst.set_band_description(id, layer_name)
+
+
+def make_multiband_datasets(list_of_temporal_var_dirs, list_of_static_var_dirs, band_key_list, output_dir,
+                            years_list, skip_processing=False):
+    """
+    Make multi-band raster dataset from individual temporal/static attributes.
+
+    :param list_of_temporal_var_dirs: List of directories of temporal attributes/datasets.
+    :param list_of_static_var_dirs: List of directories of static attributes/datasets.
+    :param band_key_list: keyword to add as band names in the multi-band dataset.
+    :param output_dir: Path of output dir where the multi-band datasets will be stored.
+    :param years_list: List of years to process the datasets.
+    :param skip_processing: Set to True to skip this process.
+
+    :return: None.
+    """
+    if not skip_processing:
+        print('creating multi-band rasters...')
+
+        global output_file_path
+        makedirs([output_dir])
+
+        # arranging the variables (their paths) in an order so that all input variables of a year/month will be in a
+        # nested list inside the main output list
+        data_paths_lists = org_vars(list_of_temporal_var_dirs=list_of_temporal_var_dirs,
+                                    list_of_static_var_dirs=list_of_static_var_dirs,
+                                    years_list=years_list)
+
+        # creating a nan mask (1 - valid, 0 -  nan) raster and adding it's path to each nested list in data_paths_lists
+        data_paths_lists_with_nan = []
+
+        for nan_no, paths in enumerate(data_paths_lists):
+            path_arrs = np.array([read_raster_arr_object(each, get_file=False) for each in paths])
+            nan_mask = np.any(np.isnan(path_arrs), axis=0)
+
+            # Invert the mask: True becomes 0, False becomes 1
+            # Convert boolean to integer: True as 0, False as 1
+            inverted_mask = ~nan_mask
+            nan_arr = inverted_mask.astype(int)
+
+            # saving as a raster and adding to each nested list in data_paths_lists
+            nan_mask_dir = '../../Data_main/rasters/nan_mask'
+            makedirs([nan_mask_dir])
+            nan_raster_path = os.path.join(nan_mask_dir, f'nanmask{nan_no + 1}.tif')
+            _, file = read_raster_arr_object(paths[0])
+            write_array_to_raster(nan_arr, file, file.transform, nan_raster_path)
+
+            data_paths_lists_with_nan.append(paths+[nan_raster_path])
+
+        # # multi-band raster creation
+        for paths in data_paths_lists_with_nan:
+            # checking to see if the data is annual or monthly data, and then setting output name accordingly.
+            # basically checking if the last block of the name is 4 digit (for year), 2 digit (month) or str (static data).
+
+            last_name_block = os.path.basename(paths[0]).split('.')[0].split('_')[-1]
+
+            if (len(last_name_block) == 4) & (last_name_block.isdigit()):  # check for annual data
+                year = os.path.basename(paths[0]).split('.')[0].split('_')[-1]
+                output_file_path = os.path.join(output_dir, f'{year}.tif')
+
+            elif (len(last_name_block) <= 2) & (last_name_block.isdigit()):  # check for monthly data
+                year = os.path.basename(paths[0]).split('.')[0].split('_')[-2]
+                month = os.path.basename(paths[0]).split('.')[0].split('_')[-1]
+                output_file_path = os.path.join(output_dir, f'{year}_{month}.tif')
+
+            # creating multi-band rasters
+            create_multiband_raster(input_files_list=paths, band_key_list=band_key_list, output_file=output_file_path)
 

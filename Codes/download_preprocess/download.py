@@ -52,6 +52,7 @@ WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
 GEE_merging_refraster_large_grids = '../../Data_main/ref_rasters/GEE_merging_refraster_larger_grids.tif'
 gee_grid_shape_large = '../../Data_main/ref_shapes/WestUS_gee_grid_large.shp'
 
+
 def get_data_GEE_saveTopath(url_and_file_path):
     """
     Uses data url to get data from GEE and save it to provided local file paths.
@@ -715,6 +716,181 @@ def download_DEM_Slope_data(data_name, download_dir, merge_keyword,
                                    ref_raster=refraster_westUS)
 
     print(f'{data_name} data downloaded and merged')
+
+
+def download_gee_data_monthly(data_name, download_dir, year_list, month_range, merge_keyword,
+                              gee_grid_shape='../../Data_main/ref_shapes/WestUS_gee_grid_large.shp',
+                              refraster_westUS=WestUS_raster, refraster_gee_merge=GEE_merging_refraster_large_grids,
+                              use_cpu_while_multidownloading=15, westUS_shape=WestUS_shape):
+    """
+    Download data (at yearly scale) from GEE.
+
+    :param data_name: Data name.
+    Current valid data names are -
+        ['MODIS_Day_LST', 'Landsat5_NDVI', 'Landsat8_NDVI', 'Landsat5_NDMI', 'Landsat8_NDMI',
+        'Landsat5_GCVI', 'Landsat8_GCVI', 'MODIS_Terra_NDVI', 'MODIS_Terra_EVI', 'MODIS_NDMI', 'MODIS_NDVI',
+        'GRIDMET_RET', 'GRIDMET_max_RH', 'GRIDMET_min_RH', 'GRIDMET_wind_vel',
+        'GRIDMET_short_rad', 'GRIDMET_vap_pres_def', 'DAYMET_sun_hr']
+    :param download_dir: File path of download directory.
+    :param year_list: List of year_list to download data for.
+    :param month_range: Tuple of month ranges to download data for, e.g., for months 1-12 use (1, 12).
+    :param merge_keyword: Keyword to use for merging downloaded data. Suggested 'WestUS'/'Conus'.
+    :param gee_grid_shape: File path of gee grids that will be used to download the data.
+    :param refraster_westUS: Reference raster to clip/save data for WestUS extent.
+    :param refraster_gee_merge: Reference raster to use for merging downloaded datasets from GEE. The merged
+                                datasets have to be clipped for Western US ROI.
+    :param use_cpu_while_multidownloading: Number (Int) of CPU cores to use for multi-download by
+                                           multi-processing/multi-threading. Default set to 15.
+    :param westUS_shape: Filepath of West US shapefile.
+
+    :return: None.
+    """
+    global key_word
+
+    ee.Initialize(opt_url='https://earthengine-highvolume.googleapis.com')
+
+    if any('Landsat' in i for i in ['Landsat5_NDVI', 'Landsat8_NDVI', 'Landsat5_NDMI', 'Landsat8_NDMI',
+                                    'Landsat5_GCVI', 'Landsat8_GCVI']):
+        download_dir = os.path.join(download_dir, data_name.split('_')[-1])
+    else:
+        download_dir = os.path.join(download_dir, data_name)
+
+    makedirs([download_dir])
+
+    # Extracting dataset information required for downloading from GEE
+    data, band, scale_factor, reducer, month_start_range, month_end_range, \
+    year_start_range, year_end_range = get_gee_dict(data_name)
+
+    # loading grids that will be used to download the data
+    grids = gpd.read_file(gee_grid_shape)
+    grids = grids.sort_values(by='FID', ascending=True)
+    grid_geometry = grids['geometry']
+    grid_no = grids['FID']
+
+    month_list = [m for m in range(month_range[0], month_range[1] + 1)]  # creating list of months
+
+    for year in year_list:  # first loop for year_list
+        for month in month_list:
+            print('********')
+            print(f'Getting data urls for year={year}, month={month}.....')
+
+            # Setting date ranges
+            start_date = ee.Date.fromYMD(year, month, 1)
+            start_date_dt = datetime(year, month, 1)
+
+            if month < 12:
+                end_date = ee.Date.fromYMD(year, month + 1, 1)
+                end_date_dt = datetime(year, month + 1, 1)
+            else:
+                end_date = ee.Date.fromYMD(year + 1, 1, 1)  # for month 12 moving end date to next year
+                end_date_dt = datetime(year + 1, 1, 1)
+
+            # a condition to check whether start and end date falls in the available data range in GEE
+            # if not the block will not be executed
+            if (start_date_dt >= year_start_range) & (end_date_dt <= year_end_range):
+                # will collect url and file name in url list and local_file_paths_list
+                data_url_list = []
+                local_file_paths_list = []
+
+                for grid_sr, geometry in zip(grid_no, grid_geometry):  # second loop for grids
+                    roi = geometry.bounds
+                    gee_extent = ee.Geometry.Rectangle(roi)
+
+                    if data_name in ['Landsat5_NDVI', 'Landsat8_NDVI']:
+                        nir = cloudMask_landsat(data_name, data, start_date, end_date, gee_extent).select(band[0]). \
+                            reduce(reducer).multiply(scale_factor[0]).add(scale_factor[1]).toFloat()
+                        red = cloudMask_landsat(data_name, data, start_date, end_date, gee_extent).select(band[1]). \
+                            reduce(reducer).multiply(scale_factor[0]).add(scale_factor[1]).toFloat()
+                        download_data = nir.subtract(red).divide(nir.add(red))
+
+                    elif data_name in ['Landsat5_NDMI', 'Landsat8_NDMI']:
+                        nir = cloudMask_landsat(data_name, data, start_date, end_date, gee_extent).select(band[0]). \
+                            reduce(reducer).multiply(scale_factor[0]).add(scale_factor[1]).toFloat()
+                        swir1 = cloudMask_landsat(data_name, data, start_date, end_date, gee_extent).select(band[1]). \
+                            reduce(reducer).multiply(scale_factor[0]).add(scale_factor[1]).toFloat()
+                        download_data = nir.subtract(swir1).divide(nir.add(swir1))
+
+                    elif data_name in ['Landsat5_GCVI', 'Landsat8_GCVI']:
+                        nir = cloudMask_landsat(data_name, data, start_date, end_date, gee_extent).select(band[0]). \
+                            reduce(reducer).multiply(scale_factor[0]).add(scale_factor[1]).toFloat()
+                        green = cloudMask_landsat(data_name, data, start_date, end_date, gee_extent).select(band[1]). \
+                            reduce(reducer).multiply(scale_factor[0]).add(scale_factor[1]).toFloat()
+                        download_data = nir.divide(green).subtract(1)
+
+                    elif data_name == 'GRIDMET_RET':
+                        # multiplying by 0.85 to applying bias correction in GRIDMET RET. GRIDMET RET is overestimated
+                        # by 12-31% across CONUS (Blankenau et al. (2020). Senay et al. (2022) applied 0.85 as constant
+                        # bias correction factor.
+                        download_data = ee.ImageCollection(data).select(band).filterDate(start_date, end_date). \
+                            filterBounds(gee_extent).reduce(reducer).multiply(0.85).multiply(scale_factor).toFloat()
+
+                    elif data_name == 'DAYMET_sun_hr':
+                        # dividing by 3600 to convert from second to hr
+                        download_data = ee.ImageCollection(data).select(band).filterDate(start_date, end_date). \
+                            filterBounds(gee_extent).reduce(reducer).divide(3600).multiply(scale_factor).toFloat()
+
+                    else:
+                        download_data = ee.ImageCollection(data).select(band).filterDate(start_date, end_date). \
+                            filterBounds(gee_extent).reduce(reducer).multiply(scale_factor).toFloat()
+
+                    data_url = download_data.getDownloadURL({'name': data_name,
+                                                             'crs': 'EPSG:4269',  # NAD83
+                                                             'scale': 2200,  # in meter. equal to ~0.02 deg
+                                                             'region': gee_extent,
+                                                             'format': 'GEO_TIFF'})
+
+                    if any('Landsat' in i for i in ['Landsat5_NDVI', 'Landsat8_NDVI', 'Landsat5_NDMI', 'Landsat8_NDMI',
+                                                    'Landsat5_GCVI', 'Landsat8_GCVI']):
+                        key_word = data_name.split('_')[-1]
+                    else:
+                        key_word = data_name
+
+                    local_file_path = os.path.join(download_dir, f'{key_word}_{str(year)}_{str(grid_sr)}.tif')
+
+                    # Appending data url and local file path (to save data) to a central list
+                    data_url_list.append(data_url)
+                    local_file_paths_list.append(local_file_path)
+
+                    # The GEE connection gets disconnected sometimes, therefore, we download the data in batches when
+                    # there is enough data url gathered for download.
+                    if (len(data_url_list) == 120) | (grid_sr == len(grid_no)):  # downloads data when one of the conditions are met
+
+                        # Combining url and file paths together to pass in multiprocessing
+                        urls_to_file_paths_compile = []
+
+                        for j, k in zip(data_url_list, local_file_paths_list):
+                            urls_to_file_paths_compile.append([j, k])
+
+                        # Download data by multi-processing/multi-threading
+                        download_data_from_GEE_by_multiprocess(download_urls_fp_list=urls_to_file_paths_compile,
+                                                               use_cpu=use_cpu_while_multidownloading)
+
+                        # After downloading some data in a batch, we empty the data_utl_list and local_file_paths_list.
+                        # The empty lists will gather some new urls and file paths, and download a new batch of datasets
+                        data_url_list = []
+                        local_file_paths_list = []
+
+                # merging downloaded datasets
+                mosaic_name = f'{key_word}_{year}.tif'
+                mosaic_dir = os.path.join(download_dir, f'{merge_keyword}', 'merged')
+                clip_dir = os.path.join(download_dir, f'{merge_keyword}')
+
+                makedirs([clip_dir, mosaic_dir])
+                merged_arr, merged_raster = mosaic_rasters_from_directory(input_dir=download_dir, output_dir=mosaic_dir,
+                                                                          raster_name=mosaic_name,
+                                                                          ref_raster=refraster_gee_merge,
+                                                                          search_by=f'*{year}*.tif', nodata=no_data_value)
+
+                clip_resample_reproject_raster(input_raster=merged_raster, input_shape=westUS_shape,
+                                               output_raster_dir=clip_dir, clip_and_resample=True,
+                                               use_ref_width_height=False, resolution=model_res,
+                                               ref_raster=refraster_westUS)
+
+                print(f'{data_name} yearly data downloaded and merged')
+
+            else:
+                print(f'Data for year {year}, month {month} is out of range. Skipping query')
+                pass
 
 
 def download_gee_data_yearly(data_name, download_dir, year_list, month_range, merge_keyword,

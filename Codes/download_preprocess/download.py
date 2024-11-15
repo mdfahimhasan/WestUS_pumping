@@ -3,6 +3,7 @@ import ee
 import sys
 import requests
 import numpy as np
+import rasterio as rio
 import geopandas as gpd
 from datetime import datetime
 from shapely.geometry import Polygon
@@ -39,7 +40,7 @@ from Codes.utils.raster_ops import read_raster_arr_object, clip_resample_reproje
 # # previously, in linux, earthengine authenticate --quiet command used to work.
 
 # # # Once gcloud and earth engine have been authenticated, no need to run the authentication process again.
-# # # Just start from ee.initialize()
+# # # Just start from ee.Initialize(project='ee-fahim', opt_url='https://earthengine-highvolume.googleapis.com')
 
 # ee.Authenticate()
 
@@ -65,23 +66,30 @@ def get_data_GEE_saveTopath(url_and_file_path):
     data_url, file_path = url_and_file_path
 
     # get data from GEE
-    r = requests.get(data_url, allow_redirects=True)
-    print('Downloading', file_path, '.....')
+    MAX_RETRIES = 3
 
-    # save data to local file path
-    open(file_path, 'wb').write(r.content)
-
-    # This is a check block to see if downloaded datasets are OK
-    # sometimes a particular grid's data is corrupted but it's completely random, not sure why it happens.
-    # Re-downloading the same data might not have that error
-    if '.tif' in file_path:  # only for data downloaded in geotiff format
+    for attempt in range(MAX_RETRIES):
         try:
-            arr = read_raster_arr_object(file_path, get_file=False)
-
-        except:
-            print(f'Downloaded data corrupted. Re-downloading {file_path}.....')
             r = requests.get(data_url, allow_redirects=True)
+            print('Downloading', file_path, '.....')
+            r.raise_for_status()  # Raise an exception for bad HTTP status codes
+
+            # save data to local file path
             open(file_path, 'wb').write(r.content)
+
+            # This is a check block to see if downloaded datasets are OK
+            # sometimes a particular grid's data is corrupted but it's completely random, not sure why it happens.
+            # Re-downloading the same data might not have that error
+            if '.tif' in file_path:  # only for data downloaded in geotiff format
+                with rio.open(file_path) as src:
+                    src.read(1)
+            break      # exit loop if download and data reading succeed; it data can't be read break will not be implemented
+                       # and code will go to the 'except' block
+
+        except Exception as e:
+            print(f'attempt {attempt + 1} failed for {file_path}. Error: {e}. Trying again')
+            if attempt == MAX_RETRIES - 1:
+                print(f'failed to download {file_path} after {MAX_RETRIES} attempts.')
 
 
 def download_data_from_GEE_by_multiprocess(download_urls_fp_list, use_cpu=2):
@@ -150,11 +158,13 @@ def create_fishnet(input_gdf, fishnet_crs, fishnet_size, fishnet_file):
 
 
 def get_gee_dict(data_name):
-    ee.Initialize(opt_url='https://earthengine-highvolume.googleapis.com')
+    ee.Initialize(project='ee-fahim', opt_url='https://earthengine-highvolume.googleapis.com')
 
     gee_data_dict = {
         'Landsat5_NDVI': 'LANDSAT/LT05/C02/T1_L2',
         'Landsat8_NDVI': 'LANDSAT/LC08/C02/T1_L2',
+        'Landsat5_OSAVI': 'LANDSAT/LT05/C02/T1_L2',
+        'Landsat8_OSAVI': 'LANDSAT/LC08/C02/T1_L2',
         'Landsat5_NDMI': 'LANDSAT/LT05/C02/T1_L2',
         'Landsat8_NDMI': 'LANDSAT/LC08/C02/T1_L2',
         'Landsat5_GCVI': 'LANDSAT/LT05/C02/T1_L2',
@@ -182,12 +192,14 @@ def get_gee_dict(data_name):
     }
 
     gee_band_dict = {
-        'Landsat5_NDVI': ['SR_B4', 'SR_B3'],  # bands for NIR and Red, respectively
-        'Landsat8_NDVI': ['SR_B5', 'SR_B4'],  # bands for NIR and Red, respectively
-        'Landsat5_NDMI': ['SR_B4', 'SR_B5'],  # bands for NIR and SWIR1, respectively
-        'Landsat8_NDMI': ['SR_B5', 'SR_B6'],  # bands for NIR and SWIR1, respectively
-        'Landsat5_GCVI': ['SR_B4', 'SR_B2'],  # bands for NIR and Green, respectively
-        'Landsat8_GCVI': ['SR_B4', 'SR_B2'],  # bands for NIR and Green, respectively,
+        'Landsat5_NDVI': ['SR_B4', 'SR_B3'],    # bands for NIR and Red, respectively
+        'Landsat8_NDVI': ['SR_B5', 'SR_B4'],    # bands for NIR and Red, respectively
+        'Landsat5_OSAVI': ['SR_B4', 'SR_B3'],   # bands for NIR and Red, respectively
+        'Landsat8_OSAVI': ['SR_B5', 'SR_B4'],   # bands for NIR and Red, respectively
+        'Landsat5_NDMI': ['SR_B4', 'SR_B5'],    # bands for NIR and SWIR1, respectively
+        'Landsat8_NDMI': ['SR_B5', 'SR_B6'],    # bands for NIR and SWIR1, respectively
+        'Landsat5_GCVI': ['SR_B4', 'SR_B2'],    # bands for NIR and Green, respectively
+        'Landsat8_GCVI': ['SR_B4', 'SR_B2'],    # bands for NIR and Green, respectively,
         'MODIS_Day_LST': 'LST_Day_1km',
         'MODIS_Terra_NDVI': 'NDVI',
         'MODIS_Terra_EVI': 'EVI',
@@ -211,12 +223,14 @@ def get_gee_dict(data_name):
     }
 
     gee_scale_dict = {
-        'Landsat5_NDVI': [0.0000275, -0.2],  # the first factor is multiplied, the second factor is an offset
-        'Landsat8_NDVI': [0.0000275, -0.2],  # the first factor is multiplied, the second factor is an offset
-        'Landsat5_NDMI': [0.0000275, -0.2],  # the first factor is multiplied, the second factor is an offset
-        'Landsat8_NDMI': [0.0000275, -0.2],  # the first factor is multiplied, the second factor is an offset
-        'Landsat5_GCVI': [0.0000275, -0.2],  # the first factor is multiplied, the second factor is an offset
-        'Landsat8_GCVI': [0.0000275, -0.2],  # the first factor is multiplied, the second factor is an offset
+        'Landsat5_NDVI': [0.0000275, -0.2],     # the first factor is multiplied, the second factor is an offset
+        'Landsat8_NDVI': [0.0000275, -0.2],     # the first factor is multiplied, the second factor is an offset
+        'Landsat5_OSAVI': [0.0000275, -0.2],    # the first factor is multiplied, the second factor is an offset
+        'Landsat8_OSAVI': [0.0000275, -0.2],    # the first factor is multiplied, the second factor is an offset
+        'Landsat5_NDMI': [0.0000275, -0.2],     # the first factor is multiplied, the second factor is an offset
+        'Landsat8_NDMI': [0.0000275, -0.2],     # the first factor is multiplied, the second factor is an offset
+        'Landsat5_GCVI': [0.0000275, -0.2],     # the first factor is multiplied, the second factor is an offset
+        'Landsat8_GCVI': [0.0000275, -0.2],     # the first factor is multiplied, the second factor is an offset
         'MODIS_Day_LST': 0.02,
         'MODIS_Terra_NDVI': 0.0001,
         'MODIS_Terra_EVI': 0.0001,
@@ -242,17 +256,19 @@ def get_gee_dict(data_name):
     }
 
     aggregation_dict = {
-        'Landsat5_NDVI': ee.Reducer.mean(),
-        'Landsat8_NDVI': ee.Reducer.mean(),
-        'Landsat5_NDMI': ee.Reducer.mean(),
-        'Landsat8_NDMI': ee.Reducer.mean(),
-        'Landsat5_GCVI': ee.Reducer.mean(),
-        'Landsat8_GCVI': ee.Reducer.mean(),
+        'Landsat5_NDVI': ee.Reducer.median(),
+        'Landsat8_NDVI': ee.Reducer.median(),
+        'Landsat5_OSAVI': ee.Reducer.median(),
+        'Landsat8_OSAVI': ee.Reducer.median(),
+        'Landsat5_NDMI': ee.Reducer.median(),
+        'Landsat8_NDMI': ee.Reducer.median(),
+        'Landsat5_GCVI': ee.Reducer.median(),
+        'Landsat8_GCVI': ee.Reducer.median(),
         'MODIS_Day_LST': ee.Reducer.mean(),
-        'MODIS_Terra_NDVI': ee.Reducer.mean(),
-        'MODIS_Terra_EVI': ee.Reducer.mean(),
-        'MODIS_NDMI': ee.Reducer.mean(),
-        'MODIS_NDVI': ee.Reducer.mean(),
+        'MODIS_Terra_NDVI': ee.Reducer.median(),
+        'MODIS_Terra_EVI': ee.Reducer.median(),
+        'MODIS_NDMI': ee.Reducer.median(),
+        'MODIS_NDVI': ee.Reducer.median(),
         'MODIS_LAI': ee.Reducer.mean(),
         'GRIDMET_RET': ee.Reducer.sum(),
         'GRIDMET_max_RH': ee.Reducer.mean(),
@@ -278,6 +294,8 @@ def get_gee_dict(data_name):
     month_start_date_dict = {
         'Landsat5_NDVI': datetime(1984, 3, 1),
         'Landsat8_NDVI': datetime(2013, 3, 1),
+        'Landsat5_OSAVI': datetime(1984, 3, 1),
+        'Landsat8_OSAVI': datetime(2013, 3, 1),
         'Landsat5_NDMI': datetime(1984, 3, 1),
         'Landsat8_NDMI': datetime(2013, 3, 1),
         'Landsat5_GCVI': datetime(1984, 3, 1),
@@ -312,6 +330,8 @@ def get_gee_dict(data_name):
     month_end_date_dict = {
         'Landsat5_NDVI': datetime(2012, 5, 1),
         'Landsat8_NDVI': datetime(2024, 1, 1),
+        'Landsat5_OSAVI': datetime(2012, 5, 1),
+        'Landsat8_OSAVI': datetime(2024, 1, 1),
         'Landsat5_NDMI': datetime(2012, 5, 1),
         'Landsat8_NDMI': datetime(2024, 1, 1),
         'Landsat5_GCVI': datetime(2012, 5, 1),
@@ -341,6 +361,8 @@ def get_gee_dict(data_name):
     year_start_date_dict = {
         'Landsat5_NDVI': datetime(1984, 1, 1),
         'Landsat8_NDVI': datetime(2013, 1, 1),
+        'Landsat5_OSAVI': datetime(1984, 1, 1),
+        'Landsat8_OSAVI': datetime(2013, 1, 1),
         'Landsat5_NDMI': datetime(1984, 1, 1),
         'Landsat8_NDMI': datetime(2013, 1, 1),
         'Landsat5_GCVI': datetime(1984, 1, 1),
@@ -370,6 +392,8 @@ def get_gee_dict(data_name):
     year_end_date_dict = {
         'Landsat5_NDVI': datetime(2012, 1, 1),
         'Landsat8_NDVI': datetime(2024, 1, 1),
+        'Landsat5_OSAVI': datetime(2012, 1, 1),
+        'Landsat8_OSAVI': datetime(2024, 1, 1),
         'Landsat5_NDMI': datetime(2012, 1, 1),
         'Landsat8_NDMI': datetime(2024, 1, 1),
         'Landsat5_GCVI': datetime(2012, 1, 1),
@@ -419,11 +443,14 @@ def cloudMask_MODIS(data_name, start_date, end_date, from_bit, to_bit, geometry_
     def bitwise_extract(img):
         """
         Applies cloudmask on image.
+
+        code source: https://spatialthoughts.com/2021/08/19/qa-bands-bitmasks-gee/
+
         :param img: The image.
 
         :return Cloud-masked image.
         """
-        ee.Initialize(opt_url='https://earthengine-highvolume.googleapis.com')
+        ee.Initialize(project='ee-fahim', opt_url='https://earthengine-highvolume.googleapis.com')
 
         global qc_img
 
@@ -473,7 +500,7 @@ def cloudMask_landsat(data_name, imcol, start_date, end_date, geometry_bounds):
 
         :return Cloud-masked image.
         """
-        ee.Initialize(opt_url='https://earthengine-highvolume.googleapis.com')
+        ee.Initialize(project='ee-fahim', opt_url='https://earthengine-highvolume.googleapis.com')
 
         qa = img.select('QA_PIXEL')
 
@@ -514,7 +541,7 @@ def download_soil_datasets(data_name, download_dir, merge_keyword,
 
     :return: None.
     """
-    ee.Initialize()
+    ee.Initialize(project='ee-fahim', opt_url='https://earthengine-highvolume.googleapis.com')
 
     download_dir = os.path.join(download_dir, data_name)
     makedirs([download_dir])
@@ -589,7 +616,7 @@ def download_tree_cover_data(data_name, download_dir, merge_keyword,
 
     :return: None.
     """
-    ee.Initialize()
+    ee.Initialize(project='ee-fahim', opt_url='https://earthengine-highvolume.googleapis.com')
 
     download_dir = os.path.join(download_dir, data_name)
     makedirs([download_dir])
@@ -664,7 +691,7 @@ def download_DEM_Slope_data(data_name, download_dir, merge_keyword,
 
     :return: None.
     """
-    ee.Initialize()
+    ee.Initialize(project='ee-fahim', opt_url='https://earthengine-highvolume.googleapis.com')
 
     download_dir = os.path.join(download_dir, data_name)
     makedirs([download_dir])
@@ -727,8 +754,9 @@ def download_gee_data_monthly(data_name, download_dir, year_list, month_range, m
 
     :param data_name: Data name.
     Current valid data names are -
-        ['MODIS_Day_LST', 'Landsat5_NDVI', 'Landsat8_NDVI', 'Landsat5_NDMI', 'Landsat8_NDMI',
-        'Landsat5_GCVI', 'Landsat8_GCVI', 'MODIS_Terra_NDVI', 'MODIS_Terra_EVI', 'MODIS_NDMI', 'MODIS_NDVI',
+        ['MODIS_Day_LST', 'Landsat5_NDVI', 'Landsat8_NDVI', 'Landsat5_OSAVI', 'Landsat8_OSAVI',
+        'Landsat5_NDMI', 'Landsat8_NDMI', 'Landsat5_GCVI', 'Landsat8_GCVI', 'MODIS_Terra_NDVI',
+        'MODIS_Terra_EVI', 'MODIS_NDMI', 'MODIS_NDVI',
         'GRIDMET_RET', 'GRIDMET_max_RH', 'GRIDMET_min_RH', 'GRIDMET_wind_vel',
         'GRIDMET_short_rad', 'GRIDMET_vap_pres_def', 'DAYMET_sun_hr']
     :param download_dir: File path of download directory.
@@ -747,9 +775,11 @@ def download_gee_data_monthly(data_name, download_dir, year_list, month_range, m
     """
     global key_word
 
-    ee.Initialize(opt_url='https://earthengine-highvolume.googleapis.com')
+    ee.Initialize(project='ee-fahim', opt_url='https://earthengine-highvolume.googleapis.com')
 
-    if any('Landsat' in i for i in ['Landsat5_NDVI', 'Landsat8_NDVI', 'Landsat5_NDMI', 'Landsat8_NDMI',
+    if any('Landsat' in i for i in ['Landsat5_NDVI', 'Landsat8_NDVI',
+                                    'Landsat5_OSAVI', 'Landsat8_OSAVI',
+                                    'Landsat5_NDMI', 'Landsat8_NDMI',
                                     'Landsat5_GCVI', 'Landsat8_GCVI']):
         download_dir = os.path.join(download_dir, data_name.split('_')[-1])
     else:
@@ -803,6 +833,13 @@ def download_gee_data_monthly(data_name, download_dir, year_list, month_range, m
                             reduce(reducer).multiply(scale_factor[0]).add(scale_factor[1]).toFloat()
                         download_data = nir.subtract(red).divide(nir.add(red))
 
+                    elif data_name in ['Landsat5_OSAVI', 'Landsat8_OSAVI']:
+                        nir = cloudMask_landsat(data_name, data, start_date, end_date, gee_extent).select(band[0]). \
+                            reduce(reducer).multiply(scale_factor[0]).add(scale_factor[1]).toFloat()
+                        red = cloudMask_landsat(data_name, data, start_date, end_date, gee_extent).select(band[1]). \
+                            reduce(reducer).multiply(scale_factor[0]).add(scale_factor[1]).toFloat()
+                        download_data = nir.subtract(red).divide(nir.add(red).add(0.16))
+
                     elif data_name in ['Landsat5_NDMI', 'Landsat8_NDMI']:
                         nir = cloudMask_landsat(data_name, data, start_date, end_date, gee_extent).select(band[0]). \
                             reduce(reducer).multiply(scale_factor[0]).add(scale_factor[1]).toFloat()
@@ -839,13 +876,15 @@ def download_gee_data_monthly(data_name, download_dir, year_list, month_range, m
                                                              'region': gee_extent,
                                                              'format': 'GEO_TIFF'})
 
-                    if any('Landsat' in i for i in ['Landsat5_NDVI', 'Landsat8_NDVI', 'Landsat5_NDMI', 'Landsat8_NDMI',
+                    if any('Landsat' in i for i in ['Landsat5_NDVI', 'Landsat8_NDVI',
+                                                    'Landsat5_OSAVI', 'Landsat8_OSAVI',
+                                                    'Landsat5_NDMI', 'Landsat8_NDMI',
                                                     'Landsat5_GCVI', 'Landsat8_GCVI']):
                         key_word = data_name.split('_')[-1]
                     else:
                         key_word = data_name
 
-                    local_file_path = os.path.join(download_dir, f'{key_word}_{str(year)}_{str(grid_sr)}.tif')
+                    local_file_path = os.path.join(download_dir, f'{key_word}_{str(year)}_{month}_{str(grid_sr)}.tif')
 
                     # Appending data url and local file path (to save data) to a central list
                     data_url_list.append(data_url)
@@ -871,7 +910,7 @@ def download_gee_data_monthly(data_name, download_dir, year_list, month_range, m
                         local_file_paths_list = []
 
                 # merging downloaded datasets
-                mosaic_name = f'{key_word}_{year}.tif'
+                mosaic_name = f'{key_word}_{year}_{month}.tif'
                 mosaic_dir = os.path.join(download_dir, f'{merge_keyword}', 'merged')
                 clip_dir = os.path.join(download_dir, f'{merge_keyword}')
 
@@ -879,7 +918,8 @@ def download_gee_data_monthly(data_name, download_dir, year_list, month_range, m
                 merged_arr, merged_raster = mosaic_rasters_from_directory(input_dir=download_dir, output_dir=mosaic_dir,
                                                                           raster_name=mosaic_name,
                                                                           ref_raster=refraster_gee_merge,
-                                                                          search_by=f'*{year}*.tif', nodata=no_data_value)
+                                                                          search_by=f'*{year}*.tif',
+                                                                          nodata=no_data_value)
 
                 clip_resample_reproject_raster(input_raster=merged_raster, input_shape=westUS_shape,
                                                output_raster_dir=clip_dir, clip_and_resample=True,
@@ -902,8 +942,9 @@ def download_gee_data_yearly(data_name, download_dir, year_list, month_range, me
 
     :param data_name: Data name.
     Current valid data names are -
-        ['MODIS_Day_LST', 'Landsat5_NDVI', 'Landsat8_NDVI', 'Landsat5_NDMI', 'Landsat8_NDMI',
-        'Landsat5_GCVI', 'Landsat8_GCVI', 'MODIS_Terra_NDVI', 'MODIS_Terra_EVI', 'MODIS_NDMI', 'MODIS_NDVI',
+        ['MODIS_Day_LST', 'Landsat5_NDVI', 'Landsat8_NDVI', 'Landsat5_OSAVI', 'Landsat8_OSAVI',
+        'Landsat5_NDMI', 'Landsat8_NDMI', 'Landsat5_GCVI', 'Landsat8_GCVI', 'MODIS_Terra_NDVI',
+        'MODIS_Terra_EVI', 'MODIS_NDMI', 'MODIS_NDVI',
         'GRIDMET_RET', 'GRIDMET_max_RH', 'GRIDMET_min_RH', 'GRIDMET_wind_vel',
         'GRIDMET_short_rad', 'GRIDMET_vap_pres_def', 'DAYMET_sun_hr']
     :param download_dir: File path of download directory.
@@ -922,9 +963,11 @@ def download_gee_data_yearly(data_name, download_dir, year_list, month_range, me
     """
     global key_word
 
-    ee.Initialize(opt_url='https://earthengine-highvolume.googleapis.com')
+    ee.Initialize(project='ee-fahim', opt_url='https://earthengine-highvolume.googleapis.com')
 
-    if any('Landsat' in i for i in ['Landsat5_NDVI', 'Landsat8_NDVI', 'Landsat5_NDMI', 'Landsat8_NDMI',
+    if any('Landsat' in i for i in ['Landsat5_NDVI', 'Landsat8_NDVI',
+                                    'Landsat5_OSAVI', 'Landsat8_OSAVI',
+                                    'Landsat5_NDMI', 'Landsat8_NDMI',
                                     'Landsat5_GCVI', 'Landsat8_GCVI']):
         download_dir = os.path.join(download_dir, data_name.split('_')[-1])
     else:
@@ -970,6 +1013,13 @@ def download_gee_data_yearly(data_name, download_dir, year_list, month_range, me
                     red = cloudMask_landsat(data_name, data, start_date, end_date, gee_extent).select(band[1]). \
                         reduce(reducer).multiply(scale_factor[0]).add(scale_factor[1]).toFloat()
                     download_data = nir.subtract(red).divide(nir.add(red))
+
+                elif data_name in ['Landsat5_OSAVI', 'Landsat8_OSAVI']:
+                    nir = cloudMask_landsat(data_name, data, start_date, end_date, gee_extent).select(band[0]). \
+                        reduce(reducer).multiply(scale_factor[0]).add(scale_factor[1]).toFloat()
+                    red = cloudMask_landsat(data_name, data, start_date, end_date, gee_extent).select(band[1]). \
+                        reduce(reducer).multiply(scale_factor[0]).add(scale_factor[1]).toFloat()
+                    download_data = nir.subtract(red).divide(nir.add(red).add(0.16))
 
                 elif data_name in ['Landsat5_NDMI', 'Landsat8_NDMI']:
                     nir = cloudMask_landsat(data_name, data, start_date, end_date, gee_extent).select(band[0]). \
@@ -1023,7 +1073,9 @@ def download_gee_data_yearly(data_name, download_dir, year_list, month_range, me
                                                          'region': gee_extent,
                                                          'format': 'GEO_TIFF'})
 
-                if any('Landsat' in i for i in ['Landsat5_NDVI', 'Landsat8_NDVI', 'Landsat5_NDMI', 'Landsat8_NDMI',
+                if any('Landsat' in i for i in ['Landsat5_NDVI', 'Landsat8_NDVI',
+                                                'Landsat5_OSAVI', 'Landsat8_OSAVI',
+                                                'Landsat5_NDMI', 'Landsat8_NDMI',
                                                 'Landsat5_GCVI', 'Landsat8_GCVI']):
                     key_word = data_name.split('_')[-1]
                 else:
@@ -1072,6 +1124,7 @@ def download_gee_data_yearly(data_name, download_dir, year_list, month_range, me
             print(f'{data_name} yearly data downloaded and merged')
 
         else:
+            print(f'Data for year {year} is out of range. Skipping query')
             pass
 
 
@@ -1084,12 +1137,13 @@ def download_all_gee_data(data_list, download_dir, year_list, month_range,
     Current valid data names are -
         ['MODIS_Day_LST',
         'Landsat5_NDVI', 'Landsat8_NDVI',
+        'Landsat5_OSAVI', 'Landsat8_OSAVI',
         'Landsat5_NDMI', 'Landsat8_NDMI',
         'Landsat5_GCVI', 'Landsat8_GCVI',
         'MODIS_Terra_NDVI', 'MODIS_Terra_EVI', 'MODIS_NDMI', 'MODIS_NDVI',
         'MODIS_LAI', 'GRIDMET_RET', 'GRIDMET_max_RH', 'GRIDMET_min_RH', 'GRIDMET_wind_vel',
         'GRIDMET_short_rad', 'GRIDMET_vap_pres_def', 'DAYMET_sun_hr',
-        'USDA_CDL', 'Field_capacity', 'Bulk_density',
+        'Field_capacity', 'Bulk_density',
         'Sand_content', 'Clay_content', 'DEM']
 
     :param download_dir: File path of main download directory. It will consist directory of individual dataset.
@@ -1102,15 +1156,22 @@ def download_all_gee_data(data_list, download_dir, year_list, month_range,
     if not skip_download:
         for data_name in data_list:
 
-            if data_name in ['MODIS_Day_LST',
-                             'Landsat5_NDVI', 'Landsat8_NDVI',
-                             'Landsat5_NDMI', 'Landsat8_NDMI',
-                             'Landsat5_GCVI', 'Landsat8_GCVI',
-                             'MODIS_LAI', 'GRIDMET_RET', 'GRIDMET_max_RH', 'GRIDMET_min_RH',
-                             'GRIDMET_wind_vel', 'GRIDMET_short_rad', 'GRIDMET_vap_pres_def', 'DAYMET_sun_hr']:
+            if data_name in ['MODIS_Day_LST', 'MODIS_LAI', 'GRIDMET_RET',
+                             'GRIDMET_max_RH', 'GRIDMET_min_RH',
+                             'GRIDMET_wind_vel', 'GRIDMET_short_rad',
+                             'GRIDMET_vap_pres_def', 'DAYMET_sun_hr']:
+                download_gee_data_monthly(data_name=data_name, download_dir=download_dir, year_list=year_list,
+                                          month_range=month_range, merge_keyword='WestUS_monthly')
 
+            elif data_name in ['Landsat5_NDVI', 'Landsat8_NDVI',
+                               'Landsat5_OSAVI', 'Landsat8_OSAVI',
+                               'Landsat5_NDMI', 'Landsat8_NDMI',
+                               'Landsat5_GCVI', 'Landsat8_GCVI',
+                               'MODIS_Terra_NDVI', 'MODIS_Terra_EVI',
+                               'MODIS_NDMI', 'MODIS_NDVI']:
                 download_gee_data_yearly(data_name=data_name, download_dir=download_dir, year_list=year_list,
-                                         month_range=month_range, merge_keyword='WestUS_yearly')
+                                          month_range=(2, 10), merge_keyword='WestUS_yearly')  # months 2-10 chosen to keep a good overlap between regionswith different growing season
+
             elif data_name == 'USDA_CDL':
                 download_gee_data_yearly(data_name=data_name, download_dir=download_dir, year_list=year_list,
                                          month_range=month_range, merge_keyword='WestUS_yearly')

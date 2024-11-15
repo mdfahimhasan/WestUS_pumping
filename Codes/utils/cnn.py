@@ -8,7 +8,6 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
 # # next TO-DO
-# take care of 2012 GCVI, NDVI, NDMI
 # standardization
 # nanMSEloss
 

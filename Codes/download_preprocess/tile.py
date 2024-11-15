@@ -35,14 +35,14 @@ class make_tiles:
                 # The 2 loops together creates a window which is used to create tile from the image.
                 for i in range(0, tiff_width, tile_width):
                     for j in range(0, tiff_height, tile_height):
-                        if (i + tile_width <= tiff_width) and (
-                                j + tile_height <= tiff_height):  # a check to keep the window within the image
-                            window = Window(col_off=i, row_off=j, width=tile_width,
-                                            height=tile_height)  # the tile window
+                        if (i + tile_width <= tiff_width) and (j + tile_height <= tiff_height):  # a check to keep the window within the image
+
+                            window = Window(col_off=i, row_off=j, width=tile_width, height=tile_height)  # the tile window
 
                             tile_arr = tiff.read(window=window)  # reading the image as an array for the tile window
 
                             tile_name = f'{year}_tile_{tile_no}' if month is None else f'{year}_{month}_tile_{tile_no}'  # tile name
+                            print(f'processing tile - {tile_name}')
 
                             window_transform = transform(window, tiff.transform)  # tiled window's affine transformation
 
@@ -51,16 +51,18 @@ class make_tiles:
 
                             # in case complete nodata tile detected, exiting the loop into next iteration
                             if make_tiles.is_image_null(tile_arr):
+                                print(f'discarding tile {tile_name} due to null band \n')
                                 continue
 
-                            # a check to see if the tile is completely nodata. In case of an unexpected nodata tile passes
-                            # through the if block, the assertion block will raise AssertionError
+                            # a check to see if the tile is completely nodata. In case of an unexpected nodata tile
+                            # passes through the if block, the assertion block will raise AssertionError
                             assert not make_tiles.is_image_null(tile_arr), f'All nodata value in tile {tile_no}'
 
                             # if the % nodata is greater than a threshold, not including those tiles
                             nodata_threshold = 95  # (unit in percent)
 
                             if any(x > nodata_threshold for x in make_tiles.count_perc_nodata(tile_arr)):
+                                print(f'discarding tile {tile_name} due >{nodata_threshold}% no data \n')
                                 continue
 
                             with rio.open(
@@ -76,8 +78,7 @@ class make_tiles:
                                     nodata=self.nodata
                             ) as dst:
 
-                                for id in range(0,
-                                                tile_arr.shape[0]):  # looping for each band of the windowed/tiled array
+                                for id in range(0, tile_arr.shape[0]):  # looping for each band of the tiled array
                                     dst.write_band(id + 1, tile_arr[id])
                                     dst.set_band_description(id + 1, band_key_list[id])
 
@@ -87,7 +88,7 @@ class make_tiles:
     def is_image_null(multiband_img_arr, nodata=-9999):
         """
         Checks all bands in an image array to see if there is an entirely null value band. A tile (image array) with
-        a single data band with all null values will be rejected later in the main code.
+        a single data band with all null values will be rejected in the main code using this code.
 
         :param multiband_img_arr: Multiband image array.
         :param nodata: No data value. Default set to -9999.

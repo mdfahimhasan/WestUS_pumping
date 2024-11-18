@@ -36,11 +36,14 @@ def read_raster_arr_object(raster_file, rasterio_obj=False, band=1, get_file=Tru
         raster_file = rio.open(raster_file)
     else:
         get_file = False
+
     raster_arr = raster_file.read(band)
+
     if change_dtype:
         raster_arr = raster_arr.astype(np.float32)
         if raster_file.nodata:
             raster_arr[np.isclose(raster_arr, raster_file.nodata)] = np.nan
+
     if get_file:
         return raster_arr, raster_file
     else:
@@ -154,6 +157,7 @@ def mosaic_rasters_from_directory(input_dir, output_dir, raster_name, ref_raster
     :return: Mosaiced raster array and filepath of mosaiced raster.
     """
     input_rasters = glob(os.path.join(input_dir, search_by))
+
     raster_list = []
     for raster in input_rasters:
         arr, file = read_raster_arr_object(raster)

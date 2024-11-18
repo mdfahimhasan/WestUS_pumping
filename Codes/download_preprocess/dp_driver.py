@@ -16,17 +16,19 @@ gee_grid_shape_for30m_IrrMapper = '../../Data_main/shapefiles/Western_US_ref_sha
 gee_grid_shape_for30m_LANID = '../../Data_main/shapefiles/Western_US_ref_shapes/WestUS_gee_grid_for30m_LANID.shp'
 
 gee_data_list = [
-    # 'Landsat5_NDVI',
-    # 'Landsat8_NDVI',
+    'Landsat5_NDVI',
+    'Landsat8_NDVI',
     'Landsat5_OSAVI',
-    'Landsat8_OSAVI'
-    # 'Landsat5_NDMI',
-    # 'Landsat8_NDMI',
-    # 'Landsat5_GCVI',
-    # 'Landsat8_GCVI',
+    'Landsat8_OSAVI',
+    'Landsat5_NDMI',
+    'Landsat8_NDMI',
+    'Landsat5_GCVI',
+    'Landsat8_GCVI',
     'GRIDMET_RET',
     'MODIS_Day_LST',
-    'Field_capacity', 'Sand_content', 'Clay_content']
+    'Field_capacity',
+    'Sand_content',
+    'Clay_content']
 
 openET_data_list = ['Irrig_crop_OpenET_IrrMapper',
                     'Irrig_crop_OpenET_LANID',
@@ -39,7 +41,7 @@ years = [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
 months = (1, 12)
 
 # flags
-skip_download_gee_data = False           ########
+skip_download_gee_data = True           ########
 skip_download_OpenET_data = True        ########
 
 download_all_gee_data(data_list=gee_data_list, download_dir=data_download_dir,

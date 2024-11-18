@@ -75,14 +75,17 @@ def get_data_GEE_saveTopath(url_and_file_path):
             r.raise_for_status()  # Raise an exception for bad HTTP status codes
 
             # save data to local file path
-            open(file_path, 'wb').write(r.content)
+            with open(file_path, 'wb') as f:
+                f.write(r.content)
 
             # This is a check block to see if downloaded datasets are OK
             # sometimes a particular grid's data is corrupted but it's completely random, not sure why it happens.
             # Re-downloading the same data might not have that error
             if '.tif' in file_path:  # only for data downloaded in geotiff format
-                with rio.open(file_path) as src:
-                    src.read(1)
+                src = rio.open(file_path)
+                data = src.read(1)
+                src.close()
+
             break      # exit loop if download and data reading succeed; it data can't be read break will not be implemented
                        # and code will go to the 'except' block
 
@@ -918,7 +921,7 @@ def download_gee_data_monthly(data_name, download_dir, year_list, month_range, m
                 merged_arr, merged_raster = mosaic_rasters_from_directory(input_dir=download_dir, output_dir=mosaic_dir,
                                                                           raster_name=mosaic_name,
                                                                           ref_raster=refraster_gee_merge,
-                                                                          search_by=f'*{year}*.tif',
+                                                                          search_by=f'*{year}_{month}*.tif',
                                                                           nodata=no_data_value)
 
                 clip_resample_reproject_raster(input_raster=merged_raster, input_shape=westUS_shape,
@@ -1156,7 +1159,7 @@ def download_all_gee_data(data_list, download_dir, year_list, month_range,
     if not skip_download:
         for data_name in data_list:
 
-            if data_name in ['MODIS_Day_LST', 'MODIS_LAI', 'GRIDMET_RET',
+            if data_name in ['MODIS_LAI', 'GRIDMET_RET',
                              'GRIDMET_max_RH', 'GRIDMET_min_RH',
                              'GRIDMET_wind_vel', 'GRIDMET_short_rad',
                              'GRIDMET_vap_pres_def', 'DAYMET_sun_hr']:
@@ -1168,9 +1171,9 @@ def download_all_gee_data(data_list, download_dir, year_list, month_range,
                                'Landsat5_NDMI', 'Landsat8_NDMI',
                                'Landsat5_GCVI', 'Landsat8_GCVI',
                                'MODIS_Terra_NDVI', 'MODIS_Terra_EVI',
-                               'MODIS_NDMI', 'MODIS_NDVI']:
+                               'MODIS_NDMI', 'MODIS_NDVI', 'MODIS_Day_LST']:
                 download_gee_data_yearly(data_name=data_name, download_dir=download_dir, year_list=year_list,
-                                          month_range=(2, 10), merge_keyword='WestUS_yearly')  # months 2-10 chosen to keep a good overlap between regionswith different growing season
+                                          month_range=(2, 10), merge_keyword='WestUS_yearly')  # months 2-10 chosen to keep a good overlap between regions with different growing season
 
             elif data_name == 'USDA_CDL':
                 download_gee_data_yearly(data_name=data_name, download_dir=download_dir, year_list=year_list,

@@ -3,6 +3,7 @@ import ee
 import sys
 import time
 import requests
+import rasterio as rio
 import geopandas as gpd
 from datetime import datetime
 from multiprocessing import cpu_count
@@ -165,23 +166,33 @@ def get_data_GEE_saveTopath(url_and_file_path):
     data_url, file_path = url_and_file_path
 
     # get data from GEE
-    r = requests.get(data_url, allow_redirects=True)
-    print('Downloading', file_path, '.....')
+    MAX_RETRIES = 3
 
-    # save data to local file path
-    open(file_path, 'wb').write(r.content)
-
-    # This is a check block to see if downloaded datasets are OK
-    # sometimes a particular grid's data is corrupted but it's completely random, not sure why it happens.
-    # Re-downloading the same data might not have that error
-    if '.tif' in file_path:  # only for data downloaded in geotiff format
+    for attempt in range(MAX_RETRIES):
         try:
-            arr = read_raster_arr_object(file_path, get_file=False)
-
-        except:
-            print(f'Downloaded data corrupted. Re-downloading {file_path}.....')
             r = requests.get(data_url, allow_redirects=True)
-            open(file_path, 'wb').write(r.content)
+            print('Downloading', file_path, '.....')
+            r.raise_for_status()  # Raise an exception for bad HTTP status codes
+
+            # save data to local file path
+            with open(file_path, 'wb') as f:
+                f.write(r.content)
+
+            # This is a check block to see if downloaded datasets are OK
+            # sometimes a particular grid's data is corrupted but it's completely random, not sure why it happens.
+            # Re-downloading the same data might not have that error
+            if '.tif' in file_path:  # only for data downloaded in geotiff format
+                src = rio.open(file_path)
+                data = src.read(1)
+                src.close()
+
+            break      # exit loop if download and data reading succeed; it data can't be read break will not be implemented
+                       # and code will go to the 'except' block
+
+        except Exception as e:
+            print(f'attempt {attempt + 1} failed for {file_path}. Error: {e}. Trying again')
+            if attempt == MAX_RETRIES - 1:
+                print(f'failed to download {file_path} after {MAX_RETRIES} attempts.')
 
 
 def download_data_from_GEE_by_multiprocess(download_urls_fp_list, use_cpu=2):

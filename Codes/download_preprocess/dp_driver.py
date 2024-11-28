@@ -3,7 +3,7 @@ from glob import glob
 from download import download_all_gee_data
 from download_openET import download_all_openET_datasets
 from Codes.download_preprocess.preprocess import run_all_preprocessing, make_multiband_datasets
-from Codes.download_preprocess.tile import make_tiles
+from Codes.download_preprocess.tiles_utils import make_multiband_tiles
 
 # ----------------------------------------------------------------------------------------------------------------------
 # 1. Data download
@@ -75,7 +75,7 @@ static_vars = ['../../Data_main/rasters/Sand_content/WestUS',
 band_key_list = ['netGWIrr',
                  'peff', 'ret', 'precip', 'irrcropET',
                  'GCVI', 'NDVI', 'NDMI', 'sand', 'fc',
-                 'nanmask']
+                 'nanmask']  # make sure to not include the trainin data's name as that band will be removed
 
 westUS_multiband_dir = '../../Data_main/rasters/multibands/westUS'
 

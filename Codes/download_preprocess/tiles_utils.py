@@ -7,12 +7,16 @@
 # use DataLoader to create batches with standardized data (DataLoader class in with the CNN script as that uses pyTorch)
 
 import os
+import shutil
+import pickle
 import numpy as np
 import pandas as pd
 from glob import glob
 import rasterio as rio
-from Codes.utils.system_ops import makedirs
 from rasterio.windows import Window, transform
+from sklearn.model_selection import train_test_split
+
+from Codes.utils.system_ops import makedirs
 from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster
 
 no_data_value = -9999
@@ -113,7 +117,8 @@ def create_multiband_raster(input_files_list, band_key_list, output_file, nodata
                 dst.set_band_description(id, layer_name)
 
 
-def make_multiband_datasets(list_of_temporal_var_dirs, list_of_static_var_dirs, band_key_list, output_dir,
+def make_multiband_datasets(list_of_temporal_var_dirs, list_of_static_var_dirs,
+                            band_key_list, output_dir,
                             years_list, skip_processing=False):
     """
     Make multi-band raster dataset from individual temporal/static attributes.
@@ -202,18 +207,20 @@ class make_multiband_tiles:
                                      Make sure not to insert the target variable's name as band name because that band
                                      will be removed and processed separately.
         :param tile_output_dir (str): Directory where the processed tiles will be saved.
-        :param target_data_output_csv (str): Path to save the target data (data used as target variable) as a CSV.
         :param tile_height (int): Height of each tile. Default set to 7.
         :param tile_width (int): Width of each tile. Default set to 7.
         :param nodata_threshold (int): Maximum percentage of nodata values allowed in a tile (default is 50).
         :param skip_processing (bool): If True, skips processing and initializes the class without performing operations.
                                        Default set to False.
+
+        :return Multi-band tiles containing input variables and a csv target values (with associated tile no).
         """
         if not skip_processing:
             print("**Caution**:")
             print("- The first band of the multi-band raster must represent the target variable.")
             print(
-                "- The `band_key_list` should only contain the names of the feature bands and exclude the target variable's name.\n")
+                "- The `band_key_list` should only contain the names of the feature bands and exclude the target "
+                "variable's name.\n")
 
             makedirs([tile_output_dir])
 
@@ -226,7 +233,7 @@ class make_multiband_tiles:
                 # storing image width, height, and nodata for later use
                 tiff_height = tiff.height
                 tiff_width = tiff.width
-                self.nodata = 0  # nodata will be zero for the processed tiles
+                self.nodata = np.nan  # nodata will be np.nan for the processed tiles
 
                 # getting year (+ month) info which will be later used in saving tile name
                 if len(os.path.basename(tiff_path).split('.')[0].split('_')[-1]) == 4:  # check for annual data
@@ -270,7 +277,7 @@ class make_multiband_tiles:
                             else:
                                 # storing the center value in the training_data dictionary
                                 target_data['tile_no'].append(tile_no)
-                                target_data['train_value'].append(center_value)
+                                target_data['value'].append(center_value)
 
                             # remove the array containing the training data from the tile
                             tile_arr = tile_arr[1:]
@@ -285,14 +292,14 @@ class make_multiband_tiles:
                             assert not make_multiband_tiles.is_image_null(
                                 tile_arr), f'All nodata value in tile {tile_no}'
 
-                            # setting all no data values to zero
-                            tile_arr[tile_arr == -9999] = 0
-
-                            # if the % zero values (nodata) is greater than a threshold, not including those tiles
+                            # if the % nodata values is greater than a threshold, not including those tiles
                             if any(x > nodata_threshold for x in
-                                   make_multiband_tiles.count_perc_nodata(tile_arr, nodata=0)):
+                                   make_multiband_tiles.count_perc_nodata(tile_arr, nodata=-9999)):
                                 print(f'discarding tile {tile_name} due >{nodata_threshold}% no data \n')
                                 continue
+
+                            # setting all no data values to np.nan
+                            tile_arr[tile_arr == -9999] = np.nan
 
                             # saving the tiled image
                             output_file = os.path.join(tile_output_dir, f'{tile_name}.tif')
@@ -354,7 +361,7 @@ class make_multiband_tiles:
         Calculates percent of nodata pixels in each band of an image array.
 
         :param multiband_img_arr: Multi-band image array.
-        :param nodata: No data values. Default set to -9999. Can be zero also.
+        :param nodata: No data values. Default set to -9999.
 
         :return: A list containing percent nodata pixel counts for all bands.
         """
@@ -371,3 +378,277 @@ class make_multiband_tiles:
             perc_counts_all_bands.append(perc_no_data)
 
         return perc_counts_all_bands
+
+
+def train_val_test_split(target_data_csv, input_tile_dir, train_dir, val_dir, test_dir,
+                         train_size=0.7, val_size=0.2, test_size=0.1,
+                         random_state=42, skip_processing=False):
+    """
+    Splits the tiles into train, validation, and test datasets, along with their target values.
+
+    :param target_data_csv: str. Path to the CSV file containing target values and tile numbers.
+    :param input_tile_dir: str. Path of input tiles containing input variables.
+    :param train_dir: str. Directory to save the training tiles and target csv.
+    :param val_dir: str. Directory to save the validation tiles and target csv.
+    :param test_dir: str. Directory to save the test tiles and target csv.
+    :param train_size: float. Proportion of the dataset to include in the train split. Default is 0.7.
+    :param val_size: float. Proportion of the dataset to include in the validation split. Default is 0.2.
+    :param test_size: float. Proportion of the dataset to include in the test split. Default is 0.1.
+    :param random_state: int. Random seed for reproducibility. Default is 42.
+    :param skip_processing: Set to True to skip processing. Default is False.
+
+    :return: None.
+    """
+    if not skip_processing:
+        makedirs([train_dir, val_dir, test_dir])
+
+        # ensuring the proportions sum to 1
+        if not (train_size + val_size + test_size == 1.0):
+            raise ValueError('The sum of train_size, val_size, and test_size must equal 1.0')
+
+        # loading the target data CSV
+        target_data = pd.read_csv(target_data_csv)
+
+        # performing the split for train, validation, and test based on target values
+        train_data, temp_data = train_test_split(target_data, train_size=train_size, random_state=random_state)
+        val_data, test_data = train_test_split(temp_data, test_size=test_size / (val_size + test_size),
+                                               random_state=random_state)
+
+        # storing splitted train, val, and test target values as csv
+        train_data_df = pd.DataFrame(train_data)
+        train_data_df.to_csv(os.path.join(train_dir, 'y_train.csv'), index=False)
+
+        val_data_df = pd.DataFrame(val_data)
+        val_data_df.to_csv(os.path.join(val_dir, 'y_val.csv'), index=False)
+
+        test_data_df = pd.DataFrame(test_data)
+        test_data_df.to_csv(os.path.join(test_dir, 'y_test.csv'), index=False)
+
+        # helper function to copy corresponding tiles to train, val, and test dir based on tile_no in target dataset
+        def copy_tiles(splitted_target_data_df, copy_dir):
+            for _, row in splitted_target_data_df.iterrows():
+                tile_no = row['tile_no']
+                matching_tiles = glob(os.path.join(input_tile_dir, f'*_{tile_no}*.tif'))
+                if len(matching_tiles) != 1:
+                    print(f'Skipping tile_no {tile_no}: found multiple matches.')
+
+                tile_path = matching_tiles[0]
+                shutil.copy(tile_path, os.path.join(copy_dir, os.path.basename(tile_path)))
+
+        # helper function for cleaning the directories before copying tiles
+        def clean_directory(dir_path):
+            if os.path.exists(dir_path):
+                shutil.rmtree(dir_path)
+            os.makedirs(dir_path, exist_ok=True)
+
+        # copying tiles to respective train, val, and test directories
+        clean_directory(train_dir)
+        clean_directory(val_dir)
+        clean_directory(test_dir)
+
+        copy_tiles(train_data, train_dir)
+        copy_tiles(val_data, val_dir)
+        copy_tiles(test_data, test_dir)
+
+    else:
+        pass
+
+
+def calc_scaling_statistics(train_dir, skip_processing=False):
+    """
+    Calculates the mean, standard deviation, min, and max for each band across all tiles in the training directory.
+
+    :param train_dir: str. Path to the directory containing training tiles.
+    :param skip_processing: Set to True to skip processing. Default is False.
+
+    :return: Four dictionaries: mean_dict, std_dict, min_dict, and max_dict.
+    """
+    if not skip_processing:  # calculating the statistics
+        # collecting all tiles in the training data directory
+        all_tiles = glob(os.path.join(train_dir, f'*.tif'))
+
+        # getting band descriptions and no data info
+        bands = rio.open(all_tiles[0]).descriptions
+        nodata = rio.open(all_tiles[0]).nodata
+
+        # initializing dictionaries to store scaling statistics
+        band_mean_dict = {band: [] for band in bands}
+        band_std_dict = {band: [] for band in bands}
+        band_min_dict = {band: [] for band in bands}
+        band_max_dict = {band: [] for band in bands}
+
+        # processing all tiles for individual bands
+        for tile in all_tiles:
+            dataset = rio.open(tile).read()  # reading all input bands in a tile
+
+            # process for each band in the tile
+            for band in bands:
+                # extracting band index from 'bands' list
+                # then, extracting corresponding array for that band and flattening
+                band_idx = bands.index(band)
+                band_arr = dataset[band_idx].flatten()
+
+                # better NaN or nodata handling
+                if nodata is not None:
+                    if np.isnan(nodata):  # Handle NaN as nodata
+                        band_arr = band_arr[~np.isnan(band_arr)]
+                    else:  # Handle non-NaN nodata values
+                        band_arr = band_arr[band_arr != nodata]
+
+                # accumulating statistics for this band
+                band_mean_dict[bands[band_idx]].extend(band_arr)
+                band_std_dict[bands[band_idx]].extend(band_arr)
+                band_min_dict[bands[band_idx]].extend(band_arr)
+                band_max_dict[bands[band_idx]].extend(band_arr)
+
+        # target statistics
+        target_df = pd.read_csv(os.path.join(train_dir, 'y_train.csv'))
+        target_df.dropna(inplace=True)
+        target_val = np.array(target_df['value'].tolist())
+
+        target_mean = np.nanmean(target_val)
+        target_std = np.nanstd(target_val)
+        target_min = np.nanmin(target_val)
+        target_max = np.nanmax(target_val)
+
+        # finalizing the statistics across all tiles for each band
+        mean_dict = {}
+        std_dict = {}
+        min_dict = {}
+        max_dict = {}
+
+        for band in band_mean_dict.keys():
+            data = np.array(band_mean_dict[band], dtype=np.float32)
+            mean_dict[band] = np.nanmean(data)
+            mean_dict['target'] = target_mean
+
+        for band in band_std_dict.keys():
+            data = np.array(band_std_dict[band], dtype=np.float32)
+            std_dict[band] = np.nanstd(data)
+            std_dict['target'] = target_std
+
+        for band in band_min_dict.keys():
+            data = np.array(band_min_dict[band], dtype=np.float32)
+            min_dict[band] = np.nanmin(data)
+            min_dict['target'] = target_min
+
+        for band in band_max_dict.keys():
+            data = np.array(band_max_dict[band], dtype=np.float32)
+            max_dict[band] = np.nanmax(data)
+            max_dict['target'] = target_max
+
+        # saving dictionaries as pickle
+        for dict_name, dictionary in zip(
+                ['mean', 'std', 'min', 'max'], [mean_dict, std_dict, min_dict, max_dict]
+        ):
+            pickle_path = os.path.join(train_dir, f'{dict_name}.pkl')
+            with open(pickle_path, 'wb') as f:
+                pickle.dump(dictionary, f)
+
+        return mean_dict, std_dict, min_dict, max_dict
+
+    else:  # loading the saved statistics
+        mean_dict = pickle.load(open(os.path.join(train_dir, 'mean.pkl'), 'rb'))
+        std_dict = pickle.load(open(os.path.join(train_dir, 'std.pkl'), 'rb'))
+        min_dict = pickle.load(open(os.path.join(train_dir, 'min.pkl'), 'rb'))
+        max_dict = pickle.load(open(os.path.join(train_dir, 'max.pkl'), 'rb'))
+
+        return mean_dict, std_dict, min_dict, max_dict
+
+
+def standardize_train_val_test(input_dir, mean_dict, std_dict, split_type='train', skip_processing=False):
+    """
+    Standardizes multi-band raster tiles and target values for train, validation, or test datasets.
+    The mean and std statistics used for standardizing comes from the train_set using the dictionaries generated by
+    calc_scaling_statistics.
+
+    :param input_dir: str. Path to the directory containing the input raster tiles and target value csv.
+    :param mean_dict: dictionary. A dictionary containing mean values (from train_set) for each band and the target variable.
+    :param std_dict: dictionary. A dictionary containing std values (from train_set) for each band and the target variable.
+    :param split_type: str. Should be something from ['train', 'val', 'test'].
+    :param skip_processing: boolean. Set to True to skip this step.
+
+    :return: None.
+    """
+    if not skip_processing:
+        # # standardizing tiles (multi-band input variables)
+
+        # creating new directory for standardized datasets
+        output_dir = os.path.join(input_dir, 'standardized')
+        makedirs([output_dir])
+
+        # collecting all tiles in the training data directory
+        all_tiles = glob(os.path.join(input_dir, f'*.tif'))
+
+        # getting band descriptions, crs, and transform
+        file = rio.open(all_tiles[0])
+        bands = file.descriptions
+        file_crs = file.crs
+        file_transform = file.transform
+
+        for tile in all_tiles:
+            data = rio.open(tile)
+            data_arr = data.read()
+
+            if data.count != len(bands):  # existing code in case number of band names and number of array don't match
+                raise ValueError("Number of bands in metadata and number of array don't match")
+
+            if not np.isnan(data.nodata):  # ensuring no data type as np.nan as this code will set 0 to no data position
+                raise ValueError(f"Expected no data value to be NaN, but got {data.nodata}.")
+
+            # initiating a new array (with all zeros) to store standardized bands
+            standardized_arr = np.zeros_like(data_arr, dtype=np.float32)
+
+            # performing standardization for each band
+            for band in bands:
+                mean_val = mean_dict[band]
+                std_val = std_dict[band]
+
+                # extracting band index from 'bands' list
+                band_idx = bands.index(band)
+
+                # standardizing
+                band_arr = data_arr[band_idx]
+                band_arr[~np.isnan(band_arr)] = (band_arr - mean_val) / std_val
+
+                # saving band in the initiated zero array
+                standardized_arr[band_idx] = band_arr
+
+            # setting all no data (np.nan) values to zero
+            standardized_arr[np.isnan(standardized_arr)] = 0
+
+            # saving standardized tile as a new array
+            new_tile_path = os.path.join(output_dir, os.path.basename(tile))
+            with rio.open(
+                    new_tile_path,
+                    'w',
+                    driver='GTiff',
+                    height=standardized_arr.shape[1],
+                    width=standardized_arr.shape[2],
+                    count=standardized_arr.shape[0],
+                    dtype=np.float32,
+                    crs=file_crs,
+                    transform=file_transform,
+                    nodata=0
+            ) as dst:
+                dst.write(standardized_arr)
+
+        # # standardizing target values
+        if split_type not in ['train', 'val', 'test']:
+            raise ValueError(f"Invalid split_type '{split_type}'. Must be one of 'train'/'val'/'test'")
+
+        # reading target data csv
+        target_df = pd.read_csv(os.path.join(input_dir, f'y_{split_type}.csv'))
+
+        # extracting mean and std values from respective dictionaries
+        mean_val = mean_dict['target']
+        std_val = std_dict['target']
+
+        # standardizing
+        target_df['standardized_value'] = (target_df['value'] - mean_val) / std_val
+
+        # saving standardized target values as csv
+        target_df.to_csv(os.path.join(output_dir, f'y_{split_type}.csv'), index=False)
+
+    else:
+        pass

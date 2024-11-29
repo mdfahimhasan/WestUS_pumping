@@ -2,6 +2,8 @@ import os
 import pickle
 import numpy as np
 from glob import glob
+
+import pandas as pd
 import rasterio as rio
 # import matplotlib.pyplot as plt
 
@@ -15,19 +17,27 @@ class DataLoaderCreator():
     A dataloader class to batchify tiles of input features and a single target value per tile for the model.
     """
 
-    def __init__(self, tile_dir, target_values, batch_size=64):
+    def __init__(self, tile_dir, target_csv, batch_size=64):
         """
         Initialize the DataLoader to batch the data.
 
         :param tile_dir (str): Directory containing .tif files for tiles.
-        :param target_values (list or array): Target values corresponding to each tile (one value per tile).
+        :param target_csv (csv): Target csv. Must have a tile_no anf value columns.
+                                 The tile_no column represents the corresponding tile no and value
+                                 represents the value to train/validate/test on.
         :param batch_size (int): Batch size for the DataLoader.
         """
         print('Initializing DataLoader to batch the data...')
 
-        # reading all datasets as numpy array
+        # reading target and input datasets
+        target_df = pd.read_csv(target_csv)
+        target_values = target_df['value'].tolist()
+        tile_no_list = target_df['tile_no'].tolist()
+
         tiles = glob(os.path.join(tile_dir, '*.tif'))
-        features_arrs = [rio.open(tt).read() for tt in tiles]
+        tiles_sorted = [tile for tile_no in tile_no_list for tile in tiles
+                        if tile.endswith(f'_{tile_no}.tif')]
+        features_arrs = [rio.open(tt).read() for tt in tiles_sorted]
 
         # creating numpy arrays for features and target
         features_np = np.stack(features_arrs)  # dimensions are - num of image * num features * height * width
@@ -37,18 +47,18 @@ class DataLoaderCreator():
         self.features_tensor = torch.tensor(features_np, dtype=torch.float32)
         self.target_tensor = torch.tensor(target_np, dtype=torch.float32)
 
-        # check and print the shapes of the tensors before batching
+        # checking and printing the shapes of the tensors before batching
         print('Features Tensor Shape before batching:', self.features_tensor.shape)
         print('Target Tensor Shape before batching:', self.target_tensor.shape)
 
-        # create a TensorDataset
+        # creating a TensorDataset
         self.dataset = TensorDataset(self.features_tensor, self.target_tensor)
 
-        # create the DataLoader
+        # creating the DataLoader
         self.dataloader = DataLoader(self.dataset, batch_size=batch_size,
                                      shuffle=True)  # shuffle True is randomizing the the data
 
-        # check and print the shapes of the tensors after batching
+        # checking and printing the shapes of the tensors after batching
         for (feature_batch, target_batch) in self.dataloader:
             print('\n Features Tensor Shape after batching:', feature_batch.shape)
             print('Target Tensor Shape after batching:', target_batch.shape, '\n')
@@ -349,7 +359,8 @@ def train(model, train_loader, optimizer, verbose=True):
         optimizer.step()
 
         # accumulate loss for the epoch
-        running_loss += loss.item()
+        runn
+        froming_loss += loss.item()
 
         # print every 10 batches
         if verbose and batch_idx % 10 == 0:
@@ -488,7 +499,7 @@ def train_validate(model, train_loader, val_loader, n_epochs, optimizer,
 #     plt.close()
 #     print(f'Loss plot saved')
 
-# standardize and normalize code (inlcuding de-stanardization and de-normalization)
+# standardize and normalize code (including de-stanardization and de-normalization)
 # need a function for loading model
-# need a function for model evaluation (gives the training, validation, and testing performacne)
+# need a function for model evaluation (gives the training, validation, and testing performancne)
 # integrate de-standardization option for target data

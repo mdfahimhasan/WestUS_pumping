@@ -27,17 +27,24 @@ class DataLoaderCreator():
                                  represents the value to train/validate/test on.
         :param batch_size (int): Batch size for the DataLoader.
         """
-        print('Initializing DataLoader to batch the data...')
+        print('Initializing DataLoader to batch the data...\n')
 
-        # reading target and input datasets
+        # reading target and input datasets.
+        # we have to make sure that target values and tiles are matching (tiles have corresponding target values).
+        # so, creating a dictionary mapping tile_no (from the file name) to its full file path for quick lookup.
+        # then, sorting tiles to match the order of tile_no_list from the target CSV.
+        # finally, reading the sorted tiles as arrays
         target_df = pd.read_csv(target_csv)
-        target_values = target_df['value'].tolist()
+        target_values = target_df['standardized_value'].tolist()
         tile_no_list = target_df['tile_no'].tolist()
 
         tiles = glob(os.path.join(tile_dir, '*.tif'))
-        tiles_sorted = [tile for tile_no in tile_no_list for tile in tiles
-                        if tile.endswith(f'_{tile_no}.tif')]
-        features_arrs = [rio.open(tt).read() for tt in tiles_sorted]
+        tile_dict = {os.path.basename(tile).split('_')[-1].replace('.tif', ''): tile for tile in tiles}
+        tiles_sorted = [tile_dict[str(tile_no)] for tile_no in tile_no_list if str(tile_no) in tile_dict]
+
+        features_arrs = [rio.open(tt).read() for tt in tiles_sorted]  # storing multi-band features as array
+
+        print('Same sorting order for feature tiles and target values ensured...\n')
 
         # creating numpy arrays for features and target
         features_np = np.stack(features_arrs)  # dimensions are - num of image * num features * height * width
@@ -49,7 +56,7 @@ class DataLoaderCreator():
 
         # checking and printing the shapes of the tensors before batching
         print('Features Tensor Shape before batching:', self.features_tensor.shape)
-        print('Target Tensor Shape before batching:', self.target_tensor.shape)
+        print('Target Tensor Shape before batching:', self.target_tensor.shape, '\n')
 
         # creating a TensorDataset
         self.dataset = TensorDataset(self.features_tensor, self.target_tensor)

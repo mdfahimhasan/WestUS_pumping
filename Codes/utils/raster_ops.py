@@ -364,8 +364,9 @@ def clip_resample_reproject_raster(input_raster, input_shape, output_raster_dir,
     return output_filepath
 
 
-def shapefile_to_raster(input_shape, output_dir, raster_name, burnvalue=None, use_attr=True, attribute="", add=None,
-                        ref_raster=WestUS_raster, resolution=model_res, alltouched=False):
+def shapefile_to_raster(input_shape, output_dir, raster_name, burnvalue=None, use_attr=True,
+                        attribute="", add=None, ref_raster=WestUS_raster,
+                        resolution=model_res, alltouched=False):
     """
     Converts polygon shapefile to raster by attribute value or burn value.
 
@@ -390,7 +391,7 @@ def shapefile_to_raster(input_shape, output_dir, raster_name, burnvalue=None, us
     output_raster = os.path.join(output_dir, raster_name)
 
     if use_attr:
-        if add is not None:
+        if add is not None:  # adds point values in the pixel
             minx, miny, maxx, maxy = total_bounds
             layer_name = os.path.basename(input_shape).split('.')[0]
             args = ['-l', layer_name, '-a', attribute, '-tr', str(resolution), str(resolution), '-te', str(minx),
@@ -399,14 +400,15 @@ def shapefile_to_raster(input_shape, output_dir, raster_name, burnvalue=None, us
             sys_call = make_gdal_sys_call(gdal_command='gdal_rasterize', args=args)
             subprocess.call(sys_call)
 
-        else:
+        else:               # the value of the last point's attribute (in case of overlapping or multiple pts in a pixel)
+                            # will be burned in the raster
             raster_options = gdal.RasterizeOptions(format='Gtiff', outputBounds=list(total_bounds),
                                                    outputType=gdal.GDT_Float32, xRes=resolution, yRes=resolution,
                                                    noData=no_data_value, attribute=attribute, allTouched=alltouched)
             gdal.Rasterize(destNameOrDestDS=output_raster, srcDS=input_shape, options=raster_options,
                            resolution=resolution)
 
-    else:
+    else:                   # will burn a specified value in the pixel
         raster_options = gdal.RasterizeOptions(format='Gtiff', outputBounds=list(total_bounds),
                                                outputType=gdal.GDT_Float32, xRes=resolution, yRes=resolution,
                                                noData=no_data_value, burnValues=burnvalue,

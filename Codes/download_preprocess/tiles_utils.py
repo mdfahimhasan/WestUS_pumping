@@ -123,6 +123,11 @@ def make_multiband_datasets(list_of_temporal_var_dirs, list_of_static_var_dirs,
     """
     Make multi-band raster dataset from individual temporal/static attributes.
 
+    **Caution**:
+        1. The first band of the multiband raster must be target band (train data) because the make_training_tiles()
+        class wil consider the first band as trainingd data.
+
+
     :param list_of_temporal_var_dirs: List of directories of temporal attributes/datasets.
     :param list_of_static_var_dirs: List of directories of static attributes/datasets.
     :param band_key_list: keyword to add as band names in the multi-band dataset.
@@ -187,197 +192,179 @@ def make_multiband_datasets(list_of_temporal_var_dirs, list_of_static_var_dirs,
             create_multiband_raster(input_files_list=paths, band_key_list=band_key_list, output_file=output_file_path)
 
 
-class make_multiband_tiles:
+class make_training_tiles:
     """
-        Processes a multi-band raster image into tiles and saves them as separate GeoTIFF files.
+    Processes a multi-band raster image into tiles of training data and associated feature attributes.
 
-        **Caution**:
-        1. The first band of the tile must be target band (train data). This class extracts the center pixel
-        value of the first band as the target variable for each time and saves it separately, while the remaining
+     **Caution**:
+        1. The first band of the multiband raster must be target band (train data). This class extracts the center pixel
+        value of the first band as the target variable for each loop and saves it separately, while the remaining
         bands are used as features (saved a tiled multi-band GeoTIFF) for the deep learning model.
 
         2. The `band_key_list` should only contain the names of the feature bands and exclude the target variable's name.
-        """
+    """
 
     def __init__(self, tiff_path, band_key_list, tile_output_dir, target_data_output_csv,
-                 tile_height=7, tile_width=7, nodata_threshold=50, skip_processing=False):
+                 tile_size=7, nodata_value=-9999, nodata_threshold=50,
+                 skip_processing=False):
         """
         :param tiff_path (str): Path to the multi-band raster TIFF file to process.
-        :param band_key_list (list): List of keys or descriptions for each band, used as metadata in output tiles.
-                                     Make sure not to insert the target variable's name as band name because that band
-                                     will be removed and processed separately.
+        :param band_key_list (list): List of keys or descriptions for each band.
         :param tile_output_dir (str): Directory where the processed tiles will be saved.
-        :param tile_height (int): Height of each tile. Default set to 7.
-        :param tile_width (int): Width of each tile. Default set to 7.
-        :param nodata_threshold (int): Maximum percentage of nodata values allowed in a tile (default is 50).
+        :param target_data_output_csv (str): Filepath to save the target training data as CSV.
+        :param tile_size (int): Size of the square tile (e.g., 7x7). Must be odd to ensure a center pixel.
+        :param nodata_value (int/float): NoData value in the raster (default: -9999).
+        :param nodata_threshold (int): Maximum percentage of NoData values allowed in a tile (default: 50).
         :param skip_processing (bool): If True, skips processing and initializes the class without performing operations.
-                                       Default set to False.
-
-        :return Multi-band tiles containing input variables and a csv target values (with associated tile no).
         """
+        self.tile_output_dir = tile_output_dir
+        self.target_data_output_csv = target_data_output_csv
+        self.tile_size = tile_size
+        self.nodata_value = nodata_value
+        self.nodata_threshold = nodata_threshold
+
         if not skip_processing:
-            print("**Caution**:")
-            print("- The first band of the multi-band raster must represent the target variable.")
-            print(
-                "- The `band_key_list` should only contain the names of the feature bands and exclude the target "
-                "variable's name.\n")
+            self.process_tiles(tiff_path, band_key_list)
 
-            makedirs([tile_output_dir])
-
-            # initiating training data storage dictionary
-            target_data = {'tile_no': [], 'target_value': []}
-
-            # Opening a multi-band image file. The tile-ing operation will be done inside the opened image file.
-            with rio.open(tiff_path) as tiff:
-
-                # storing image width, height, and nodata for later use
-                tiff_height = tiff.height
-                tiff_width = tiff.width
-                self.nodata = np.nan  # nodata will be np.nan for the processed tiles
-
-                # getting year (+ month) info which will be later used in saving tile name
-                if len(os.path.basename(tiff_path).split('.')[0].split('_')[-1]) == 4:  # check for annual data
-                    year = os.path.basename(tiff_path).split('.')[0].split('_')[-1]
-                    month = None
-
-                else:  # check for monthly data
-                    year = os.path.basename(tiff_path).split('.')[0].split('_')[-2]
-                    month = os.path.basename(tiff_path).split('.')[0].split('_')[-1]
-
-                # initiating tile number
-                tile_no = 1
-
-                # The 1st loop takes across width and the 2nd loop takes across height.
-                # The 2 loops together creates a window which is used to create tile from the image.
-                for i in range(0, tiff_width, tile_width):
-                    for j in range(0, tiff_height, tile_height):
-                        if (i + tile_width <= tiff_width) and (
-                                j + tile_height <= tiff_height):  # a check to keep the window within the image
-
-                            window = Window(col_off=i, row_off=j, width=tile_width,
-                                            height=tile_height)  # the tile window
-
-                            tile_arr = tiff.read(window=window)  # reading the image as an array for the tile window
-
-                            tile_name = f'{year}_tile_{tile_no}' if month is None else f'{year}_{month}_tile_{tile_no}'  # tile name
-                            print(f'processing tile - {tile_name}')
-
-                            window_transform = transform(window, tiff.transform)  # tiled window's affine transformation
-
-                            # we will only use the center pixel as the target value/variable
-                            # So, only keeping the center pixel for band 1 and setting the other as nan
-                            # if center pixel doesn't have a value discard the whole tile
-                            # otherwise store the center value to the training data list
-                            center_pixel_pos = tile_height // 2
-                            center_value = tile_arr[0][center_pixel_pos, center_pixel_pos]
-
-                            if center_value == -9999:
-                                print(f'discarding tile {tile_name} due to null center value \n')
-                                continue
-                            else:
-                                # storing the center value in the training_data dictionary
-                                target_data['tile_no'].append(tile_no)
-                                target_data['value'].append(center_value)
-
-                            # remove the array containing the training data from the tile
-                            tile_arr = tile_arr[1:]
-
-                            # in case complete nodata tile detected, exiting the loop into next iteration
-                            if make_multiband_tiles.is_image_null(tile_arr):
-                                print(f'discarding tile {tile_name} due to null band \n')
-                                continue
-
-                            # a check to see if the tile is completely nodata. In case of an unexpected nodata tile
-                            # passes through the if block, the assertion block will raise AssertionError
-                            assert not make_multiband_tiles.is_image_null(
-                                tile_arr), f'All nodata value in tile {tile_no}'
-
-                            # if the % nodata values is greater than a threshold, not including those tiles
-                            if any(x > nodata_threshold for x in
-                                   make_multiband_tiles.count_perc_nodata(tile_arr, nodata=-9999)):
-                                print(f'discarding tile {tile_name} due >{nodata_threshold}% no data \n')
-                                continue
-
-                            # setting all no data values to np.nan
-                            tile_arr[tile_arr == -9999] = np.nan
-
-                            # saving the tiled image
-                            output_file = os.path.join(tile_output_dir, f'{tile_name}.tif')
-
-                            with rio.open(
-                                    output_file,
-                                    'w',
-                                    driver='GTiff',
-                                    height=tile_arr.shape[1],
-                                    width=tile_arr.shape[2],
-                                    dtype=tile_arr.dtype,
-                                    count=tile_arr.shape[0],
-                                    crs=tiff.crs,
-                                    transform=window_transform,
-                                    nodata=self.nodata
-                            ) as dst:
-
-                                for id in range(0, tile_arr.shape[0]):  # looping for each band of the tiled array
-                                    dst.write_band(id + 1, tile_arr[id])
-                                    dst.set_band_description(id + 1, band_key_list[id])
-
-                            tile_no += 1
-
-            # saving training data as csv
-            target_df = pd.DataFrame(target_data)
-            target_df.to_csv(target_data_output_csv, index=False)
-
-    @staticmethod
-    def is_image_null(multiband_img_arr, nodata=-9999):
+    def process_tiles(self, tiff_path, band_key_list):
         """
-        Checks all bands in an image array to see if there is an entirely null value band. A tile (image array) with
-        a single data band with all null values will be rejected in the main code using this code.
+        Processes a multi-band raster image into tiles of training data and associated feature attributes.
 
-        :param multiband_img_arr: Multi-band image array.
-        :param nodata: No data value. Default set to -9999.
+        :param tiff_path: Path to the multi-band raster TIFF file to process.
+        :param band_key_list: List of keys or descriptions for each band.
 
-        :return: A boolean variable.
+        :return: None.
         """
-        # initiating a variable is_img_null as False. If any of the band is entirely null, the function will
-        # convert this variable to True. Otherwise, the function will return is_band_null as False.
-        is_img_null = False
+        makedirs([self.tile_output_dir])
 
-        # reading each band separately and checking if the entire band is null or not
-        # if any of the band is entirely null, that tile won't be saved, as it has some missing attribute
-        # Note that, an image where all bands have at least one valid pixel will pass this filter.
-        for num_band in range(0, multiband_img_arr.shape[0]):
-            single_arr = multiband_img_arr[num_band]
+        # initiating training data storage dictionary
+        target_data = {'tile_no': [], 'target_value': []}
 
-            if np.all(single_arr == nodata):
-                is_img_null = True
-            else:
-                pass
+        # opening a multi-band image file. The tile-ing operation will be done inside the opened image file.
+        with rio.open(tiff_path) as tiff:
+            tiff_height, tiff_width = tiff.height, tiff.width
+            tile_radius = self.tile_size // 2
 
-        return is_img_null
+            # reading the training data band
+            training_band_index = 0  # The training data is set as band 0 in the multiband dataset in make_multiband_datasets() function
+            training_band = tiff.read(training_band_index + 1)  # added +1 as rasterio read uses 1-based index
 
-    @staticmethod
-    def count_perc_nodata(multiband_img_arr, nodata=-9999):
+            # initiating tile number
+            tile_no = 1
+
+            # The first loop iterates across the height (rows) and the second loop across the width (columns) of the raster.
+            # Both loops start at `tile_radius` to ensure the tile remains fully within the raster boundaries, avoiding edge cases.
+            # Both loops end at `tiff_height - tile_radius` (for rows) and `tiff_width - tile_radius` (for columns) to handle edge cases.
+            # The loops move by 1 cell at a time, check if there is a valid training data value at the center pixel,
+            # and create a tile around it if valid.
+            for row in range(tile_radius, tiff_height - tile_radius):
+                for col in range(tile_radius, tiff_width - tile_radius):
+                    center_value = training_band[row, col]
+
+                    # skipping NoData center pixels
+                    if center_value == self.nodata_value:
+                        continue
+
+                    # if the center value has valid value, create a window around it and read the data
+                    window = Window(col_off=col - tile_radius, row_off=row - tile_radius,
+                                    width=self.tile_size, height=self.tile_size)
+                    tile_arr = tiff.read(window=window)
+
+                    # keeping only the arrays except the first band (indexed 0, as that is training data)
+                    tile_arr = tile_arr[1:]
+
+                    # checking if any array in the windowed tiff in entirely null (only no data values)
+                    if self.is_image_null(tile_arr):
+                        continue
+
+                    # checking if the tile has too many NoData values
+                    nodata_percentage = self.calculate_nodata_percentage(tile_arr)
+                    if any(perc > self.nodata_threshold for perc in nodata_percentage):
+                        continue
+
+                    # replacing NoData values with np.nan
+                    tile_arr[tile_arr == self.nodata_value] = np.nan
+
+                    # saving the tile
+                    crs = tiff.crs
+                    window_transform = transform(window, tiff.transform)  # tiled window's affine transformation
+
+                    tile_name = f'tile_{tile_no}.tif'
+                    output_file = os.path.join(self.tile_output_dir, tile_name)
+                    self.save_tile(output_file, tile_arr, crs, window_transform, band_key_list)
+
+                    # saving the target value
+                    target_data['tile_no'].append(tile_no)
+                    target_data['target_value'].append(center_value)
+
+                    tile_no += 1
+
+        # Save the training data to a CSV file
+        target_df = pd.DataFrame(target_data)
+        target_df.to_csv(self.target_data_output_csv, index=False)
+
+    def calculate_nodata_percentage(self, tile_arr):
         """
-        Calculates percent of nodata pixels in each band of an image array.
+        Calculates the percentage of NoData pixels in each band of the tile and returns a list.
 
-        :param multiband_img_arr: Multi-band image array.
-        :param nodata: No data values. Default set to -9999.
+        :param tile_arr: Multi-band tile array.
 
-        :return: A list containing percent nodata pixel counts for all bands.
+        :return: List of NoData percentages for each band.
         """
         perc_counts_all_bands = []
-        for num_band in range(0, multiband_img_arr.shape[0]):
-            single_arr = multiband_img_arr[num_band]
 
-            valid_pixels = np.count_nonzero(np.where(single_arr != nodata, 1, 0), keepdims=False)
+        for num_band in range(0, tile_arr.shape[0]):
+            single_arr = tile_arr[num_band]
+
+            valid_pixels = np.count_nonzero(np.where(single_arr != self.nodata_value, 1, 0), keepdims=False)
+
             total_pixels = single_arr.shape[0] * single_arr.shape[1]
-            nodata_count = total_pixels - valid_pixels
 
-            perc_no_data = nodata_count * 100 / total_pixels
+            perc_no_data = (total_pixels - valid_pixels) * 100 / total_pixels
 
             perc_counts_all_bands.append(perc_no_data)
 
         return perc_counts_all_bands
+
+
+    def is_image_null(self, tile_arr):
+        """
+        Checks all bands in an image array to see if there is an entirely null value band. A tile (image array) with
+        a single data band with all null values will be rejected in the main code using this code.
+
+        :param tile_arr: Multi-band image array.
+
+        :return: A boolean variable.
+        """
+        # reading each band separately and checking if an entire band is null or not.
+        # If any of the band is entirely null, this function will immidiately return True and the tile will be skipped.
+        # Note that, an image where all bands have at least one valid pixel will pass this filter.
+        for num_band in range(0, tile_arr.shape[0]):
+            single_arr = tile_arr[num_band]
+
+            if np.all(single_arr == self.nodata_value):
+                return True
+
+        # If no bands are null, return False
+        return False
+
+    def save_tile(self, output_file, tile_arr, crs, transform, band_key_list):
+        with rio.open(
+                output_file,
+                'w',
+                driver='GTiff',
+                height=tile_arr.shape[1],
+                width=tile_arr.shape[2],
+                dtype=tile_arr.dtype,
+                count=tile_arr.shape[0],
+                crs=crs,
+                transform=transform,
+                nodata=np.nan
+        ) as dst:
+            for band_id in range(tile_arr.shape[0]):
+                dst.write(tile_arr[band_id], band_id + 1)
+                dst.set_band_description(band_id + 1, band_key_list[band_id])
+
 
 
 def train_val_test_split(target_data_csv, input_tile_dir, train_dir, val_dir, test_dir,

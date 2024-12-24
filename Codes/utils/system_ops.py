@@ -1,3 +1,8 @@
+# Author : Md Fahim Hasan
+# PhD Candidate
+# Colorado State university
+# Fahim.Hasan@colostate.edu
+
 import os
 import shutil
 from glob import glob

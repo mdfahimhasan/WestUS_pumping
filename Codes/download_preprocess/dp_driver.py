@@ -1,9 +1,19 @@
+# Author : Md Fahim Hasan
+# PhD Candidate
+# Colorado State university
+# Fahim.Hasan@colostate.edu
+
 import os
+import sys
 from glob import glob
 from download import download_all_gee_data
 from download_openET import download_all_openET_datasets
-from Codes.download_preprocess.preprocess import run_all_preprocessing, make_multiband_datasets
-from Codes.download_preprocess.tiles_utils import make_multiband_tiles
+
+from os.path import dirname, abspath
+sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
+
+from Codes.download_preprocess.preprocess import run_all_preprocessing
+from Codes.download_preprocess.tiles_utils import make_training_tiles
 
 # ----------------------------------------------------------------------------------------------------------------------
 # 1. Data download
@@ -83,7 +93,7 @@ years = list(range(2000, 2019 + 1))
 
 # flags
 skip_process_GS_data = True                 ########
-skip_prism_processing = True                ########
+skip_prism_processing = False                ########
 
 run_all_preprocessing(skip_process_GrowSeason_data=skip_process_GS_data,
                       skip_prism_processing=skip_prism_processing)

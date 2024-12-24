@@ -1,3 +1,8 @@
+# author : Md Fahim Hasan
+# PhD Candidate
+# Colorado State university
+# Fahim.Hasan@colostate.edu
+
 import os
 import re
 import datetime
@@ -95,8 +100,8 @@ def extract_month_from_GrowSeason_data(GS_data_dir, skip_processing=False):
                 dst.write(GS_month_arr)
 
 
-def dynamic_gs_sum_var(year_list, growing_season_dir, monthly_input_dir, gs_output_dir,
-                       sum_keyword, skip_processing=False):
+def dynamic_gs_sum_of_variable(year_list, growing_season_dir, monthly_input_dir, gs_output_dir,
+                               sum_keyword, skip_processing=False):
     """
     Dynamically (spatio-temporally) sums any variable for dynamic growing seasons.
 
@@ -161,8 +166,8 @@ def dynamic_gs_sum_var(year_list, growing_season_dir, monthly_input_dir, gs_outp
                 dst.write(summed_arr, 1)
 
 
-def dynamic_gs_mean_var(year_list, growing_season_dir, monthly_input_dir, gs_output_dir,
-                        mean_keyword, skip_processing=False):
+def dynamic_gs_mean_of_variable(year_list, growing_season_dir, monthly_input_dir, gs_output_dir,
+                                mean_keyword, skip_processing=False):
     """
     Dynamically (spatio-temporally) averages any variable for dynamic growing seasons.
 
@@ -329,15 +334,15 @@ def process_prism_data(prism_bil_dir, prism_tif_dir, output_dir_prism_monthly, g
             print(f'Processing {keyword} data for {year}...')
 
             if 'precip' in keyword:
-                dynamic_gs_sum_var(year_list, growing_season_dir=growing_season_dir, monthly_input_dir=output_dir_prism_monthly,
-                                   gs_output_dir=output_dir_prism_gs,
-                                   sum_keyword=keyword, skip_processing=False)
+                dynamic_gs_sum_of_variable(year_list, growing_season_dir=growing_season_dir, monthly_input_dir=output_dir_prism_monthly,
+                                           gs_output_dir=output_dir_prism_gs,
+                                           sum_keyword=keyword, skip_processing=False)
 
             elif any(i in keyword for i in ['tmax', 'tmin']):
-                dynamic_gs_mean_var(year_list, growing_season_dir=growing_season_dir,
-                                    monthly_input_dir=output_dir_prism_monthly,
-                                    gs_output_dir=output_dir_prism_gs,
-                                    mean_keyword=keyword, skip_processing=False)
+                dynamic_gs_mean_of_variable(year_list, growing_season_dir=growing_season_dir,
+                                            monthly_input_dir=output_dir_prism_monthly,
+                                            gs_output_dir=output_dir_prism_gs,
+                                            mean_keyword=keyword, skip_processing=False)
 
     else:
         pass
@@ -379,3 +384,20 @@ def run_all_preprocessing(skip_process_GrowSeason_data=False,
                        output_dir_prism_gs='../../Data_main/rasters/PRISM_Precip/WestUS_growing_season',
                        west_US_shape='../../Data_main/shapefiles/Western_US_ref_shapes/WestUS_states.shp',
                        keyword='prism_tmax', skip_processing=skip_prism_processing)
+
+    # RET processing
+
+
+    # LST processing
+
+
+    # GCVI processing
+
+
+    # NDVI processing
+
+
+    # NDMI processing
+
+
+    # OSAVI processing

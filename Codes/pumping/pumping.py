@@ -1,3 +1,12 @@
+# Author : Md Fahim Hasan
+# PhD Candidate
+# Colorado State university
+# Fahim.Hasan@colostate.edu
+
+# # The pumping data processed by this script requires some hand-filtering and processing after the process
+# of raw data to point creation. After that some hand-filtering is performed and the final data is rasterized
+# as pumping rasters
+
 import os
 import sys
 import pickle

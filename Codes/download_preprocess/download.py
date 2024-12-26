@@ -183,7 +183,9 @@ def get_gee_dict(data_name):
         'MODIS_NDMI': 'MODIS/061/MOD09A1',  # cloudcover mask added later
         'MODIS_NDVI': 'MODIS/061/MOD09A1',  # cloudcover mask added later
         'MODIS_LAI': 'MODIS/061/MOD15A2H',
+        'GRIDMET_Precip': 'IDAHO_EPSCOR/GRIDMET',
         'GRIDMET_RET': 'IDAHO_EPSCOR/GRIDMET',
+        'GRIDMET_Tmax': 'IDAHO_EPSCOR/GRIDMET',
         'GRIDMET_max_RH': 'IDAHO_EPSCOR/GRIDMET',
         'GRIDMET_min_RH': 'IDAHO_EPSCOR/GRIDMET',
         'GRIDMET_wind_vel': 'IDAHO_EPSCOR/GRIDMET',  # at 10m
@@ -214,7 +216,9 @@ def get_gee_dict(data_name):
         'MODIS_NDMI': ['sur_refl_b02', 'sur_refl_b06'],  # bands for NIR and SWIR, respectively
         'MODIS_NDVI': ['sur_refl_b02', 'sur_refl_b01'],  # bands for NIR and Red, respectively
         'MODIS_LAI': 'Lai_500m',
+        'GRIDMET_Precip': 'pr',  # daily total, unit in mm
         'GRIDMET_RET': 'etr',
+        'GRIDMET_Tmax': 'tmmx',  # unit in K
         'GRIDMET_max_RH': 'rmax',
         'GRIDMET_min_RH': 'rmin',
         'GRIDMET_wind_vel': 'vs',
@@ -246,7 +250,9 @@ def get_gee_dict(data_name):
         'MODIS_NDVI': 0.0001,
         'MODIS_LAI': 0.1,
         'MODIS_ET': 0.1,
+        'GRIDMET_Precip':1,
         'GRIDMET_RET': 1,
+        'GRIDMET_Tmax':1,
         'GRIDMET_max_RH': 1,
         'GRIDMET_min_RH': 1,
         'GRIDMET_wind_vel': 1,
@@ -278,7 +284,9 @@ def get_gee_dict(data_name):
         'MODIS_NDMI': ee.Reducer.median(),
         'MODIS_NDVI': ee.Reducer.median(),
         'MODIS_LAI': ee.Reducer.mean(),
+        'GRIDMET_Precip': ee.Reducer.sum(),
         'GRIDMET_RET': ee.Reducer.sum(),
+        'GRIDMET_Tmax': ee.Reducer.mean(),
         'GRIDMET_max_RH': ee.Reducer.mean(),
         'GRIDMET_min_RH': ee.Reducer.mean(),
         'GRIDMET_wind_vel': ee.Reducer.mean(),
@@ -315,11 +323,9 @@ def get_gee_dict(data_name):
         'MODIS_NDVI': datetime(2000, 2, 1),
         'MODIS_LAI': datetime(2000, 2, 1),
         'MODIS_ET': datetime(2001, 1, 1),
-        'TERRACLIMATE_ET': datetime(1958, 1, 1),
-        'TERRACLIMATE_RET': datetime(1958, 1, 1),
-        'TERRACLIMATE_vap_pres': datetime(1958, 1, 1),
-        'TERRACLIMATE_vap_pres_def': datetime(1958, 1, 1),
+        'GRIDMET_Precip': datetime(1979, 1, 1),
         'GRIDMET_RET': datetime(1979, 1, 1),
+        'GRIDMET_Tmax': datetime(1979, 1, 1),
         'GRIDMET_max_RH': datetime(1979, 1, 1),
         'GRIDMET_min_RH': datetime(1979, 1, 1),
         'GRIDMET_wind_vel': datetime(1979, 1, 1),
@@ -350,7 +356,9 @@ def get_gee_dict(data_name):
         'MODIS_NDMI': datetime(2023, 8, 29),
         'MODIS_NDVI': datetime(2023, 8, 29),
         'MODIS_LAI': datetime(2023, 11, 9),
+        'GRIDMET_Precip': datetime(2023, 9, 15),
         'GRIDMET_RET': datetime(2022, 12, 1),
+        'GRIDMET_Tmax': datetime(2022, 12, 1),
         'GRIDMET_max_RH': datetime(2022, 12, 1),
         'GRIDMET_min_RH': datetime(2022, 12, 1),
         'GRIDMET_wind_vel': datetime(2022, 12, 1),
@@ -381,7 +389,9 @@ def get_gee_dict(data_name):
         'MODIS_NDMI': datetime(2000, 1, 1),
         'MODIS_NDVI': datetime(2000, 1, 1),
         'MODIS_LAI': datetime(2000, 1, 1),
+        'GRIDMET_Precip': datetime(1979, 1, 1),
         'GRIDMET_RET': datetime(1979, 1, 1),
+        'GRIDMET_Tmax': datetime(1979, 1, 1),
         'GRIDMET_max_RH': datetime(1979, 1, 1),
         'GRIDMET_min_RH': datetime(1979, 1, 1),
         'GRIDMET_wind_vel': datetime(1979, 1, 1),
@@ -412,7 +422,9 @@ def get_gee_dict(data_name):
         'MODIS_NDMI': datetime(2024, 1, 1),
         'MODIS_NDVI': datetime(2024, 1, 1),
         'MODIS_LAI': datetime(2024, 1, 1),
+        'GRIDMET_Precip': datetime(2024, 1, 1),
         'GRIDMET_RET': datetime(2024, 12, 1),
+        'GRIDMET_Tmax': datetime(2024, 12, 1),
         'GRIDMET_max_RH': datetime(2024, 1, 1),
         'GRIDMET_min_RH': datetime(2024, 1, 1),
         'GRIDMET_wind_vel': datetime(2024, 1, 1),
@@ -764,7 +776,7 @@ def download_gee_data_monthly(data_name, download_dir, year_list, month_range, m
     Current valid data names are -
         ['MODIS_Day_LST', 'Landsat5_NDVI', 'Landsat8_NDVI', 'Landsat5_OSAVI', 'Landsat8_OSAVI',
         'Landsat5_NDMI', 'Landsat8_NDMI', 'Landsat5_GCVI', 'Landsat8_GCVI', 'MODIS_Terra_NDVI',
-        'MODIS_Terra_EVI', 'MODIS_NDMI', 'MODIS_NDVI',
+        'MODIS_Terra_EVI', 'MODIS_NDMI', 'MODIS_NDVI', 'GRIDMET_Precip', 'GRIDMET_Tmax',
         'GRIDMET_RET', 'GRIDMET_max_RH', 'GRIDMET_min_RH', 'GRIDMET_wind_vel',
         'GRIDMET_short_rad', 'GRIDMET_vap_pres_def', 'DAYMET_sun_hr']
     :param download_dir: File path of download directory.
@@ -952,7 +964,7 @@ def download_gee_data_yearly(data_name, download_dir, year_list, month_range, me
     Current valid data names are -
         ['MODIS_Day_LST', 'Landsat5_NDVI', 'Landsat8_NDVI', 'Landsat5_OSAVI', 'Landsat8_OSAVI',
         'Landsat5_NDMI', 'Landsat8_NDMI', 'Landsat5_GCVI', 'Landsat8_GCVI', 'MODIS_Terra_NDVI',
-        'MODIS_Terra_EVI', 'MODIS_NDMI', 'MODIS_NDVI',
+        'MODIS_Terra_EVI', 'MODIS_NDMI', 'MODIS_NDVI', 'GRIDMET_Precip', 'GRIDMET_Tmax',
         'GRIDMET_RET', 'GRIDMET_max_RH', 'GRIDMET_min_RH', 'GRIDMET_wind_vel',
         'GRIDMET_short_rad', 'GRIDMET_vap_pres_def', 'DAYMET_sun_hr']
     :param download_dir: File path of download directory.
@@ -1149,9 +1161,9 @@ def download_all_gee_data(data_list, download_dir, year_list, month_range,
         'Landsat5_NDMI', 'Landsat8_NDMI',
         'Landsat5_GCVI', 'Landsat8_GCVI',
         'MODIS_Terra_NDVI', 'MODIS_Terra_EVI', 'MODIS_NDMI', 'MODIS_NDVI',
-        'MODIS_LAI', 'GRIDMET_RET', 'GRIDMET_max_RH', 'GRIDMET_min_RH', 'GRIDMET_wind_vel',
-        'GRIDMET_short_rad', 'GRIDMET_vap_pres_def', 'DAYMET_sun_hr',
-        'Field_capacity', 'Bulk_density',
+        'MODIS_LAI', 'GRIDMET_Precip', 'GRIDMET_Tmax', 'GRIDMET_RET', 'GRIDMET_max_RH',
+        'GRIDMET_min_RH', 'GRIDMET_wind_vel', 'GRIDMET_short_rad', 'GRIDMET_vap_pres_def',
+        'DAYMET_sun_hr', Field_capacity', 'Bulk_density',
         'Sand_content', 'Clay_content', 'DEM']
 
     :param download_dir: File path of main download directory. It will consist directory of individual dataset.
@@ -1164,7 +1176,8 @@ def download_all_gee_data(data_list, download_dir, year_list, month_range,
     if not skip_download:
         for data_name in data_list:
 
-            if data_name in ['MODIS_LAI', 'GRIDMET_RET',
+            if data_name in ['MODIS_LAI', 'GRIDMET_Precip',
+                             'GRIDMET_RET', 'GRIDMET_Tmax',
                              'GRIDMET_max_RH', 'GRIDMET_min_RH',
                              'GRIDMET_wind_vel', 'GRIDMET_short_rad',
                              'GRIDMET_vap_pres_def', 'DAYMET_sun_hr']:

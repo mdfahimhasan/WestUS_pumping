@@ -5,17 +5,22 @@
 
 import os
 import re
+import sys
 import datetime
 import numpy as np
 from glob import glob
 from osgeo import gdal
 import rasterio as rio
+
+from os.path import dirname, abspath
+sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
+
 from Codes.utils.system_ops import makedirs
 from Codes.utils.raster_ops import read_raster_arr_object, clip_resample_reproject_raster
 
 no_data_value = -9999
 model_res = 0.01976293625031605786  # in deg, ~2 km
-WestUS_shape = '../../Data_main/ref_shapes/WestUS_states.shp'
+WestUS_shape = '../../Data_main/ref_shapes/WestUS.shp'
 WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
 
 
@@ -112,11 +117,9 @@ def dynamic_gs_sum_of_variable(year_list, growing_season_dir, monthly_input_dir,
     :param sum_keyword: Keyword str to add before the summed raster.
     :param skip_processing: Set to True if want to skip processing this step.
 
-    :return:
+    :return: None.
     """
     if not skip_processing:
-        print(f'Dynamically summing {sum_keyword} monthly datasets for growing season...')
-
         makedirs([gs_output_dir])
 
         # The regex r'_([0-9]{1,2})\.tif' extracts the month (1 or 2 digits; e.g., '_1.tif', '_12.tif')
@@ -126,6 +129,8 @@ def dynamic_gs_sum_of_variable(year_list, growing_season_dir, monthly_input_dir,
         month_pattern = re.compile(r'_([0-9]{1,2})\.tif')
 
         for year in year_list:
+            print(f'Dynamically summing {sum_keyword} monthly datasets for growing season {year}...')
+
             # gathering and sorting the datasets by month (from 1 to 12)
             datasets = glob(os.path.join(monthly_input_dir, f'*{year}*.tif'))
             sorted_datasets = sorted(datasets, key=lambda x: int(
@@ -178,16 +183,16 @@ def dynamic_gs_mean_of_variable(year_list, growing_season_dir, monthly_input_dir
     :param mean_keyword: Keyword str to add before the averaged raster.
     :param skip_processing: Set to True if want to skip processing this step.
 
-    :return:
+    :return: None.
     """
     if not skip_processing:
-        print(f'Dynamically averaging {mean_keyword} monthly datasets for growing season...')
-
         makedirs([gs_output_dir])
 
         month_pattern = re.compile(r'_([0-9]{1,2})\.tif')
 
         for year in year_list:
+            print(f'Dynamically averaging {mean_keyword} monthly datasets for growing season {year}...')
+
             # gathering and sorting the datasets by month (from 1 to 12)
             datasets = glob(os.path.join(monthly_input_dir, f'*{year}*.tif'))
             sorted_datasets = sorted(datasets, key=lambda x: int(month_pattern.search(x).group(1)))
@@ -208,7 +213,8 @@ def dynamic_gs_mean_of_variable(year_list, growing_season_dir, monthly_input_dir
 
             # Count the number of valid months in each pixel's growing season
             valid_month_count = np.sum(kernel_mask, axis=0)
-            valid_month_count[valid_month_count == 0] = np.nan  # Avoid division by zero for non-growing season pixels
+            valid_month_count = valid_month_count.astype('float')  # converting valid_month_count to float to allow np.nan assignment
+            valid_month_count[valid_month_count == 0] = np.nan  # to avoid division by zero for non-growing season pixels
 
             # computing the mean over valid months
             summed_arr = np.sum(arrs_stck * kernel_mask, axis=0)
@@ -330,32 +336,36 @@ def process_prism_data(prism_bil_dir, prism_tif_dir, output_dir_prism_monthly, g
         #########
         # # Code-block for summing monthly data for year_list by growing season for the Western US
         #########
-        for year in year_list:  # first loop for year_list
-            print(f'Processing {keyword} data for {year}...')
+        if 'precip' in keyword:
+            dynamic_gs_sum_of_variable(year_list, growing_season_dir=growing_season_dir, monthly_input_dir=output_dir_prism_monthly,
+                                       gs_output_dir=output_dir_prism_gs,
+                                       sum_keyword=keyword, skip_processing=False)
 
-            if 'precip' in keyword:
-                dynamic_gs_sum_of_variable(year_list, growing_season_dir=growing_season_dir, monthly_input_dir=output_dir_prism_monthly,
-                                           gs_output_dir=output_dir_prism_gs,
-                                           sum_keyword=keyword, skip_processing=False)
-
-            elif any(i in keyword for i in ['tmax', 'tmin']):
-                dynamic_gs_mean_of_variable(year_list, growing_season_dir=growing_season_dir,
-                                            monthly_input_dir=output_dir_prism_monthly,
-                                            gs_output_dir=output_dir_prism_gs,
-                                            mean_keyword=keyword, skip_processing=False)
+        elif any(i in keyword for i in ['tmax', 'tmin']):
+            dynamic_gs_mean_of_variable(year_list, growing_season_dir=growing_season_dir,
+                                        monthly_input_dir=output_dir_prism_monthly,
+                                        gs_output_dir=output_dir_prism_gs,
+                                        mean_keyword=keyword, skip_processing=False)
 
     else:
         pass
 
 
 def run_all_preprocessing(skip_process_GrowSeason_data=False,
-                          skip_prism_processing=False):
+                          skip_prism_precip_processing=False,
+                          skip_prism_tmax_processing=False,
+                          skip_gridmet_RET_processing=False,
+                          skip_gridmet_precip_processing=False,
+                          skip_gridmet_tmax_processing=False):
     """
     Run all preprocessing steps.
 
     :param skip_process_GrowSeason_data: Set to True to skip processing growing season data.
-    :param skip_prism_processing: Set True if want to skip prism (precipitation and temperature) data preprocessing.
-
+    :param skip_prism_precip_processing: Set True if want to skip prism precipitation data preprocessing.
+    :param skip_prism_tmax_processing: Set True if want to skip prism temperature data preprocessing.
+    :param skip_gridmet_RET_processing: Set to True to skip processing RET growing season data.
+    :param skip_gridmet_precip_processing: Set to True to skip processing gridmet precip growing season data.
+    :param skip_gridmet_tmax_processing: Set to True to skip processing gridmet max temperature growing season data.
 
     :return: None.
     """
@@ -371,8 +381,8 @@ def run_all_preprocessing(skip_process_GrowSeason_data=False,
                        output_dir_prism_monthly='../../Data_main/rasters/PRISM_Precip/WestUS_monthly',
                        growing_season_dir='../../Data_main/rasters/Growing_season',
                        output_dir_prism_gs='../../Data_main/rasters/PRISM_Precip/WestUS_growing_season',
-                       west_US_shape='../../Data_main/shapefiles/Western_US_ref_shapes/WestUS_states.shp',
-                       keyword='prism_precip', skip_processing=skip_prism_processing)
+                       west_US_shape=WestUS_shape, keyword='prism_precip',
+                       skip_processing=skip_prism_precip_processing)
 
     # prism maximum temperature data processing
     process_prism_data(year_list=(1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
@@ -381,23 +391,30 @@ def run_all_preprocessing(skip_process_GrowSeason_data=False,
                        prism_tif_dir='../../Data_main/rasters/PRISM_Tmax/tif_format',
                        output_dir_prism_monthly='../../Data_main/rasters/PRISM_Tmax/WestUS_monthly',
                        growing_season_dir='../../Data_main/rasters/Growing_season',
-                       output_dir_prism_gs='../../Data_main/rasters/PRISM_Precip/WestUS_growing_season',
-                       west_US_shape='../../Data_main/shapefiles/Western_US_ref_shapes/WestUS_states.shp',
-                       keyword='prism_tmax', skip_processing=skip_prism_processing)
+                       output_dir_prism_gs='../../Data_main/rasters/PRISM_Tmax/WestUS_growing_season',
+                       west_US_shape=WestUS_shape, keyword='prism_tmax',
+                       skip_processing=skip_prism_tmax_processing)
 
     # RET processing
+    dynamic_gs_sum_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+                                          2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                               growing_season_dir='../../Data_main/rasters/Growing_season',
+                               monthly_input_dir='../../Data_main/rasters/RET/WestUS_monthly',
+                               gs_output_dir='../../Data_main/rasters/RET/WestUS_growing_season',
+                               sum_keyword='RET', skip_processing=skip_gridmet_RET_processing)
 
+    # GRIDMET precipitation data processing
+    dynamic_gs_sum_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+                                          2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                               growing_season_dir='../../Data_main/rasters/Growing_season',
+                               monthly_input_dir='../../Data_main/rasters/Precip/WestUS_monthly',
+                               gs_output_dir='../../Data_main/rasters/Precip/WestUS_growing_season',
+                               sum_keyword='Precip', skip_processing=skip_gridmet_precip_processing)
 
-    # LST processing
-
-
-    # GCVI processing
-
-
-    # NDVI processing
-
-
-    # NDMI processing
-
-
-    # OSAVI processing
+    # GRIDMET max temperature data processing
+    dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+                                          2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                                growing_season_dir='../../Data_main/rasters/Growing_season',
+                                monthly_input_dir='../../Data_main/rasters/Tmax/WestUS_monthly',
+                                gs_output_dir='../../Data_main/rasters/Tmax/WestUS_growing_season',
+                                mean_keyword='Tmax', skip_processing=skip_gridmet_tmax_processing)

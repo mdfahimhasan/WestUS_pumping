@@ -414,7 +414,7 @@ def pumping_pts_to_raster(state_code, years, pumping_pts_shp, pumping_attr_AF,
             # converting yearly pumping point dataset into yearly AF raster.
             # all pumping inside a 2 km pixel will be summed
             # the generated raster is for the whole Western US with 0 values outside the basin
-            output_AF_raster = f'pumping_{year}_AF.tif'
+            output_AF_raster = f'pumping_AF_{year}.tif'
             pumping_AF_raster = shapefile_to_raster(input_shape=annual_filtered_shp,
                                                     output_dir=pumping_AF_dir,
                                                     raster_name=output_AF_raster, use_attr=True,
@@ -438,7 +438,7 @@ def pumping_pts_to_raster(state_code, years, pumping_pts_shp, pumping_attr_AF,
             pumping_mm_arr[pumping_mm_arr == 0] = -9999  # filling nan positions (was assigned 0) with -9999 as
                                                          # -9999 is used for discarding no pumping data for tile creation
 
-            pumping_mm_raster = os.path.join(pumping_mm_dir, f'pumping_{year}_mm.tif')
+            pumping_mm_raster = os.path.join(pumping_mm_dir, f'pumping_mm_{year}.tif')
             write_array_to_raster(pumping_mm_arr, file, file.transform, pumping_mm_raster)
 
 
@@ -511,7 +511,7 @@ if __name__ == '__main__':
 
     # # Utah
     process_UT_pumping_data(raw_csv='../../Data_main/pumping/Utah/raw/WaterUse_Utah.csv',
-                            output_pump_shp='../../Data_main/Pumping/Utah/Final/pumping_UT_v0.shp',  # # this is a preliminary version that might have undergone hand filtering/processing
+                            output_pump_shp='../../Data_main/pumping/Utah/Final/pumping_UT_v0.shp',  # # this is a preliminary version that might have undergone hand filtering/processing
                             skip_process=skip_process_UT_pumping,
                             selected_columns_from_csv=['Lat NAD83', 'Lon NAD83', 'System Name', 'Source Name',
                                                        'Source Status', 'Source Type', 'Diversion Type',

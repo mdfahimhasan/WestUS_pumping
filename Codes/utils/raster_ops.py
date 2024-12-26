@@ -20,9 +20,9 @@ from Codes.utils.system_ops import makedirs
 
 no_data_value = -9999
 model_res = 0.01976293625031605786  # in deg, ~2 km
-WestUS_shape = '../../Data_main/shapefiles/Western_US_ref_shapes/WestUS_states.shp'
-WestUS_raster = '../../Data_main/reference_rasters/Western_US_refraster_2km.tif'
-GEE_merging_refraster_large_grids = '../../Data_main/reference_rasters/GEE_merging_refraster_larger_grids.tif'
+WestUS_shape = '../../Data_main/ref_shapes/WestUS_states.shp'
+WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
+GEE_merging_refraster_large_grids = '../../Data_main/ref_rasters/GEE_merging_refraster_larger_grids.tif'
 
 
 def read_raster_arr_object(raster_file, rasterio_obj=False, band=1, get_file=True, change_dtype=True):
@@ -294,6 +294,8 @@ def clip_resample_reproject_raster(input_raster, input_shape, output_raster_dir,
 
     :return: Processed raster filepath.
     """
+    global processed_data
+
     if raster_name is None:  # if raster_name is None will set raster name from the input raster.
         raster_name = os.path.basename(input_raster)
         output_raster_name = keyword + '_' + raster_name

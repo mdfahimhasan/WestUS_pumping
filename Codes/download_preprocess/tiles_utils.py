@@ -37,7 +37,7 @@ def org_vars(list_of_temporal_var_dirs, years_list, list_of_static_var_dirs=None
              of a particular year and month.
     """
     # # processing temporal variables
-    if month_range is None:  # if the datasets are annual
+    if month_range is None:  # # if the datasets are annual
         all_data_paths = []  # final list to append the data paths
 
         # 1st loop for each year and 2nd loop for each dataset
@@ -45,13 +45,12 @@ def org_vars(list_of_temporal_var_dirs, years_list, list_of_static_var_dirs=None
             data_paths = []
 
             for var in list_of_temporal_var_dirs:
-                data = glob(os.path.join(var, f'*{year}.*tif'))
-
+                data = glob(os.path.join(var, f'*{year}*.tif'))
                 data_paths.extend(data)
 
             all_data_paths.append(data_paths)
 
-    else:  # if the datasets are monthly
+    else:  # # if the datasets are monthly
         all_data_paths = []  # final list to append the data paths
 
         # 1st loop for each year, 2nd loop for each month, and 2nd loop for each dataset
@@ -112,6 +111,7 @@ def create_multiband_raster(input_files_list, band_key_list, output_file, nodata
             nodata=nodata
     ) as dst:
         for id, (layer, layer_name) in enumerate(zip(input_files_list, band_key_list), start=1):
+
             with rio.open(layer) as src:
                 dst.write_band(id, src.read(1))
                 dst.set_band_description(id, layer_name)
@@ -140,9 +140,9 @@ def make_multiband_datasets(list_of_temporal_var_dirs, list_of_static_var_dirs,
     if not skip_processing:
         print('creating multi-band rasters...')
 
-        global output_file_path
-
         makedirs([output_dir])
+
+        global output_file_path
 
         # arranging the variables (their paths) in an order so that all input variables of a year/month will be in a
         # nested list inside the main output list
@@ -150,30 +150,31 @@ def make_multiband_datasets(list_of_temporal_var_dirs, list_of_static_var_dirs,
                                     list_of_static_var_dirs=list_of_static_var_dirs,
                                     years_list=years_list)
 
-        # creating a nan mask (1 - valid, 0 -  nan) raster and adding it's path to each nested list in data_paths_lists
-        data_paths_lists_with_nan = []
-
-        for nan_no, paths in enumerate(data_paths_lists):
-            path_arrs = np.array([read_raster_arr_object(each, get_file=False) for each in paths])
-            nan_mask = np.any(np.isnan(path_arrs), axis=0)
-
-            # inverting the mask: True becomes 0, False becomes 1
-            # Then, converting boolean to integer: True as 0, False as 1
-            inverted_mask = ~nan_mask
-            nan_arr = inverted_mask.astype(int)
-
-            # saving as a raster and adding to each nested list in data_paths_lists
-            nan_mask_dir = '../../Data_main/rasters/nan_mask'
-            makedirs([nan_mask_dir])
-
-            nan_raster_path = os.path.join(nan_mask_dir, f'nanmask{nan_no + 1}.tif')
-            _, file = read_raster_arr_object(paths[0])
-            write_array_to_raster(nan_arr, file, file.transform, nan_raster_path)
-
-            data_paths_lists_with_nan.append(paths + [nan_raster_path])
+        # # creating a nan mask (1 - valid, 0 -  nan) raster and adding it's path to each nested list in data_paths_lists
+        # data_paths_lists_with_nan = []
+        #
+        # for nan_no, paths in enumerate(data_paths_lists):
+        #     path_arrs = np.array([read_raster_arr_object(each, get_file=False) for each in paths])
+        #     nan_mask = np.any(np.isnan(path_arrs), axis=0)
+        #
+        #     # inverting the mask: True becomes 0, False becomes 1
+        #     # Then, converting boolean to integer: True as 0, False as 1
+        #     inverted_mask = ~nan_mask
+        #     nan_arr = inverted_mask.astype(int)
+        #
+        #     # saving as a raster and adding to each nested list in data_paths_lists
+        #     nan_mask_dir = '../../Data_main/rasters/nan_mask'
+        #     makedirs([nan_mask_dir])
+        #
+        #     nan_raster_path = os.path.join(nan_mask_dir, f'nanmask{nan_no + 1}.tif')
+        #     _, file = read_raster_arr_object(paths[0])
+        #     write_array_to_raster(nan_arr, file, file.transform, nan_raster_path)
+        #
+        #     data_paths_lists_with_nan.append(paths + [nan_raster_path])
 
         # # multi-band raster creation
-        for paths in data_paths_lists_with_nan:
+        for paths in data_paths_lists:
+
             # checking to see if the data is annual or monthly data, and then setting output name accordingly.
             # basically checking if the last block of the name is 4 digit (for year), 2 digit (month) or str (static data).
 
@@ -205,7 +206,7 @@ class make_training_tiles:
     """
 
     def __init__(self, tiff_path, band_key_list, tile_output_dir, target_data_output_csv,
-                 tile_size=7, nodata_value=-9999, nodata_threshold=50,
+                 tile_size=7, nodata_value=-9999, nodata_threshold=50, start_tile_no=1,
                  skip_processing=False):
         """
         :param tiff_path (str): Path to the multi-band raster TIFF file to process.
@@ -215,6 +216,7 @@ class make_training_tiles:
         :param tile_size (int): Size of the square tile (e.g., 7x7). Must be odd to ensure a center pixel.
         :param nodata_value (int/float): NoData value in the raster (default: -9999).
         :param nodata_threshold (int): Maximum percentage of NoData values allowed in a tile (default: 50).
+        :param start_tile_no (int): Initial value for the tile number. Default set to 1.
         :param skip_processing (bool): If True, skips processing and initializes the class without performing operations.
         """
         self.tile_output_dir = tile_output_dir
@@ -222,6 +224,7 @@ class make_training_tiles:
         self.tile_size = tile_size
         self.nodata_value = nodata_value
         self.nodata_threshold = nodata_threshold
+        self.tile_no = start_tile_no
 
         if not skip_processing:
             self.process_tiles(tiff_path, band_key_list)
@@ -239,6 +242,12 @@ class make_training_tiles:
 
         # initiating training data storage dictionary
         target_data = {'tile_no': [], 'target_value': []}
+
+        # extracting year info from dta path and modifying band_key_list to reflect that in band name
+        year = os.path.basename(tiff_path).split('.')[0].split('_')[-1]
+        band_key_list_mod = [(i + '_' + year) for i in band_key_list]
+
+        print(f'creating multi-band tiles for {year}...')
 
         # opening a multi-band image file. The tile-ing operation will be done inside the opened image file.
         with rio.open(tiff_path) as tiff:
@@ -289,19 +298,21 @@ class make_training_tiles:
                     crs = tiff.crs
                     window_transform = transform(window, tiff.transform)  # tiled window's affine transformation
 
-                    tile_name = f'tile_{tile_no}.tif'
+                    tile_name = f'tile_{self.tile_no}.tif'
                     output_file = os.path.join(self.tile_output_dir, tile_name)
-                    self.save_tile(output_file, tile_arr, crs, window_transform, band_key_list)
+                    self.save_tile(output_file, tile_arr, crs, window_transform, band_key_list_mod)
 
                     # saving the target value
                     target_data['tile_no'].append(tile_no)
                     target_data['target_value'].append(center_value)
 
-                    tile_no += 1
+                    self.tile_no += 1
 
         # Save the training data to a CSV file
         target_df = pd.DataFrame(target_data)
-        target_df.to_csv(self.target_data_output_csv, index=False)
+        target_df.to_csv(self.target_data_output_csv, mode='a',
+                         header=not os.path.exists(self.target_data_output_csv),
+                         index=False)
 
     def calculate_nodata_percentage(self, tile_arr):
         """

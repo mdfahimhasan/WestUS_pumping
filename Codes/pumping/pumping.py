@@ -7,10 +7,11 @@
 # of raw data to point creation. After that some hand-filtering is performed and the final data is rasterized
 # as pumping rasters
 
-# # We also applied filtering out low pumping values for Colorad.
+# # We also applied filtering out low pumping values for Colorado and kansas.
 # Removed pixels where pumping + surface water irrigation + Peff < irrigated crop ET (under a threshold).
-# This was only done for Colorado as we are unsure about the quality of data across CO.
-# For Kansas and Arizona, we are confident about high data quality.
+# For Arizona, we didn't do it as Arizona has large surface water irrigation and we don't have an accurate
+# surface water irrigation dataset (we only have a decent proxy from USGS HUC12 dataset).
+# Moreover, both Kansas and Ariozna are known to have high quality pumping data.
 
 import os
 import sys
@@ -597,10 +598,10 @@ if __name__ == '__main__':
     skip_process_UT_pumping = True  # # caution: the processed files might have been further post-processed. Follow caution in setting this to 'False'.
 
     skip_make_AZ_pumping_raster = True  # #
-    skip_make_KS_pumping_raster = True  # #
+    skip_make_KS_pumping_raster = False  # #
     skip_make_CO_pumping_raster = True  # #
 
-    skip_combine_pumping_rasters = True  # #
+    skip_combine_pumping_rasters = False  # #
 
 
     # # Arizona
@@ -626,7 +627,8 @@ if __name__ == '__main__':
                           output_dir='../../Data_main/pumping/rasters/Arizona',
                           ref_raster=WestUS_raster, resolution=model_res,
                           skip_processing=skip_make_AZ_pumping_raster,
-                          skip_low_val_removal=True)
+                          skip_low_val_removal=True)  # not implementing low pumping value removal in AZ
+                                                      # Refer to top of the script for detail
 
     # # Kansas
     process_KS_pumping_csv(raw_csv='../../Data_main/pumping/Kansas/csv/pumping_KS.csv',
@@ -642,7 +644,11 @@ if __name__ == '__main__':
                           output_dir='../../Data_main/pumping/rasters/Kansas',
                           ref_raster=WestUS_raster, resolution=model_res,
                           skip_processing=skip_make_KS_pumping_raster,
-                          skip_low_val_removal=True)
+                          irrigated_cropET_dir='../../Data_main/rasters/Irrigated_cropET/WestUS_grow_season',
+                          Peff_dir='../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
+                          surface_irrig_dir='../../Data_main/rasters/SW_irrigation',
+                          deviation_allowed=0.2,
+                          skip_low_val_removal=False)    # implementing low pumping value removal in KS
 
     # # Colorado
     process_CO_pumping_data(raw_csv='../../Data_main/pumping/Colorado/raw/pumping_data.csv',
@@ -660,8 +666,7 @@ if __name__ == '__main__':
                           Peff_dir='../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
                           surface_irrig_dir='../../Data_main/rasters/SW_irrigation',
                           deviation_allowed=0.2,
-                          skip_low_val_removal=False)  # implementing low pumping value removal in CO only
-                                                       # as we are not sure about comprehensive data across the state
+                          skip_low_val_removal=False)  # implementing low pumping value removal in CO
 
     # # Utah
     process_UT_pumping_data(raw_csv='../../Data_main/pumping/Utah/raw/WaterUse_Utah.csv',

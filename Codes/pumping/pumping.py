@@ -7,6 +7,11 @@
 # of raw data to point creation. After that some hand-filtering is performed and the final data is rasterized
 # as pumping rasters
 
+# # We also applied filtering out low pumping values for Colorad.
+# Removed pixels where pumping + surface water irrigation + Peff < irrigated crop ET (under a threshold).
+# This was only done for Colorado as we are unsure about the quality of data across CO.
+# For Kansas and Arizona, we are confident about high data quality.
+
 import os
 import sys
 import pickle
@@ -371,7 +376,11 @@ def process_UT_pumping_data(raw_csv, output_pump_shp, skip_process=False, **kwar
 
 def pumping_pts_to_raster(state_code, years, pumping_pts_shp, pumping_attr_AF,
                           year_attr, output_dir,
-                          ref_raster=WestUS_raster, resolution=model_res, skip_processing=False):
+                          skip_processing=False,
+                          ref_raster=WestUS_raster, resolution=model_res,
+                          irrigated_cropET_dir=None, Peff_dir=None,
+                          surface_irrig_dir=None, deviation_allowed=None,
+                          skip_low_val_removal=False):
     """
     Convert point scale (shapefile) groundwater pumping estimates to rasters in AF and mm.
     For individual pixels (2km) sums up all the pumping values inside it.
@@ -383,9 +392,21 @@ def pumping_pts_to_raster(state_code, years, pumping_pts_shp, pumping_attr_AF,
     :param year_attr: Attribute in the point shapefile with year.
     :param output_dir: Filepath of main output dir. Intermediate directories named 'pumping_AF_raster' and
                         'pumping_mm_raster' will be created automatically.
+    :param skip_processing: Set to True to skip this process.
     :param ref_raster: Filepath of Western US reference raster.
     :param resolution: model resolution.
-    :param skip_processing: Set to True to skip this process.
+    :param irrigated_cropET_dir: Directory containing raster files of growing season irrigated crop ET data.
+                                 Default set to None.
+    :param Peff_dir: Directory containing raster files of growing season Peff data.
+                     Default set to None.
+    :param surface_irrig_dir: Directory containing raster files of surface water irrigation data.
+                              Default set to None.
+                              Note that- this data was distributed into pixels from USGS HUC12 dataset and was used
+                                         as a proxy for surface water irrigation in our effective precipitation paper.
+    :param deviation_allowed: Fractional threshold (e.g., 0.1 for 10%) to allow total water
+                              to be slightly less than irrigated crop ET. Default is 0.2.
+    :param skip_low_val_removal: Set to True to skip filtering out pixels with low pumping values.
+                                 Default set to False.
 
     :return: Raster directories' path with AF and mm pumping.
     """
@@ -435,11 +456,134 @@ def pumping_pts_to_raster(state_code, years, pumping_pts_shp, pumping_attr_AF,
 
             pumping_mm_arr = np.where(~np.isnan(pumping_AF_arr), pumping_AF_arr * 1233481837548 /
                                       area_mm2_single_pixel, -9999)
-            pumping_mm_arr[pumping_mm_arr == 0] = -9999  # filling nan positions (was assigned 0) with -9999 as
-                                                         # -9999 is used for discarding no pumping data for tile creation
+
+            # remove pumping values that are low (doesn't meet criteria total water > irrigated cropET
+            # or the allowed threshold)
+            if not skip_low_val_removal:
+                if irrigated_cropET_dir is None or Peff_dir is None or surface_irrig_dir is None:
+                    raise ValueError(
+                        "To perform low pumping value removal, 'irrigated_cropET_dir', 'Peff_dir', and 'surface_irrig_dir' "
+                        "must be provided. Set 'skip_low_val_removal=True' to bypass this step.")
+
+                filter_out_low_pumping_values(year, pumping_mm_arr, irrigated_cropET_dir,
+                                              Peff_dir, surface_irrig_dir, deviation_allowed,
+                                              skip_processing=False)
+
+            # filling nan positions (0 values) with -9999 as
+            # -9999 is used for discarding no pumping data for tile creation
+            pumping_mm_arr[pumping_mm_arr == 0] = -9999
 
             pumping_mm_raster = os.path.join(pumping_mm_dir, f'pumping_mm_{year}.tif')
             write_array_to_raster(pumping_mm_arr, file, file.transform, pumping_mm_raster)
+    else:
+        pass
+
+
+def filter_out_low_pumping_values(year, pumping_arr, irrigated_cropET_dir,
+                                  Peff_dir, surface_irrig_dir, deviation_allowed=0.2,
+                                  skip_processing=False):
+    """
+    Filters the pumping array to retain values that meet the water balance criteria.
+
+    The function validates pumping values by ensuring that the total water (Peff + pumping + surface irrigation)
+    meets or exceeds the irrigated crop ET or falls within a specified allowable deviation.
+    Invalid pumping values are set to zero.
+
+    :param year: The year for which the data is being processed.
+    :param pumping_arr: The array of pumping values to filter.
+    :param irrigated_cropET_dir: Directory containing raster files of growing season irrigated crop ET data.
+    :param Peff_dir: Directory containing raster files of growing season Peff data.
+    :param surface_irrig_dir: Directory containing raster files of surface water irrigation data.
+                              Note that- this data was distributed into pixels from USGS HUC12 dataset and was used
+                                         as a proxy for surface water irrigation in our effective precipitation paper.
+    :param deviation_allowed: Fractional threshold (e.g., 0.1 for 10%) to allow total water
+                              to be slightly less than irrigated crop ET. Default is 0.2.
+    :param skip_processing: If True, skip processing. Default is False.
+
+    :return: Filtered pumping array with invalid values set to zero.
+    """
+    if not skip_processing:
+        # reading growing season cropET data for irrigated croplands
+        irrig_cropET = glob(os.path.join(irrigated_cropET_dir, f'*{year}*.tif'))[0]
+        irrig_arr = read_raster_arr_object(irrig_cropET, get_file=False)
+
+        # reading growing season Peff data for irrigated croplands
+        peff = glob(os.path.join(Peff_dir, f'*{year}*.tif'))[0]
+        peff_arr = read_raster_arr_object(peff, get_file=False)
+
+        # reading surface water irrigation dataset (sourced from USGS HUC12 dataset. Distributed to
+        # pixel in our Peff paper)
+        surf_irrig = glob(os.path.join(surface_irrig_dir, f'*{year}*.tif'))[0]
+        surf_irrig_arr = read_raster_arr_object(surf_irrig, get_file=False)
+
+        # calculating total water
+        total_water = peff_arr + pumping_arr + surf_irrig_arr
+
+        # Applying filter to identify valid pumping values.
+        # A valid pumping value is one where the total water (Peff + pumping + surface irrigation) is greater than or
+        # equal to the irrigated crop ET. However, there can be issues with the data, such as incomplete pumping records,
+        # underestimated Peff, proxy surface water irrigation dataset, or bias in irrigated crop ET.
+        # To account for these potential discrepancies, a threshold (e.g., 10% or 20%) is used to include
+        # pumping values even when total water is slightly lower than the irrigated crop ET.
+        threshold = 1 - deviation_allowed
+        mask = (total_water >= irrig_arr) | (total_water >= threshold * irrig_arr)
+
+        pumping_arr = pumping_arr * mask  # invalid values are set to 0
+
+        return pumping_arr
+
+    else:
+        pass
+
+
+def combine_pumping_rasters(years, KS_dir, CO_dir, AZ_dir, output_dir, skip_processing=False):
+    """
+    Combines multiple pumping rasters into a final pumping raster by replacing zero values
+    in a reference raster with corresponding pumping data. Sets remaining zero values to -9999.
+
+    :param years: List/Tuple of years to process data for.
+    :param KS_dir: Annual pumping data directory (rasters) for Kansas.
+    :param CO_dir: Annual pumping data directory (rasters) for Colorado.
+    :param AZ_dir: Annual pumping data directory (rasters) for Arizona.
+    :param output_dir: Path to save the combined pumping rasters.
+    :param skip_processing: Set to True to skip this process. Default set to False.
+    :returns None.
+    """
+    if not skip_processing:
+        print("Combining states' pumping data to create Western US-wide pumping raster... \n"
+              "This will be used as a training data for the model...")
+
+        # creating output directory
+        makedirs([output_dir])
+
+        # processing the output annual pumping raster for each year
+        for year in years:
+            # reading pumping data for each year for given states
+            KS_data = glob(os.path.join(KS_dir, f'*{year}*.tif'))[0]
+            CO_data = glob(os.path.join(CO_dir, f'*{year}*.tif'))[0]
+            AZ_data = glob(os.path.join(AZ_dir, f'*{year}*.tif'))[0]
+
+            KS_arr, file = read_raster_arr_object(KS_data)
+            CO_arr = read_raster_arr_object(CO_data, get_file=False)
+            AZ_arr = read_raster_arr_object(AZ_data, get_file=False)
+
+            # initializing a zero array to store pumping data
+            pump_arr = np.zeros_like(KS_arr)
+
+            # replacing zero value of reference raster with pumping value
+            pump_arr = np.where(KS_arr > 0, KS_arr, pump_arr)
+            pump_arr = np.where(CO_arr > 0, CO_arr, pump_arr)
+            pump_arr = np.where(AZ_arr > 0, AZ_arr, pump_arr)
+
+            # setting all zero values to -9999 (where there is no pumping value)
+            pump_arr[pump_arr == 0] = -9999
+
+            # saving finalized pumping array as raster
+            output_raster = os.path.join(output_dir, f'pumping_{year}.tif')
+            write_array_to_raster(pump_arr, file, file.transform, output_raster)
+
+    else:
+        pass
 
 
 if __name__ == '__main__':
@@ -455,6 +599,8 @@ if __name__ == '__main__':
     skip_make_AZ_pumping_raster = True  # #
     skip_make_KS_pumping_raster = True  # #
     skip_make_CO_pumping_raster = True  # #
+
+    skip_combine_pumping_rasters = True  # #
 
 
     # # Arizona
@@ -473,13 +619,14 @@ if __name__ == '__main__':
         }
     )
 
-    pumping_pts_to_raster(state_code='AZ', years=list(range(2000, 2021)),
+    pumping_pts_to_raster(state_code='AZ', years=list(range(2000, 2020)),  # up to 2019 as Peff data (used for filtering) is available up to 2019
                           pumping_pts_shp='../../Data_main/pumping/Arizona/Final/pumping_AZ_v0.shp',  # # make sure that this is the final filtered pumping shapefile
                           pumping_attr_AF='AF_pumped',
                           year_attr='Year',
                           output_dir='../../Data_main/pumping/rasters/Arizona',
                           ref_raster=WestUS_raster, resolution=model_res,
-                          skip_processing=skip_make_AZ_pumping_raster)
+                          skip_processing=skip_make_AZ_pumping_raster,
+                          skip_low_val_removal=True)
 
     # # Kansas
     process_KS_pumping_csv(raw_csv='../../Data_main/pumping/Kansas/csv/pumping_KS.csv',
@@ -488,26 +635,33 @@ if __name__ == '__main__':
                            output_acres_csv='../../Data_main/pumping/Kansas/pumping_acres_KS.csv',
                            skip_process=skip_process_KS_pumping)
 
-    pumping_pts_to_raster(state_code='KS', years=list(range(2000, 2021)),
+    pumping_pts_to_raster(state_code='KS', years=list(range(2000, 2020)),  # up to 2019 as Peff data (used for filtering) is available up to 2019
                           pumping_pts_shp='../../Data_main/pumping/Kansas/Final/pumping_Ks.shp',
                           pumping_attr_AF='AF_pumped',
                           year_attr='Year',
                           output_dir='../../Data_main/pumping/rasters/Kansas',
                           ref_raster=WestUS_raster, resolution=model_res,
-                          skip_processing=skip_make_KS_pumping_raster)
+                          skip_processing=skip_make_KS_pumping_raster,
+                          skip_low_val_removal=True)
 
     # # Colorado
     process_CO_pumping_data(raw_csv='../../Data_main/pumping/Colorado/raw/pumping_data.csv',
                             output_pump_shp='../../Data_main/Pumping/Colorado/Final/pumping_CO_v0.shp',  # # this is a preliminary version that might have undergone hand filtering/processing
                             skip_process=skip_process_CO_pumping)
 
-    pumping_pts_to_raster(state_code='CO', years=list(range(2000, 2021)),
+    pumping_pts_to_raster(state_code='CO', years=list(range(2000, 2020)),  # up to 2019 as Peff data (used for filtering) is available up to 2019
                           pumping_pts_shp='../../Data_main/pumping/Colorado/Final/pumping_CO_v1.shp',  # # make sure that this is the final filtered pumping shapefile
                           pumping_attr_AF='AF_pumped',
                           year_attr='Year',
                           output_dir='../../Data_main/pumping/rasters/Colorado',
                           ref_raster=WestUS_raster, resolution=model_res,
-                          skip_processing=skip_make_CO_pumping_raster)
+                          skip_processing=skip_make_CO_pumping_raster,
+                          irrigated_cropET_dir='../../Data_main/rasters/Irrigated_cropET/WestUS_grow_season',
+                          Peff_dir='../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
+                          surface_irrig_dir='../../Data_main/rasters/SW_irrigation',
+                          deviation_allowed=0.2,
+                          skip_low_val_removal=False)  # implementing low pumping value removal in CO only
+                                                       # as we are not sure about comprehensive data across the state
 
     # # Utah
     process_UT_pumping_data(raw_csv='../../Data_main/pumping/Utah/raw/WaterUse_Utah.csv',
@@ -522,3 +676,11 @@ if __name__ == '__main__':
                                                'Use Type': ['Agricultural', 'irrigation']
                                             }
                             )
+
+    # # Combine states' pumping data into a combined pumping raster for Western US
+    combine_pumping_rasters(years=list(range(2000, 2020)),  # up to 2019 as Peff data (used for filtering) is available up to 2019
+                            KS_dir='../../Data_main/pumping/rasters/Kansas/pumping_mm',
+                            CO_dir='../../Data_main/pumping/rasters/Colorado/pumping_mm',
+                            AZ_dir='../../Data_main/pumping/rasters/Arizona/pumping_mm',
+                            output_dir='../../Data_main/pumping/rasters/WestUS_pumping',
+                            skip_processing=skip_combine_pumping_rasters)

@@ -537,7 +537,8 @@ def filter_out_low_pumping_values(year, pumping_arr, irrigated_cropET_dir,
         pass
 
 
-def combine_pumping_rasters(years, KS_dir, CO_dir, AZ_dir, output_dir, skip_processing=False):
+def combine_pumping_rasters(years, KS_dir, CO_dir, AZ_dir, irr_cropland_dir,
+                            output_dir, skip_processing=False):
     """
     Combines multiple pumping rasters into a final pumping raster by replacing zero values
     in a reference raster with corresponding pumping data. Sets remaining zero values to -9999.
@@ -546,6 +547,7 @@ def combine_pumping_rasters(years, KS_dir, CO_dir, AZ_dir, output_dir, skip_proc
     :param KS_dir: Annual pumping data directory (rasters) for Kansas.
     :param CO_dir: Annual pumping data directory (rasters) for Colorado.
     :param AZ_dir: Annual pumping data directory (rasters) for Arizona.
+    :param irr_cropland_dir: Annual irrigated cropland directory to apply irrigated cropland filter.
     :param output_dir: Path to save the combined pumping rasters.
     :param skip_processing: Set to True to skip this process. Default set to False.
     :returns None.
@@ -568,6 +570,10 @@ def combine_pumping_rasters(years, KS_dir, CO_dir, AZ_dir, output_dir, skip_proc
             CO_arr = read_raster_arr_object(CO_data, get_file=False)
             AZ_arr = read_raster_arr_object(AZ_data, get_file=False)
 
+            # irrigated cropland data for the year
+            irr_cropland = glob(os.path.join(irr_cropland_dir, f'*{year}*.tif'))[0]
+            irr_arr = read_raster_arr_object(irr_cropland, get_file=False)
+
             # initializing a zero array to store pumping data
             pump_arr = np.zeros_like(KS_arr)
 
@@ -576,8 +582,11 @@ def combine_pumping_rasters(years, KS_dir, CO_dir, AZ_dir, output_dir, skip_proc
             pump_arr = np.where(CO_arr > 0, CO_arr, pump_arr)
             pump_arr = np.where(AZ_arr > 0, AZ_arr, pump_arr)
 
+            # Setting nan value for pixels that are not irrigated per irrigated cropland data
+            pump_arr = np.where(np.isnan(irr_arr), -9999, pump_arr)
+
             # setting all zero values to -9999 (where there is no pumping value)
-            pump_arr[pump_arr == 0] = -9999
+            pump_arr = np.where(pump_arr == 0, -9999, pump_arr)
 
             # saving finalized pumping array as raster
             output_raster = os.path.join(output_dir, f'pumping_{year}.tif')
@@ -598,7 +607,7 @@ if __name__ == '__main__':
     skip_process_UT_pumping = True  # # caution: the processed files might have been further post-processed. Follow caution in setting this to 'False'.
 
     skip_make_AZ_pumping_raster = True  # #
-    skip_make_KS_pumping_raster = False  # #
+    skip_make_KS_pumping_raster = True  # #
     skip_make_CO_pumping_raster = True  # #
 
     skip_combine_pumping_rasters = False  # #
@@ -647,7 +656,7 @@ if __name__ == '__main__':
                           irrigated_cropET_dir='../../Data_main/rasters/Irrigated_cropET/WestUS_grow_season',
                           Peff_dir='../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
                           surface_irrig_dir='../../Data_main/rasters/SW_irrigation',
-                          deviation_allowed=0.2,
+                          deviation_allowed=0.1,
                           skip_low_val_removal=False)    # implementing low pumping value removal in KS
 
     # # Colorado
@@ -665,7 +674,7 @@ if __name__ == '__main__':
                           irrigated_cropET_dir='../../Data_main/rasters/Irrigated_cropET/WestUS_grow_season',
                           Peff_dir='../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
                           surface_irrig_dir='../../Data_main/rasters/SW_irrigation',
-                          deviation_allowed=0.2,
+                          deviation_allowed=0.1,
                           skip_low_val_removal=False)  # implementing low pumping value removal in CO
 
     # # Utah
@@ -687,5 +696,6 @@ if __name__ == '__main__':
                             KS_dir='../../Data_main/pumping/rasters/Kansas/pumping_mm',
                             CO_dir='../../Data_main/pumping/rasters/Colorado/pumping_mm',
                             AZ_dir='../../Data_main/pumping/rasters/Arizona/pumping_mm',
+                            irr_cropland_dir='../../Data_main/rasters/Irrigated_cropland',
                             output_dir='../../Data_main/pumping/rasters/WestUS_pumping',
                             skip_processing=skip_combine_pumping_rasters)

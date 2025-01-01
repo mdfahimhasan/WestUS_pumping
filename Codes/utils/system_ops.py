@@ -21,11 +21,11 @@ def makedirs(directory_list):
             os.makedirs(directory)
 
 
-def copy_file(input_dir_file, copy_dir, search_by='*.tif', rename=None):
+def copy_file(input_dir_or_file, copy_dir, search_by='*.tif', rename=None):
     """
     Copy a file to the specified directory.
 
-    :param input_dir_file: File path of input directory/ Path of the file to copy.
+    :param input_dir_or_file: File path of input directory/ Path of the file to copy.
     :param copy_dir: File path of copy directory.
     :param search_by: Default set to '*.tif'.
     :param rename: New name of file if required. Default set to None.
@@ -33,8 +33,8 @@ def copy_file(input_dir_file, copy_dir, search_by='*.tif', rename=None):
     :return: File path of copied file.
     """
     makedirs([copy_dir])
-    if '.tif' not in input_dir_file:
-        input_file = glob(os.path.join(input_dir_file, search_by))[0]
+    if '.tif' not in input_dir_or_file:
+        input_file = glob(os.path.join(input_dir_or_file, search_by))[0]
         if rename is not None:
             copied_file = os.path.join(copy_dir, f'{rename}.tif')
         else:
@@ -47,10 +47,10 @@ def copy_file(input_dir_file, copy_dir, search_by='*.tif', rename=None):
         if rename is not None:
             copied_file = os.path.join(copy_dir, f'{rename}.tif')
         else:
-            file_name = os.path.basename(input_dir_file)
+            file_name = os.path.basename(input_dir_or_file)
             copied_file = os.path.join(copy_dir, file_name)
 
-        shutil.copyfile(input_dir_file, copied_file)
+        shutil.copyfile(input_dir_or_file, copied_file)
 
     return copied_file
 

@@ -21,6 +21,22 @@ def makedirs(directory_list):
             os.makedirs(directory)
 
 
+def clean_and_make_directory(dir_path):
+    """
+    Removes an existing directory and all it's content. Then, makes a new directory.
+
+    :param dir_path: Path of the directory.
+
+    :return: None.
+    """
+    # cleaning the existing directory
+    if os.path.exists(dir_path):
+        shutil.rmtree(dir_path)
+
+    # making a new directory
+    os.makedirs(dir_path, exist_ok=True)
+
+
 def copy_file(input_dir_or_file, copy_dir, search_by='*.tif', rename=None):
     """
     Copy a file to the specified directory.

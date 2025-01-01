@@ -10,7 +10,8 @@ from glob import glob
 
 def makedirs(directory_list):
     """
-    Make directory (if not exists) from a list of directory.
+    Make directory (if not exists) from a list of directory. Can create multiple directories if provided in the arg as
+    a list.
 
     :param directory_list: A list of directories to create.
 
@@ -24,6 +25,7 @@ def makedirs(directory_list):
 def clean_and_make_directory(dir_path):
     """
     Removes an existing directory and all it's content. Then, makes a new directory.
+    Works for a single directory.
 
     :param dir_path: Path of the directory.
 

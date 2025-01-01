@@ -1,3 +1,15 @@
+# Author : Md Fahim Hasan
+# PhD Candidate
+# Colorado State university
+# Fahim.Hasan@colostate.edu
+
+"""
+Acknowledgment:
+This script was developed based on the author's knowledge base on satellite data processing and pre-processing
+machine/deep learning inputs. Assistance and insights provided has been taken from  ChatGPT, an AI model by OpenAI,
+to improve  efficiency, accuracy, and readability of the script, considering the complex nature of this script.
+"""
+
 # # Steps of implementation for readying datasets for the DL model
 
 # create tiles (we will do odd size images, preferred size is 7*7 or 9*9 for now)
@@ -6,19 +18,23 @@
 # generally standardizing/normalizing both input features and target variables are good practice (normalizing target variable might hurt interpretability)
 # use DataLoader to create batches with standardized data (DataLoader class in with the CNN script as that uses pyTorch)
 
+
+# This script has
+
 import os
 import shutil
 import pickle
+
 import numpy as np
 import pandas as pd
 from glob import glob
 import rasterio as rio
-from multiprocessing import Pool, Manager, Lock
-from rasterio.windows import Window, transform
+from multiprocessing import Pool, Manager
+from rasterio.windows import Window
 from sklearn.model_selection import train_test_split
 
-from Codes.utils.system_ops import makedirs, copy_file
-from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster
+from Codes.utils.system_ops import makedirs, copy_file, clean_and_make_directory
+from Codes.utils.raster_ops import read_raster_arr_object
 
 no_data_value = -9999
 
@@ -199,11 +215,23 @@ class make_training_tiles:
     Processes a multi-band raster image into tiles of training data and associated feature attributes.
 
      **Caution**:
-        1. The first band of the multiband raster must be target band (train data). This class extracts the center pixel
+        1. The first band of the multi-band raster must be target band (train data-pumping. This class extracts the center pixel
         value of the first band as the target variable for each loop and saves it separately, while the remaining
         bands are used as features (saved a tiled multi-band GeoTIFF) for the deep learning model.
+        2. The 2nd and 3rd bands must be net groundwater irrigation (netGW_Irr) and effective precipitation (Peff), respectively.
+        3. The `band_key_list` should only contain the names of the feature bands and exclude the target variable's name.
 
-        2. The `band_key_list` should only contain the names of the feature bands and exclude the target variable's name.
+
+    Filters out tiles based on the following conditions (applied in the _process_chunk_worker() function:
+
+        1. Skips tiles where the center pixel of the training band has a NoData value.
+        2. Skips tiles where the center pixel of the netGW_Irr band has a value of 0.
+        3. Skips tiles where the center pixel of the Peff band has a NoData value.
+        4. Skips tiles where the center pixel's training band value (e.g., pumping data) is less than 50% of the
+           center pixel's netGW_Irr value.
+           - This avoids cases where pumping is disproportionately low compared to net groundwater irrigation,
+             i.e., pumping data doesn't represent the total pumping in thta pixel.
+
     """
 
     def __init__(self, tiff_path_list, band_key_list,
@@ -234,21 +262,22 @@ class make_training_tiles:
         self.tile_no = start_tile_no
         self.num_workers = num_workers
 
-        # removing old output files and making a new folder
-        if os.path.exists(self.final_tile_output_dir):
-            shutil.rmtree(self.final_tile_output_dir)
 
-        makedirs([self.interim_tile_output_dir])
-
-        # implementing the tiling using multiprocesing (multiprocess has been used to fasten processing speed)
+        # implementing the tiling using multi-processing (multiprocess has been used to fasten processing speed)
         if not skip_processing:
+            # removing old output files and making a new folder
+            if os.path.exists(self.final_tile_output_dir):
+                shutil.rmtree(self.final_tile_output_dir)
+
+            makedirs([self.interim_tile_output_dir])
+
             for tiff_path in tiff_path_list:
                 cumulative_tile_no = self.process_tiles(tiff_path, band_key_list)
                 self.tile_no = cumulative_tile_no  # updating the self.tile_no after each multi-band raster iteration
 
-        # final process to serialize tile_no (multiprocess sets tile_no based on total central pixel
-        # processed in each chunk, resulting in large value of tile_no that need to be serialized)
-        self._final_update_tile_no()
+            # final process to serialize tile_no (multiprocess sets tile_no based on total central pixel
+            # processed in each chunk, resulting in large value of tile_no that need to be serialized)
+            self._final_update_tile_no()
 
     def process_tiles(self, tiff_path, band_key_list):
         """
@@ -305,9 +334,12 @@ class make_training_tiles:
                 'nodata_threshold': self.nodata_threshold
             }
 
-            pool_input =[]  # initiating an empty list to store pool inputs
+            # initiating an empty list to store pool inputs
+            pool_input =[]
 
+            # processing data with multiprocessing
             for chunk_idx, chunk in enumerate(row_chunks):
+
                 # assigning the starting tile number for the current chunk
                 start_tile_no = cumulative_tile_no
                 cumulative_tile_no += len(chunk) * (tiff.width - 2 * tile_radius)  # approximate number of tile in this chunk
@@ -327,7 +359,7 @@ class make_training_tiles:
                              header=not os.path.exists(self.interim_target_data_output_csv),
                              index=False)
 
-            # returning the updated 'cumulative_tile_no' which will be used to update the 'self.tile_no' in __init__
+            # returning the updated 'cumulative_tile_no' which will be used to update the 'self.tile_no' in __init__()
             return cumulative_tile_no
 
     def _process_chunk_worker(self, args):
@@ -352,7 +384,9 @@ class make_training_tiles:
 
         with rio.open(tiff_path) as tiff:
             tile_radius = config['tile_size'] // 2
-            training_band = tiff.read(1)  # 1st band is training data. Rasterio uses 1-based indexing
+            training_band = tiff.read(1)  # 1st band is training data (pumping). Rasterio uses 1-based indexing
+            netGW_band = tiff.read(2)     # 2nd band - netGW_Irr
+            Peff_band = tiff.read(3)      # 3rd band - effective precipitation
 
             # The first loop iterates across chunk (each chunk has 100 rows by default) and
             # the second loop across the width (columns) of the raster.
@@ -365,13 +399,28 @@ class make_training_tiles:
             for row in chunk:
                 for col in range(tile_radius, tiff.width - tile_radius):
                     try:
-                        center_value = training_band[row, col]
-
-                        # skipping NoData center pixels
-                        if center_value == self.nodata_value:
+                        # skipping tile with NoData in the center pixel of the tile
+                        center_train_value = training_band[row, col]
+                        if center_train_value == self.nodata_value:
                             continue
 
-                        # if the center value has valid value, create a window around it and read the data
+                        # skipping tile where center pixel's (of the tile) netGW_Irr value is 0
+                        netGW_value = netGW_band[row, col]
+                        if netGW_value == 0:
+                            continue
+
+                        # skipping tile where center pixel's (of the tile) Peff value is no data
+                        peff_value = Peff_band[row, col]
+                        if peff_value == self.nodata_value:
+                            continue
+
+                        # skipping tile if pumping (center pixel value for 1st band) is less than 50% of the
+                        # netGW_Irr value
+                        if center_train_value < 0.5 * netGW_value:
+                            continue
+
+                        # If the center value has valid value for training data, netGW_Irr, and Peff,
+                        # creating a window around it and read the data
                         window = Window(col_off=col - tile_radius, row_off=row - tile_radius,
                                         width=self.tile_size, height=self.tile_size)
                         tile_arr = tiff.read(window=window)
@@ -400,12 +449,13 @@ class make_training_tiles:
 
                         try:
                             self.save_tile(output_file, tile_arr, crs, window_transform, band_key_list)
+
                         except Exception as e:
                             print(f"Skipping tile {tile_name} due to save error: {e}")
                             continue
 
                         # append target (training) data to target_data_list
-                        target_data_list.append({'tile_no': current_tile_no, 'target_value': center_value})
+                        target_data_list.append({'tile_no': current_tile_no, 'target_value': center_train_value})
                         current_tile_no += 1
 
                     except Exception as e:
@@ -503,9 +553,48 @@ class make_training_tiles:
         target_csv.to_csv(self.final_target_data_output_csv, index=False)
 
 
+def copy_tiles(row, input_dir, copy_dir):
+    """
+   Copies a tile based on the tile number from the source to the destination directory.
+
+   :param row: A row from the DataFrame containing 'tile_no'.
+   :param input_dir: Path of the directory containing input tiles.
+   :param copy_dir: Destination directory to copy the tiles.
+
+   :return: None.
+   """
+    tile_no = int(row['tile_no'])
+    matching_tiles = glob(os.path.join(input_dir, f'*_{tile_no}.*tif'))
+    if len(matching_tiles) != 1:
+        print(f'Skipping tile_no {tile_no}: found multiple matches.')
+
+    tile_path = matching_tiles[0]
+    shutil.copy(tile_path, os.path.join(copy_dir, os.path.basename(tile_path)))
+
+
+# multiprocessing helper function for copying files
+def copy_tiles_parallel(splitted_target_df, input_dir, copy_dir, num_workers):
+    """
+    Copy tiles to train, validation, and test data directory using multiprocessing.
+
+    :param splitted_target_df: Train/validation/test dataframe.
+    :param input_dir: Path of directory of all tiled data.
+    :param copy_dir: Path to copy the tiles.
+    :param num_workers: int. Number of parallel processes to use for multiprocessing. Default is 10.
+
+    :return: None.
+    """
+    # preparing iterable of argument tuples for starmap
+    args = [(row, input_dir, copy_dir) for _, row in splitted_target_df.iterrows()]
+
+    # implementing copying using multiprocessing
+    with Pool(processes=num_workers) as pool:
+        pool.starmap(copy_tiles, args)
+
+
 def train_val_test_split(target_data_csv, input_tile_dir, train_dir, val_dir, test_dir,
                          train_size=0.7, val_size=0.2, test_size=0.1,
-                         random_state=42, skip_processing=False):
+                         random_state=42, num_workers=10, skip_processing=False):
     """
     Splits the tiles into train, validation, and test datasets, along with their target values.
 
@@ -518,16 +607,15 @@ def train_val_test_split(target_data_csv, input_tile_dir, train_dir, val_dir, te
     :param val_size: float. Proportion of the dataset to include in the validation split. Default is 0.2.
     :param test_size: float. Proportion of the dataset to include in the test split. Default is 0.1.
     :param random_state: int. Random seed for reproducibility. Default is 42.
+    :param num_workers: int. Number of parallel processes to use for multiprocessing. Default is 10.
     :param skip_processing: Set to True to skip processing. Default is False.
 
     :return: None.
     """
     if not skip_processing:
-        makedirs([train_dir, val_dir, test_dir])
+        print(f'making train-validation-test ({train_size * 100}-{val_size * 100}-{test_size * 100} %) splits....\n')
 
-        # ensuring the proportions sum to 1
-        if not (train_size + val_size + test_size == 1.0):
-            raise ValueError('The sum of train_size, val_size, and test_size must equal 1.0')
+        makedirs([train_dir, val_dir, test_dir])
 
         # loading the target data CSV
         target_data = pd.read_csv(target_data_csv)
@@ -536,6 +624,11 @@ def train_val_test_split(target_data_csv, input_tile_dir, train_dir, val_dir, te
         train_data, temp_data = train_test_split(target_data, train_size=train_size, random_state=random_state)
         val_data, test_data = train_test_split(temp_data, test_size=test_size / (val_size + test_size),
                                                random_state=random_state)
+
+        # cleaning existing data from the directories
+        clean_and_make_directory(train_dir)
+        clean_and_make_directory(val_dir)
+        clean_and_make_directory(test_dir)
 
         # storing splitted train, val, and test target values as csv
         train_data_df = pd.DataFrame(train_data)
@@ -547,134 +640,130 @@ def train_val_test_split(target_data_csv, input_tile_dir, train_dir, val_dir, te
         test_data_df = pd.DataFrame(test_data)
         test_data_df.to_csv(os.path.join(test_dir, 'y_test.csv'), index=False)
 
-        # helper function to copy corresponding tiles to train, val, and test dir based on tile_no in target dataset
-        def copy_tiles(splitted_target_data_df, copy_dir):
-            for _, row in splitted_target_data_df.iterrows():
-                tile_no = row['tile_no']
-                matching_tiles = glob(os.path.join(input_tile_dir, f'*_{tile_no}*.tif'))
-                if len(matching_tiles) != 1:
-                    print(f'Skipping tile_no {tile_no}: found multiple matches.')
-
-                tile_path = matching_tiles[0]
-                shutil.copy(tile_path, os.path.join(copy_dir, os.path.basename(tile_path)))
-
-        # helper function for cleaning the directories before copying tiles
-        def clean_directory(dir_path):
-            if os.path.exists(dir_path):
-                shutil.rmtree(dir_path)
-            os.makedirs(dir_path, exist_ok=True)
-
         # copying tiles to respective train, val, and test directories
-        clean_directory(train_dir)
-        clean_directory(val_dir)
-        clean_directory(test_dir)
-
-        copy_tiles(train_data, train_dir)
-        copy_tiles(val_data, val_dir)
-        copy_tiles(test_data, test_dir)
+        copy_tiles_parallel(train_data, input_tile_dir, train_dir, num_workers)
+        copy_tiles_parallel(val_data, input_tile_dir, val_dir, num_workers)
+        copy_tiles_parallel(test_data, input_tile_dir, test_dir, num_workers)
 
     else:
         pass
 
 
-def calc_scaling_statistics(train_dir, skip_processing=False):
+def accumulate_band_values_each_tile(tile, bands, nodata):
+    """
+    Collects valid band values to calculate per-band statistics using multiprocessing.
+
+    :param tile: Path to the tile file.
+    :param bands: List of band descriptions.
+    :param nodata: NoData value for the tile.
+
+    :return: A dictionary containing per-band statistics (mean, std, min, max).
+    """
+    dataset = rio.open(tile).read()  # reading all input bands in a tile
+    band_values = {band: [] for band in bands}
+
+    # process for each band in the tile
+    for band in bands:
+        # extracting band index from 'bands' list
+        # then, extracting corresponding array for that band and flattening
+        band_idx = bands.index(band)
+        band_arr = dataset[band_idx].flatten()
+
+        # better NaN or nodata handling
+        if nodata is not None:
+            if np.isnan(nodata):  # Handle NaN as nodata
+                band_arr = band_arr[~np.isnan(band_arr)]
+            else:  # Handle non-NaN nodata values
+                band_arr = band_arr[band_arr != nodata]
+
+        # accumulating statistics for this band
+        if len(band_arr) > 0:  # to avoid empty arrays
+            band_values[band].extend(band_arr)
+
+    return band_values
+
+
+def calc_scaling_statistics(train_dir, output_dir, num_workers=10, skip_processing=False):
     """
     Calculates the mean, standard deviation, min, and max for each band across all tiles in the training directory.
 
     :param train_dir: str. Path to the directory containing training tiles.
+    :param output_dir: str. Path to the directory to save calculated statistics.
+    :param num_workers: int. Number of parallel processes to use for multiprocessing. Default is 10.
     :param skip_processing: Set to True to skip processing. Default is False.
 
     :return: Four dictionaries: mean_dict, std_dict, min_dict, and max_dict.
     """
     if not skip_processing:  # calculating the statistics
+        print('calculating statistics for data scaling...')
+
+        clean_and_make_directory(output_dir)
+
         # collecting all tiles in the training data directory
         all_tiles = glob(os.path.join(train_dir, f'*.tif'))
 
         # getting band descriptions and no data info
         bands = rio.open(all_tiles[0]).descriptions
+        bands = [band.split('_')[0] for band in bands]
+        print('Band Descriptions:', bands)
+
         nodata = rio.open(all_tiles[0]).nodata
 
-        # initializing dictionaries to store scaling statistics
-        band_mean_dict = {band: [] for band in bands}
-        band_std_dict = {band: [] for band in bands}
-        band_min_dict = {band: [] for band in bands}
-        band_max_dict = {band: [] for band in bands}
+        # Collecting individual band arrays separately in a dictionary
+        # which will be used to calculate band statistics.
+        # Using multiprocessing to parallelly process large number of tiles
+        args = [(tile, bands, nodata) for tile in all_tiles]
 
-        # processing all tiles for individual bands
-        for tile in all_tiles:
-            dataset = rio.open(tile).read()  # reading all input bands in a tile
+        with Pool(processes=num_workers) as pool:
+            result_dict = pool.starmap(accumulate_band_values_each_tile, args)
 
-            # process for each band in the tile
+        # iterating overs results from multiprocessing
+        aggregated_values = {band: [] for band in bands}
+        for tiles_values in result_dict:
+            # Each tile_values is a dictionary containing band names as keys
+            # and the corresponding valid pixel values from that tile as a list.
+            # Here, multiple dictionary are the results of multiprocessing, which
+            # need to be merged across all tiles for each band.
+
             for band in bands:
-                # extracting band index from 'bands' list
-                # then, extracting corresponding array for that band and flattening
-                band_idx = bands.index(band)
-                band_arr = dataset[band_idx].flatten()
+                # Extending the aggregated list for the current band with values from this tile.
+                # This ensures that all pixel values for each band, from all tiles, are merged
+                # into a single list in the aggregated_values dictionary.
+                # Without this second loop, we would only process the values from the last tile
+                # in the results, which would result in incomplete statistics.
+                aggregated_values[band].extend(tiles_values[band])
 
-                # better NaN or nodata handling
-                if nodata is not None:
-                    if np.isnan(nodata):  # Handle NaN as nodata
-                        band_arr = band_arr[~np.isnan(band_arr)]
-                    else:  # Handle non-NaN nodata values
-                        band_arr = band_arr[band_arr != nodata]
+        # calculating statistics
+        mean_dict = {band: np.nanmean(aggregated_values[band]) for band in bands}
+        std_dict = {band: np.nanstd(aggregated_values[band]) for band in bands}
+        min_dict = {band: np.nanmin(aggregated_values[band]) for band in bands}
+        max_dict = {band: np.nanmax(aggregated_values[band]) for band in bands}
 
-                # accumulating statistics for this band
-                band_mean_dict[bands[band_idx]].extend(band_arr)
-                band_std_dict[bands[band_idx]].extend(band_arr)
-                band_min_dict[bands[band_idx]].extend(band_arr)
-                band_max_dict[bands[band_idx]].extend(band_arr)
-
-        # target statistics
+        # processing target statistics
         target_df = pd.read_csv(os.path.join(train_dir, 'y_train.csv'))
         target_df.dropna(inplace=True)
-        target_val = np.array(target_df['value'].tolist())
+        target_val = np.array(target_df['target_value'].tolist())
 
-        target_mean = np.nanmean(target_val)
-        target_std = np.nanstd(target_val)
-        target_min = np.nanmin(target_val)
-        target_max = np.nanmax(target_val)
-
-        # finalizing the statistics across all tiles for each band
-        mean_dict = {}
-        std_dict = {}
-        min_dict = {}
-        max_dict = {}
-
-        for band in band_mean_dict.keys():
-            data = np.array(band_mean_dict[band], dtype=np.float32)
-            mean_dict[band] = np.nanmean(data)
-            mean_dict['target'] = target_mean
-
-        for band in band_std_dict.keys():
-            data = np.array(band_std_dict[band], dtype=np.float32)
-            std_dict[band] = np.nanstd(data)
-            std_dict['target'] = target_std
-
-        for band in band_min_dict.keys():
-            data = np.array(band_min_dict[band], dtype=np.float32)
-            min_dict[band] = np.nanmin(data)
-            min_dict['target'] = target_min
-
-        for band in band_max_dict.keys():
-            data = np.array(band_max_dict[band], dtype=np.float32)
-            max_dict[band] = np.nanmax(data)
-            max_dict['target'] = target_max
+        mean_dict['target'] = np.nanmean(target_val)
+        std_dict['target'] = np.nanstd(target_val)
+        min_dict['target'] = np.nanmin(target_val)
+        max_dict['target'] = np.nanmax(target_val)
 
         # saving dictionaries as pickle
         for dict_name, dictionary in zip(
                 ['mean', 'std', 'min', 'max'], [mean_dict, std_dict, min_dict, max_dict]
         ):
-            pickle_path = os.path.join(train_dir, f'{dict_name}.pkl')
+            pickle_path = os.path.join(output_dir, f'{dict_name}.pkl')
             with open(pickle_path, 'wb') as f:
                 pickle.dump(dictionary, f)
 
         return mean_dict, std_dict, min_dict, max_dict
 
     else:  # loading the saved statistics
-        mean_dict = pickle.load(open(os.path.join(train_dir, 'mean.pkl'), 'rb'))
-        std_dict = pickle.load(open(os.path.join(train_dir, 'std.pkl'), 'rb'))
-        min_dict = pickle.load(open(os.path.join(train_dir, 'min.pkl'), 'rb'))
-        max_dict = pickle.load(open(os.path.join(train_dir, 'max.pkl'), 'rb'))
+        mean_dict = pickle.load(open(os.path.join(output_dir, 'mean.pkl'), 'rb'))
+        std_dict = pickle.load(open(os.path.join(output_dir, 'std.pkl'), 'rb'))
+        min_dict = pickle.load(open(os.path.join(output_dir, 'min.pkl'), 'rb'))
+        max_dict = pickle.load(open(os.path.join(output_dir, 'max.pkl'), 'rb'))
 
         return mean_dict, std_dict, min_dict, max_dict
 

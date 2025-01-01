@@ -14,152 +14,154 @@ from os.path import dirname, abspath
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.download_preprocess.preprocess import run_all_preprocessing
-from Codes.download_preprocess.tiles_utils import make_multiband_datasets
-
-# ----------------------------------------------------------------------------------------------------------------------
-# 1. Data download
-# ----------------------------------------------------------------------------------------------------------------------
-
-# directories and variables
-data_download_dir = '../../Data_main/rasters'
-gee_grid_shape_large = '../../Data_main/ref_shapes/WestUS_gee_grid.shp'
-gee_grid_shape_for30m_IrrMapper = '../../Data_main/ref_shapes/WestUS_gee_grid_for30m_IrrMapper.shp'
-gee_grid_shape_for30m_LANID = '../../Data_main/ref_shapes/WestUS_gee_grid_for30m_LANID.shp'
-
-gee_data_list = [
-    'Landsat5_NDVI',
-    'Landsat8_NDVI',
-    'Landsat5_OSAVI',
-    'Landsat8_OSAVI',
-    'Landsat5_NDMI',
-    'Landsat8_NDMI',
-    'Landsat5_GCVI',
-    'Landsat8_GCVI',
-    'GRIDMET_Precip',
-    'GRIDMET_RET',
-    'GRIDMET_Tmax'
-    'MODIS_Day_LST',
-    'Field_capacity',
-    'Sand_content',
-    'Clay_content'
-]
-
-openET_data_list = ['Irrig_crop_OpenET_IrrMapper',
-                    'Irrig_crop_OpenET_LANID',
-                    'Irrigation_Frac_IrrMapper',
-                    'Irrigation_Frac_LANID']
-
-years = [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-         2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015,
-         2016, 2017, 2018, 2019, 2020]
-months = (1, 12)
-
-# flags
-skip_download_gee_data = True  #########################################################################################
-skip_download_OpenET_data = True  ######################################################################################
-
-download_all_gee_data(data_list=gee_data_list, download_dir=data_download_dir,
-                      year_list=years, month_range=months,
-                      skip_download=skip_download_gee_data)
-
-download_all_openET_datasets(year_list=years, month_range=months,
-                             openET_data_list=openET_data_list,
-                             data_download_dir=data_download_dir,
-                             grid_shape_for_2km_ensemble=None,
-                             grid_shape_for30m_irrmapper=gee_grid_shape_for30m_IrrMapper,
-                             grid_shape_for30m_lanid=gee_grid_shape_for30m_LANID,
-                             skip_download_OpenET_data=skip_download_OpenET_data)
-
-# ----------------------------------------------------------------------------------------------------------------------
-# 2. Data preprocessing
-# ----------------------------------------------------------------------------------------------------------------------
-
-# directories and variables
-years = list(range(2000, 2019 + 1))  # collecting data from 2000-2019 as growing season Peff is available upto 2019 only
-
-# flags
-skip_process_GS_data = True  ###########################################################################################
-skip_prism_precip_processing = True  ###################################################################################
-skip_prism_tmax_processing = True  #####################################################################################
-skip_GRIDMET_RET_processing = True  ####################################################################################
-skip_GRIDMET_precip_processing = True  #################################################################################
-skip_GRIDMET_tmax_processing = True  ###################################################################################
-
-run_all_preprocessing(skip_process_GrowSeason_data=skip_process_GS_data,
-                      skip_prism_precip_processing=skip_prism_precip_processing,
-                      skip_prism_tmax_processing=skip_prism_tmax_processing,
-                      skip_gridmet_RET_processing=skip_GRIDMET_RET_processing,
-                      skip_gridmet_precip_processing=skip_GRIDMET_precip_processing,
-                      skip_gridmet_tmax_processing=skip_GRIDMET_tmax_processing)
-
-# ----------------------------------------------------------------------------------------------------------------------
-# 3. Multi-band raster creation for model training (includes pumping data in 1st band)
-# ----------------------------------------------------------------------------------------------------------------------
-
-# directories and variables
-datasets_dict = {'../../Data_main/pumping/rasters/Colorado/pumping_mm': 'pumping_mm',  # the pumping data only has data from Colorado for now
-                 '../../Data_main/rasters/NetGW_irrigation/WesternUS': 'netGWIrr',
-                 '../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled': 'peff',
-                 '../../Data_main/rasters/RET/WestUS_growing_season': 'ret',
-                 '../../Data_main/rasters/Precip/WestUS_growing_season': 'precip',
-                 '../../Data_main/rasters/Tmax/WestUS_growing_season': 'tmax',
-                 '../../Data_main/rasters/Irrigated_cropET/WestUS_grow_season': 'irr_cropET',
-                 '../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac': 'irr_crop_frac',
-                 '../../Data_main/rasters/Irrigated_cropland': 'irr_cropland',
-                 '../../Data_main/rasters/GCVI/WestUS_yearly': 'gcvi',
-                 '../../Data_main/rasters/OSAVI/WestUS_yearly': 'osavi',
-                 '../../Data_main/rasters/NDVI/WestUS_yearly': 'ndvi',
-                 '../../Data_main/rasters/NDMI/WestUS_yearly': 'ndmi',
-                 '../../Data_main/rasters/Clay_content/WestUS': 'clay',
-                 '../../Data_main/rasters/Sand_content/WestUS': 'sand',
-                 '../../Data_main/rasters/Field_capacity/WestUS': 'fc'}
-
-static_vars_dir = [i for i in datasets_dict.keys() if
-                   any(var in i for var in ('Clay_content', 'Sand_content', 'Field_capacity'))]
-temporal_vars_dir = [i for i in datasets_dict.keys() if i not in static_vars_dir]
-
-band_key_list = list(datasets_dict.values())  # make sure to not include the training data's name as that band will be removed
-
-westUS_multiband_dir = '../../Data_main/rasters/multibands/training/westUS'
-
-training_years = (2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
-                  # 2012,   # 2012 skipped as no GCVI/NDVI/NDVI/NDMi data available due to gap in Landsat data; will think an alternative
-                  2013, 2014, 2015, 2016, 2017, 2018, 2019)
-
-# flags
-skip_create_multiband_raster = True  ####################################################################################
-
-# multi-band raster creation
-make_multiband_datasets(list_of_temporal_var_dirs=temporal_vars_dir, list_of_static_var_dirs=static_vars_dir,
-                        band_key_list=band_key_list,
-                        output_dir=westUS_multiband_dir,
-                        years_list=training_years, skip_processing=skip_create_multiband_raster)
-
-# ----------------------------------------------------------------------------------------------------------------------
-# 4. Multi-band tile creation for model training (includes pumping data in 1st band)
-# ----------------------------------------------------------------------------------------------------------------------
-
-# directories and variables
-multiband_rasters = glob(os.path.join(westUS_multiband_dir, '*.tif'))
-interim_multiband_tile_dir = '../../Data_main/rasters/multibands/training/tiles/interim'
-interim_target_csv = '../../Data_main/rasters/multibands/training/tiles/interim/target.csv'
-final_multiband_tile_dir = '../../Data_main/rasters/multibands/training/tiles'
-final_target_csv = '../../Data_main/rasters/multibands/training/tiles/target.csv'
+from Codes.download_preprocess.tiles_utils import make_multiband_datasets, make_training_tiles, \
+        train_val_test_split, calc_scaling_statistics, standardize_train_val_test
 
 
-band_key_list = band_key_list[1:]
-use_cpu_nodes = 10
-
-# flags
-skip_create_tile = False  ###############################################################################################
+# The `if __name__ == "__main__":` guard is required when using Python's multiprocessing module
+# (used in make_training_tiles() class), especially on Windows and macOS. It ensures that the code inside this block
+# is only executed when the script is run directly. This prevents recursive imports and ensures that worker processes
+# are correctly spawned without re-running the entire script in each process.
 
 if __name__ == '__main__':
-    # The `if __name__ == "__main__":` guard is required when using Python's multiprocessing module, especially on
-    # Windows and macOS. It ensures that the code inside this block is only executed when the script is run directly.
-    # This prevents recursive imports and ensures that worker processes are correctly spawned without re-running
-    # the entire script in each process.
+    # ------------------------------------------------------------------------------------------------------------------
+    # 1. Data download
+    # ------------------------------------------------------------------------------------------------------------------
 
-    from Codes.download_preprocess.tiles_utils import make_training_tiles
+    # directories and variables
+    data_download_dir = '../../Data_main/rasters'
+    gee_grid_shape_large = '../../Data_main/ref_shapes/WestUS_gee_grid.shp'
+    gee_grid_shape_for30m_IrrMapper = '../../Data_main/ref_shapes/WestUS_gee_grid_for30m_IrrMapper.shp'
+    gee_grid_shape_for30m_LANID = '../../Data_main/ref_shapes/WestUS_gee_grid_for30m_LANID.shp'
+
+    gee_data_list = [
+        'Landsat5_NDVI',
+        'Landsat8_NDVI',
+        'Landsat5_OSAVI',
+        'Landsat8_OSAVI',
+        'Landsat5_NDMI',
+        'Landsat8_NDMI',
+        'Landsat5_GCVI',
+        'Landsat8_GCVI',
+        'GRIDMET_Precip',
+        'GRIDMET_RET',
+        'GRIDMET_Tmax'
+        'MODIS_Day_LST',
+        'Field_capacity',
+        'Sand_content',
+        'Clay_content'
+    ]
+
+    openET_data_list = ['Irrig_crop_OpenET_IrrMapper',
+                        'Irrig_crop_OpenET_LANID',
+                        'Irrigation_Frac_IrrMapper',
+                        'Irrigation_Frac_LANID']
+
+    years = [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
+             2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015,
+             2016, 2017, 2018, 2019, 2020]
+    months = (1, 12)
+
+    # flags
+    skip_download_gee_data = True  ######################################################################################
+    skip_download_OpenET_data = True  ###################################################################################
+
+    download_all_gee_data(data_list=gee_data_list, download_dir=data_download_dir,
+                          year_list=years, month_range=months,
+                          skip_download=skip_download_gee_data)
+
+    download_all_openET_datasets(year_list=years, month_range=months,
+                                 openET_data_list=openET_data_list,
+                                 data_download_dir=data_download_dir,
+                                 grid_shape_for_2km_ensemble=None,
+                                 grid_shape_for30m_irrmapper=gee_grid_shape_for30m_IrrMapper,
+                                 grid_shape_for30m_lanid=gee_grid_shape_for30m_LANID,
+                                 skip_download_OpenET_data=skip_download_OpenET_data)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # 2. Data preprocessing
+    # ------------------------------------------------------------------------------------------------------------------
+
+    # directories and variables
+    years = list(range(2000, 2019 + 1))  # collecting data from 2000-2019 as growing season Peff is available upto 2019 only
+
+    # flags
+    skip_process_GS_data = True  ########################################################################################
+    skip_prism_precip_processing = True  ################################################################################
+    skip_prism_tmax_processing = True  ##################################################################################
+    skip_GRIDMET_RET_processing = True  #################################################################################
+    skip_GRIDMET_precip_processing = True  ##############################################################################
+    skip_GRIDMET_tmax_processing = True  ################################################################################
+
+    run_all_preprocessing(skip_process_GrowSeason_data=skip_process_GS_data,
+                          skip_prism_precip_processing=skip_prism_precip_processing,
+                          skip_prism_tmax_processing=skip_prism_tmax_processing,
+                          skip_gridmet_RET_processing=skip_GRIDMET_RET_processing,
+                          skip_gridmet_precip_processing=skip_GRIDMET_precip_processing,
+                          skip_gridmet_tmax_processing=skip_GRIDMET_tmax_processing)
+
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # 3. Multi-band raster creation for model training (includes pumping data in 1st band)
+    # ------------------------------------------------------------------------------------------------------------------
+
+    # directories and variables
+    datasets_dict = {'../../Data_main/pumping/rasters/Colorado/pumping_mm': 'pumping_mm',
+                     # the pumping data only has data from Colorado for now
+                     '../../Data_main/rasters/NetGW_irrigation/WesternUS': 'netGWIrr',
+                     '../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled': 'peff',
+                     '../../Data_main/rasters/RET/WestUS_growing_season': 'ret',
+                     '../../Data_main/rasters/Precip/WestUS_growing_season': 'precip',
+                     '../../Data_main/rasters/Tmax/WestUS_growing_season': 'tmax',
+                     '../../Data_main/rasters/Irrigated_cropET/WestUS_grow_season': 'irr_cropET',
+                     '../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac': 'irr_crop_frac',
+                     '../../Data_main/rasters/Irrigated_cropland': 'irr_cropland',
+                     '../../Data_main/rasters/GCVI/WestUS_yearly': 'gcvi',
+                     '../../Data_main/rasters/OSAVI/WestUS_yearly': 'osavi',
+                     '../../Data_main/rasters/NDVI/WestUS_yearly': 'ndvi',
+                     '../../Data_main/rasters/NDMI/WestUS_yearly': 'ndmi',
+                     '../../Data_main/rasters/Clay_content/WestUS': 'clay',
+                     '../../Data_main/rasters/Sand_content/WestUS': 'sand',
+                     '../../Data_main/rasters/Field_capacity/WestUS': 'fc'}
+
+    static_vars_dir = [i for i in datasets_dict.keys() if
+                       any(var in i for var in ('Clay_content', 'Sand_content', 'Field_capacity'))]
+    temporal_vars_dir = [i for i in datasets_dict.keys() if i not in static_vars_dir]
+
+    band_key_list = list(
+        datasets_dict.values())  # make sure to not include the training data's name as that band will be removed
+
+    westUS_multiband_dir = '../../Data_main/rasters/multibands/training/westUS'
+
+    training_years = (2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
+                      # 2012,   # 2012 skipped as no GCVI/NDVI/NDVI/NDMi data available due to gap in Landsat data; will think an alternative
+                      2013, 2014, 2015, 2016, 2017, 2018, 2019)
+
+    # flags
+    skip_create_multiband_raster = True  ###############################################################################
+
+    # multi-band raster creation
+    make_multiband_datasets(list_of_temporal_var_dirs=temporal_vars_dir, list_of_static_var_dirs=static_vars_dir,
+                            band_key_list=band_key_list,
+                            output_dir=westUS_multiband_dir,
+                            years_list=training_years, skip_processing=skip_create_multiband_raster)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # 4. Multi-band tile creation for model training (includes pumping data in 1st band)
+    # ------------------------------------------------------------------------------------------------------------------
+
+    # directories and variables
+    multiband_rasters = glob(os.path.join(westUS_multiband_dir, '*.tif'))
+    interim_multiband_tile_dir = '../../Data_main/rasters/multibands/training/tiles/interim'
+    interim_target_csv = '../../Data_main/rasters/multibands/training/tiles/interim/target.csv'
+    final_multiband_tile_dir = '../../Data_main/rasters/multibands/training/tiles'
+    final_target_csv = '../../Data_main/rasters/multibands/training/tiles/target.csv'
+
+    band_key_list = band_key_list[1:]
+    use_cpu_nodes = 10
+
+    # flags
+    skip_create_tile = True  ###########################################################################################
 
     tile_maker = make_training_tiles(tiff_path_list=multiband_rasters, band_key_list=band_key_list,
                                      interim_tile_output_dir=interim_multiband_tile_dir,
@@ -170,7 +172,41 @@ if __name__ == '__main__':
                                      num_workers=use_cpu_nodes,
                                      skip_processing=skip_create_tile)
 
+    # ------------------------------------------------------------------------------------------------------------------
+    # 5. Train-validation-test split
+    # ------------------------------------------------------------------------------------------------------------------
 
+    # directories and variables
+    multiband_tile_dir = final_multiband_tile_dir
+    target_csv = final_target_csv
+    train_dir = '../../Data_main/rasters/multibands/train_val_test_splits/train'
+    val_dir = '../../Data_main/rasters/multibands/train_val_test_splits/val'
+    test_dir = '../../Data_main/rasters/multibands/train_val_test_splits/test'
 
+    use_cpu_nodes = 10
+
+    # flags
+    skip_split_train_val_test = False  ##################################################################################
+
+    train_val_test_split(target_data_csv=target_csv, input_tile_dir=multiband_tile_dir,
+                         train_dir=train_dir, val_dir=val_dir, test_dir=test_dir,
+                         train_size=0.7, val_size=0.2, test_size=0.1,
+                         random_state=42, num_workers=use_cpu_nodes,
+                         skip_processing=skip_split_train_val_test)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # 6. Calculate scaling statistics and standardize
+    # ------------------------------------------------------------------------------------------------------------------
+
+    # directories and variables
+    statistics_dir = '../../Data_main/rasters/multibands/scaling_stats'
+    use_cpu_nodes = 10
+
+    # flags
+    skip_calc_stats = False  #############################################################################################
+
+    calc_scaling_statistics(train_dir=train_dir, output_dir=statistics_dir,
+                            num_workers=use_cpu_nodes,
+                            skip_processing=skip_calc_stats)
 
 

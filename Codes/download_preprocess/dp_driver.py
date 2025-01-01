@@ -14,7 +14,7 @@ from os.path import dirname, abspath
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.download_preprocess.preprocess import run_all_preprocessing
-from Codes.download_preprocess.tiles_utils import make_multiband_datasets, make_training_tiles
+from Codes.download_preprocess.tiles_utils import make_multiband_datasets
 
 # ----------------------------------------------------------------------------------------------------------------------
 # 1. Data download
@@ -97,8 +97,7 @@ run_all_preprocessing(skip_process_GrowSeason_data=skip_process_GS_data,
 # ----------------------------------------------------------------------------------------------------------------------
 
 # directories and variables
-datasets_dict = {'../../Data_main/pumping/rasters/Colorado/pumping_mm': 'pumping_mm',
-                 # the pumping data only has data from Colorado for now
+datasets_dict = {'../../Data_main/pumping/rasters/Colorado/pumping_mm': 'pumping_mm',  # the pumping data only has data from Colorado for now
                  '../../Data_main/rasters/NetGW_irrigation/WesternUS': 'netGWIrr',
                  '../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled': 'peff',
                  '../../Data_main/rasters/RET/WestUS_growing_season': 'ret',
@@ -140,27 +139,36 @@ make_multiband_datasets(list_of_temporal_var_dirs=temporal_vars_dir, list_of_sta
 # 4. Multi-band tile creation for model training (includes pumping data in 1st band)
 # ----------------------------------------------------------------------------------------------------------------------
 
-# directories
+# directories and variables
 multiband_rasters = glob(os.path.join(westUS_multiband_dir, '*.tif'))
-multiband_tile_dir = '../../Data_main/rasters/multibands/training/tiles'
-target_csv = '../../Data_main/rasters/multibands/training/tiles/target.csv'
+interim_multiband_tile_dir = '../../Data_main/rasters/multibands/training/tiles/interim'
+interim_target_csv = '../../Data_main/rasters/multibands/training/tiles/interim/target.csv'
+final_multiband_tile_dir = '../../Data_main/rasters/multibands/training/tiles'
+final_target_csv = '../../Data_main/rasters/multibands/training/tiles/target.csv'
+
 
 band_key_list = band_key_list[1:]
+use_cpu_nodes = 10
 
 # flags
 skip_create_tile = False  ###############################################################################################
 
-# external tile counter
-current_tile_no = 1  # Start tile numbering
+if __name__ == '__main__':
+    # The `if __name__ == "__main__":` guard is required when using Python's multiprocessing module, especially on
+    # Windows and macOS. It ensures that the code inside this block is only executed when the script is run directly.
+    # This prevents recursive imports and ensures that worker processes are correctly spawned without re-running
+    # the entire script in each process.
 
-for multi_ras in multiband_rasters:
-    tile_maker = make_training_tiles(tiff_path=multi_ras, band_key_list=band_key_list,
-                                     tile_output_dir=multiband_tile_dir,
-                                     target_data_output_csv=target_csv,
-                                     start_tile_no=current_tile_no,
+    from Codes.download_preprocess.tiles_utils import make_training_tiles
+
+    tile_maker = make_training_tiles(tiff_path_list=multiband_rasters, band_key_list=band_key_list,
+                                     interim_tile_output_dir=interim_multiband_tile_dir,
+                                     interim_target_data_output_csv=interim_target_csv,
+                                     final_tile_output_dir=final_multiband_tile_dir,
+                                     final_target_data_output_csv=final_target_csv,
+                                     start_tile_no=1,
+                                     num_workers=use_cpu_nodes,
                                      skip_processing=skip_create_tile)
-
-    current_tile_no = tile_maker.tile_no
 
 
 

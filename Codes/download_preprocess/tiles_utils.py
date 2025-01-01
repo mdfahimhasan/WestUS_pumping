@@ -13,10 +13,11 @@ import numpy as np
 import pandas as pd
 from glob import glob
 import rasterio as rio
+from multiprocessing import Pool, Manager, Lock
 from rasterio.windows import Window, transform
 from sklearn.model_selection import train_test_split
 
-from Codes.utils.system_ops import makedirs
+from Codes.utils.system_ops import makedirs, copy_file
 from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster
 
 no_data_value = -9999
@@ -205,114 +206,212 @@ class make_training_tiles:
         2. The `band_key_list` should only contain the names of the feature bands and exclude the target variable's name.
     """
 
-    def __init__(self, tiff_path, band_key_list, tile_output_dir, target_data_output_csv,
+    def __init__(self, tiff_path_list, band_key_list,
+                 interim_tile_output_dir, interim_target_data_output_csv,
+                 final_tile_output_dir, final_target_data_output_csv,
                  tile_size=7, nodata_value=-9999, nodata_threshold=50, start_tile_no=1,
-                 skip_processing=False):
+                 num_workers=20, skip_processing=False):
         """
-        :param tiff_path (str): Path to the multi-band raster TIFF file to process.
+        :param tiff_path_list (list): List of paths to the multi-band raster TIFF file to process.
         :param band_key_list (list): List of keys or descriptions for each band.
-        :param tile_output_dir (str): Directory where the processed tiles will be saved.
-        :param target_data_output_csv (str): Filepath to save the target training data as CSV.
+        :param interim_tile_output_dir (str): Interim directory where the processed tiles will be saved.
+        :param final_tile_output_dir (str): Final directory where the processed tiles will be saved.
+        :param interim_target_data_output_csv (str): Filepath to save the interim target training data as CSV.
         :param tile_size (int): Size of the square tile (e.g., 7x7). Must be odd to ensure a center pixel.
         :param nodata_value (int/float): NoData value in the raster (default: -9999).
         :param nodata_threshold (int): Maximum percentage of NoData values allowed in a tile (default: 50).
         :param start_tile_no (int): Initial value for the tile number. Default set to 1.
+        :param num_workers: int. Number of parallel processes to use for multiprocessing. Default is 20.
         :param skip_processing (bool): If True, skips processing and initializes the class without performing operations.
         """
-        self.tile_output_dir = tile_output_dir
-        self.target_data_output_csv = target_data_output_csv
+        self.interim_tile_output_dir = interim_tile_output_dir
+        self.interim_target_data_output_csv = interim_target_data_output_csv
+        self.final_tile_output_dir = final_tile_output_dir
+        self.final_target_data_output_csv = final_target_data_output_csv
         self.tile_size = tile_size
         self.nodata_value = nodata_value
         self.nodata_threshold = nodata_threshold
         self.tile_no = start_tile_no
+        self.num_workers = num_workers
 
+        # removing old output files and making a new folder
+        if os.path.exists(self.final_tile_output_dir):
+            shutil.rmtree(self.final_tile_output_dir)
+
+        makedirs([self.interim_tile_output_dir])
+
+        # implementing the tiling using multiprocesing (multiprocess has been used to fasten processing speed)
         if not skip_processing:
-            self.process_tiles(tiff_path, band_key_list)
+            for tiff_path in tiff_path_list:
+                cumulative_tile_no = self.process_tiles(tiff_path, band_key_list)
+                self.tile_no = cumulative_tile_no  # updating the self.tile_no after each multi-band raster iteration
+
+        # final process to serialize tile_no (multiprocess sets tile_no based on total central pixel
+        # processed in each chunk, resulting in large value of tile_no that need to be serialized)
+        self._final_update_tile_no()
 
     def process_tiles(self, tiff_path, band_key_list):
         """
         Processes a multi-band raster image into tiles of training data and associated feature attributes.
 
-        :param tiff_path: Path to the multi-band raster TIFF file to process.
-        :param band_key_list: List of keys or descriptions for each band.
+        The function divides the raster into row chunks, processes each chunk in parallel using multiprocessing,
+        and creates square tiles of data. It extracts the center pixel value from the first band (target data)
+        and saves both the tiles and the associated target values.
 
-        :return: None.
+        :param tiff_path: str. Path to the multi-band raster TIFF file to process.
+        :param band_key_list: list. List of keys or descriptions for each band in the raster, excluding the target band.
+
+        :return: None
+            Saves the output tiles as multi-band GeoTIFF files in the specified directory (`interim_tile_output_dir`)
+            and the target data (tile numbers and center pixel values) as a CSV file (`interim_target_data_output_csv`).
+
+        **Details**:
+        - The raster is divided into row chunks of 100 rows each (adjusted for tile size to avoid edge cases).
+        - Each chunk is processed by a worker function (`_process_chunk_worker`) in parallel.
+        - Shared multiprocessing objects:
+            - `target_data_list`: A shared list to store target data (tile numbers and center pixel values).
+        - Tiles are saved as GeoTIFF files, with band metadata modified to include the year extracted from `tiff_path`.
+        - Target data is saved as a CSV file after all workers have completed processing.
         """
-        makedirs([self.tile_output_dir])
-
-        # initiating training data storage dictionary
-        target_data = {'tile_no': [], 'target_value': []}
 
         # extracting year info from dta path and modifying band_key_list to reflect that in band name
         year = os.path.basename(tiff_path).split('.')[0].split('_')[-1]
         band_key_list_mod = [(i + '_' + year) for i in band_key_list]
 
-        print(f'creating multi-band tiles for {year}...')
+        print(f'\n creating multi-band tiles for {year}...')
 
         # opening a multi-band image file. The tile-ing operation will be done inside the opened image file.
         with rio.open(tiff_path) as tiff:
-            tiff_height, tiff_width = tiff.height, tiff.width
+            tiff_height = tiff.height
             tile_radius = self.tile_size // 2
+            row_chunks = [range(start, min(start + 100, tiff_height - tile_radius))
+                          for start in range(tile_radius, tiff_height - tile_radius, 100)]  # Chunk size of 100 rows
 
-            # reading the training data band
-            training_band_index = 0  # The training data is set as band 0 in the multiband dataset in make_multiband_datasets() function
-            training_band = tiff.read(training_band_index + 1)  # added +1 as rasterio read uses 1-based index
+            print(f"processing multi-band raster in {len(row_chunks)} chunks \n")
 
-            # initiating tile number
-            tile_no = 1
+            # Manager() is used to create a shared list (`target_data_list`) for storing target data across worker processes.
+            manager = Manager()
+            target_data_list = manager.list()  # shared list of target data
 
-            # The first loop iterates across the height (rows) and the second loop across the width (columns) of the raster.
-            # Both loops start at `tile_radius` to ensure the tile remains fully within the raster boundaries, avoiding edge cases.
-            # Both loops end at `tiff_height - tile_radius` (for rows) and `tiff_width - tile_radius` (for columns) to handle edge cases.
+            # assigning a unique starting tile number for each chunk using `cumulative_tile_no`.
+            # This ensures unique tile IDs across different chunks and raster files.
+            cumulative_tile_no = self.tile_no
+
+            # # # # # # # # # # # # # # # preparing the input arguments for each worker process: # # # # # # # # # # # #
+            config = {
+                'tile_size': self.tile_size,
+                'nodata_value': self.nodata_value,
+                'interim_tile_output_dir': self.interim_tile_output_dir,
+                'nodata_threshold': self.nodata_threshold
+            }
+
+            pool_input =[]  # initiating an empty list to store pool inputs
+
+            for chunk_idx, chunk in enumerate(row_chunks):
+                # assigning the starting tile number for the current chunk
+                start_tile_no = cumulative_tile_no
+                cumulative_tile_no += len(chunk) * (tiff.width - 2 * tile_radius)  # approximate number of tile in this chunk
+
+                print(f"Chunk {chunk_idx} starts with tile_no {start_tile_no}")  # debugging
+                pool_input.append((chunk, tiff_path, band_key_list_mod, start_tile_no, target_data_list, config))
+
+
+            # # # # # # creating a multiprocessing pool with a specified number of worker processes  # # # # # # # # # #
+            # This will control resource usage during parallel raster chunk processing.
+            with Pool(processes=self.num_workers) as pool:
+                pool.map(self._process_chunk_worker, pool_input)
+
+            # saving the training data to a CSV file
+            target_df = pd.DataFrame(list(target_data_list))   # converting Manager.list() to python list >> DataFrame
+            target_df.to_csv(self.interim_target_data_output_csv, mode='a',
+                             header=not os.path.exists(self.interim_target_data_output_csv),
+                             index=False)
+
+            # returning the updated 'cumulative_tile_no' which will be used to update the 'self.tile_no' in __init__
+            return cumulative_tile_no
+
+    def _process_chunk_worker(self, args):
+        """
+        Processes a chunk of raster rows to create training tiles and save associated target data.
+
+        :param args: These args are given/generated within the process_tiles() function.
+                    - chunk: Specifies the range of rows to process for this worker.
+                    - tiff_path: Path to the raster file so the worker can open and read it independently.
+                    - band_key_list: List of band names or keys for saving tiles. It has been modified with 'year' name
+                    - start_tile_no: The initial tile number for this chunk, assigned from `cumulative_tile_no`.
+                    - target_data_list: Shared multiprocessing list for storing target data.
+                    - config: Contains additional settings like tile_size, nodata_value, and interim_tile_output_dir.
+
+        :return: None.
+                 Results (e.g., tile numbers and target data) are saved in shared objects (tile_no, target_data_list)
+                          and do not need to be returned.
+        """
+        chunk, tiff_path, band_key_list, start_tile_no, target_data_list, config = args
+
+        current_tile_no = start_tile_no  # initializing the local tile number for this chunk
+
+        with rio.open(tiff_path) as tiff:
+            tile_radius = config['tile_size'] // 2
+            training_band = tiff.read(1)  # 1st band is training data. Rasterio uses 1-based indexing
+
+            # The first loop iterates across chunk (each chunk has 100 rows by default) and
+            # the second loop across the width (columns) of the raster.
+            # Both loops start at `tile_radius` (for row loop it's used during chunk creation) to ensure the tile remains
+            # fully within the raster boundaries, avoiding edge cases.
+            # Both loops end at `tiff_height - tile_radius` (for rows) and `tiff_width - tile_radius` (for columns)
+            # to handle edge cases.
             # The loops move by 1 cell at a time, check if there is a valid training data value at the center pixel,
             # and create a tile around it if valid.
-            for row in range(tile_radius, tiff_height - tile_radius):
-                for col in range(tile_radius, tiff_width - tile_radius):
-                    center_value = training_band[row, col]
+            for row in chunk:
+                for col in range(tile_radius, tiff.width - tile_radius):
+                    try:
+                        center_value = training_band[row, col]
 
-                    # skipping NoData center pixels
-                    if center_value == self.nodata_value:
+                        # skipping NoData center pixels
+                        if center_value == self.nodata_value:
+                            continue
+
+                        # if the center value has valid value, create a window around it and read the data
+                        window = Window(col_off=col - tile_radius, row_off=row - tile_radius,
+                                        width=self.tile_size, height=self.tile_size)
+                        tile_arr = tiff.read(window=window)
+
+                        # keeping only the arrays except the first band (indexed 0, as that is training data)
+                        tile_arr = tile_arr[1:]
+
+                        # checking if any array in the windowed tiff in entirely null (only no data values)
+                        if self.is_image_null(tile_arr):
+                            continue
+
+                        # checking if the tile has too many NoData values
+                        nodata_percentage = self.calculate_nodata_percentage(tile_arr)
+                        if any(perc > self.nodata_threshold for perc in nodata_percentage):
+                            continue
+
+                        # replacing NoData values with np.nan
+                        tile_arr[tile_arr == self.nodata_value] = np.nan
+
+                        # Save the tile
+                        crs = tiff.crs
+                        window_transform = tiff.window_transform(window)
+
+                        tile_name = f'tile_{current_tile_no}.tif'
+                        output_file = os.path.join(config['interim_tile_output_dir'], tile_name)
+
+                        try:
+                            self.save_tile(output_file, tile_arr, crs, window_transform, band_key_list)
+                        except Exception as e:
+                            print(f"Skipping tile {tile_name} due to save error: {e}")
+                            continue
+
+                        # append target (training) data to target_data_list
+                        target_data_list.append({'tile_no': current_tile_no, 'target_value': center_value})
+                        current_tile_no += 1
+
+                    except Exception as e:
+                        # Log and skip problematic tiles
+                        print(f"Skipping tile at row {row}, col {col} due to read error: {e}")
                         continue
-
-                    # if the center value has valid value, create a window around it and read the data
-                    window = Window(col_off=col - tile_radius, row_off=row - tile_radius,
-                                    width=self.tile_size, height=self.tile_size)
-                    tile_arr = tiff.read(window=window)
-
-                    # keeping only the arrays except the first band (indexed 0, as that is training data)
-                    tile_arr = tile_arr[1:]
-
-                    # checking if any array in the windowed tiff in entirely null (only no data values)
-                    if self.is_image_null(tile_arr):
-                        continue
-
-                    # checking if the tile has too many NoData values
-                    nodata_percentage = self.calculate_nodata_percentage(tile_arr)
-                    if any(perc > self.nodata_threshold for perc in nodata_percentage):
-                        continue
-
-                    # replacing NoData values with np.nan
-                    tile_arr[tile_arr == self.nodata_value] = np.nan
-
-                    # saving the tile
-                    crs = tiff.crs
-                    window_transform = transform(window, tiff.transform)  # tiled window's affine transformation
-
-                    tile_name = f'tile_{self.tile_no}.tif'
-                    output_file = os.path.join(self.tile_output_dir, tile_name)
-                    self.save_tile(output_file, tile_arr, crs, window_transform, band_key_list_mod)
-
-                    # saving the target value
-                    target_data['tile_no'].append(tile_no)
-                    target_data['target_value'].append(center_value)
-
-                    self.tile_no += 1
-
-        # Save the training data to a CSV file
-        target_df = pd.DataFrame(target_data)
-        target_df.to_csv(self.target_data_output_csv, mode='a',
-                         header=not os.path.exists(self.target_data_output_csv),
-                         index=False)
 
     def calculate_nodata_percentage(self, tile_arr):
         """
@@ -348,7 +447,7 @@ class make_training_tiles:
         :return: A boolean variable.
         """
         # reading each band separately and checking if an entire band is null or not.
-        # If any of the band is entirely null, this function will immidiately return True and the tile will be skipped.
+        # If any of the band is entirely null, this function will immediately return True and the tile will be skipped.
         # Note that, an image where all bands have at least one valid pixel will pass this filter.
         for num_band in range(0, tile_arr.shape[0]):
             single_arr = tile_arr[num_band]
@@ -376,6 +475,32 @@ class make_training_tiles:
                 dst.write(tile_arr[band_id], band_id + 1)
                 dst.set_band_description(band_id + 1, band_key_list[band_id])
 
+    def _final_update_tile_no(self):
+        print('\n finalizing tile_no for tiled rasters and target data...')
+        all_tiles = glob(os.path.join(self.interim_tile_output_dir, '*tif'))
+        old_tile_no = [os.path.basename(i).split('.')[0].split('_')[-1] for i in all_tiles]
+
+        # generating new sequential tile numbers
+        new_tile_no = list(range(1, len(old_tile_no) + 1))
+
+        # creating a dictionary where old_tile_no is key and new_tile_no is value
+        old_to_new_map = dict(zip(old_tile_no, new_tile_no))
+
+        # copying all tile to the final directory after changing their names
+        for file in all_tiles:
+            old_no = os.path.basename(file).split('.')[0].split('_')[-1]
+            new_no = old_to_new_map[old_no]
+            new_file_name = f'tile_{new_no}.tif'
+
+            copy_file(input_dir_or_file=file, copy_dir=self.final_tile_output_dir,
+                      rename=new_file_name)
+
+        # replacing old tile no in target data csv with new tile no
+        target_csv = pd.read_csv(self.interim_target_data_output_csv)
+        target_csv['tile_no'] = target_csv['tile_no'].astype(str).map(old_to_new_map)
+
+        # save final csv
+        target_csv.to_csv(self.final_target_data_output_csv, index=False)
 
 
 def train_val_test_split(target_data_csv, input_tile_dir, train_dir, val_dir, test_dir,

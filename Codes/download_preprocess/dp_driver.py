@@ -13,6 +13,7 @@ from os.path import dirname, abspath
 
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
+from Codes.utils.system_ops import assign_cpu_nodes
 from Codes.download_preprocess.preprocess import run_all_preprocessing
 from Codes.download_preprocess.tiles_utils import make_multiband_datasets, make_training_tiles, \
         train_val_test_split, calc_scaling_statistics, standardize_train_val_test
@@ -24,6 +25,7 @@ from Codes.download_preprocess.tiles_utils import make_multiband_datasets, make_
 # are correctly spawned without re-running the entire script in each process.
 
 if __name__ == '__main__':
+
     # ------------------------------------------------------------------------------------------------------------------
     # 1. Data download
     # ------------------------------------------------------------------------------------------------------------------
@@ -138,13 +140,14 @@ if __name__ == '__main__':
                       2013, 2014, 2015, 2016, 2017, 2018, 2019)
 
     # flags
-    skip_create_multiband_raster = True  ###############################################################################
+    skip_create_multiband_raster = False  ###############################################################################
 
     # multi-band raster creation
     make_multiband_datasets(list_of_temporal_var_dirs=temporal_vars_dir, list_of_static_var_dirs=static_vars_dir,
                             band_key_list=band_key_list,
                             output_dir=westUS_multiband_dir,
                             years_list=training_years, skip_processing=skip_create_multiband_raster)
+
 
     # ------------------------------------------------------------------------------------------------------------------
     # 4. Multi-band tile creation for model training (includes pumping data in 1st band)
@@ -158,10 +161,10 @@ if __name__ == '__main__':
     final_target_csv = '../../Data_main/rasters/multibands/training/tiles/target.csv'
 
     band_key_list = band_key_list[1:]
-    use_cpu_nodes = 10
 
     # flags
-    skip_create_tile = True  ###########################################################################################
+    skip_create_tile = False  ###########################################################################################
+    use_cpu_nodes = assign_cpu_nodes([skip_create_tile])
 
     tile_maker = make_training_tiles(tiff_path_list=multiband_rasters, band_key_list=band_key_list,
                                      interim_tile_output_dir=interim_multiband_tile_dir,
@@ -176,17 +179,16 @@ if __name__ == '__main__':
     # 5. Train-validation-test split
     # ------------------------------------------------------------------------------------------------------------------
 
-    # directories and variables
+    # directories
     multiband_tile_dir = final_multiband_tile_dir
     target_csv = final_target_csv
     train_dir = '../../Data_main/rasters/multibands/train_val_test_splits/train'
     val_dir = '../../Data_main/rasters/multibands/train_val_test_splits/val'
     test_dir = '../../Data_main/rasters/multibands/train_val_test_splits/test'
 
-    use_cpu_nodes = 10
-
     # flags
     skip_split_train_val_test = False  ##################################################################################
+    use_cpu_nodes = assign_cpu_nodes([skip_split_train_val_test])
 
     train_val_test_split(target_data_csv=target_csv, input_tile_dir=multiband_tile_dir,
                          train_dir=train_dir, val_dir=val_dir, test_dir=test_dir,
@@ -195,18 +197,60 @@ if __name__ == '__main__':
                          skip_processing=skip_split_train_val_test)
 
     # ------------------------------------------------------------------------------------------------------------------
-    # 6. Calculate scaling statistics and standardize
+    # 6. Calculate standardization statistics
     # ------------------------------------------------------------------------------------------------------------------
 
-    # directories and variables
+    # directories
     statistics_dir = '../../Data_main/rasters/multibands/scaling_stats'
-    use_cpu_nodes = 10
 
     # flags
-    skip_calc_stats = False  #############################################################################################
+    skip_calc_stats = False       ########################################################################################
+    use_cpu_nodes = assign_cpu_nodes([skip_calc_stats])
 
-    calc_scaling_statistics(train_dir=train_dir, output_dir=statistics_dir,
-                            num_workers=use_cpu_nodes,
-                            skip_processing=skip_calc_stats)
+    mean_dict, std_dict, _, _ = \
+        calc_scaling_statistics(train_dir=train_dir, output_dir=statistics_dir,
+                                num_workers=use_cpu_nodes,
+                                skip_processing=skip_calc_stats)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # 7. Standardize
+    # ------------------------------------------------------------------------------------------------------------------
+
+    # directories
+    train_dir = '../../Data_main/rasters/multibands/train_val_test_splits/train'
+    standardized_train_dir = '../../Data_main/rasters/multibands/train_val_test_splits/standardized/train'
+
+    val_dir = '../../Data_main/rasters/multibands/train_val_test_splits/val'
+    standardized_val_dir = '../../Data_main/rasters/multibands/train_val_test_splits/standardized/val'
+
+    test_dir = '../../Data_main/rasters/multibands/train_val_test_splits/test'
+    standardized_test_dir = r'../../Data_main/rasters/multibands/train_val_test_splits/standardized/test'
+
+    # flags
+    skip_standardize_train = False  #####################################################################################
+    skip_standardize_val = False    #####################################################################################
+    skip_standardize_test = False   #####################################################################################
+
+    use_cpu_nodes = assign_cpu_nodes([skip_standardize_train, skip_standardize_val, skip_standardize_test])
+
+    standardize_train_val_test(input_tile_dir=train_dir,
+                               mean_dict=mean_dict, std_dict=std_dict,
+                               split_type='train', output_dir=standardized_train_dir,
+                               num_workers=use_cpu_nodes,
+                               skip_processing=skip_standardize_train)
+
+    standardize_train_val_test(input_tile_dir=val_dir,
+                               mean_dict=mean_dict, std_dict=std_dict,
+                               split_type='val', output_dir=standardized_val_dir,
+                               num_workers=use_cpu_nodes,
+                               skip_processing=skip_standardize_val)
+
+    standardize_train_val_test(input_tile_dir=test_dir,
+                               mean_dict=mean_dict, std_dict=std_dict,
+                               split_type='test', output_dir=standardized_test_dir,
+                               num_workers=use_cpu_nodes,
+                               skip_processing=skip_standardize_test)
+
+
 
 

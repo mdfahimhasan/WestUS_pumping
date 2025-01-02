@@ -5,6 +5,7 @@
 
 import os
 import shutil
+import platform
 from glob import glob
 
 
@@ -95,3 +96,35 @@ def make_gdal_sys_call(gdal_command, args, verbose=True):
 
     else:
         print('gdal sys call not optimized for linux yet')
+
+
+def assign_cpu_nodes(flags):
+    """
+    Dynamically assigns CPU nodes based on the operating system and the status of processing flags.
+
+    :param flags: list of bool. Each flag indicates whether a processing step should be skipped (True) or run (False).
+
+    :return: int or None. Number of CPU nodes assigned if processing is required; otherwise, None.
+    """
+    if not isinstance(flags, (list, tuple)):
+        raise TypeError("Flags must be a list or tuple of boolean values.")
+
+    # checking if any flag is False
+    if any(not flag for flag in flags):
+
+        # detecting OS
+        os_name = platform.system()
+
+        # assigning CPU nodes dynamically based on OS
+        if os_name == 'Windows':  # Windows
+            use_cpu_nodes = 10    # capped at 10 as Windows is local PC
+        elif os_name == 'Linux':  # Linux
+            use_cpu_nodes = 30    # capped at 30 as Linux is HPC
+        else:
+            raise ValueError(f'Unsupported OS: {os_name}. Must be Windows or Linux.')
+
+        print(f'\n Using {use_cpu_nodes} CPU nodes on {os_name} \n...')
+        return use_cpu_nodes
+
+    else:
+        return None

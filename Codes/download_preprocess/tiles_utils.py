@@ -753,17 +753,22 @@ def calc_scaling_statistics(train_dir, output_dir, num_workers=10, skip_processi
         for dict_name, dictionary in zip(
                 ['mean', 'std', 'min', 'max'], [mean_dict, std_dict, min_dict, max_dict]
         ):
-            pickle_path = os.path.join(output_dir, f'{dict_name}.pkl')
-            with open(pickle_path, 'wb') as f:
-                pickle.dump(dictionary, f)
+            df = pd.DataFrame(dictionary.items(), columns=['variable', 'value'])
+            csv_path = os.path.join(output_dir, f'{dict_name}.csv')
+            df.to_csv(csv_path, index=False)
 
         return mean_dict, std_dict, min_dict, max_dict
 
     else:  # loading the saved statistics
-        mean_dict = pickle.load(open(os.path.join(output_dir, 'mean.pkl'), 'rb'))
-        std_dict = pickle.load(open(os.path.join(output_dir, 'std.pkl'), 'rb'))
-        min_dict = pickle.load(open(os.path.join(output_dir, 'min.pkl'), 'rb'))
-        max_dict = pickle.load(open(os.path.join(output_dir, 'max.pkl'), 'rb'))
+        mean_csv = pd.read_csv(os.path.join(output_dir, 'mean.csv'))
+        std_csv = pd.read_csv(os.path.join(output_dir, 'std.csv'))
+        min_csv = pd.read_csv(os.path.join(output_dir, 'min.csv'))
+        max_csv = pd.read_csv(os.path.join(output_dir, 'max.csv'))
+
+        mean_dict = dict(zip(mean_csv['variable'], mean_csv['value']))
+        std_dict = dict(zip(std_csv['variable'], std_csv['value']))
+        min_dict = dict(zip(min_csv['variable'], min_csv['value']))
+        max_dict =dict(zip(max_csv['variable'], max_csv['value']))
 
         return mean_dict, std_dict, min_dict, max_dict
 

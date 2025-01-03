@@ -140,7 +140,7 @@ if __name__ == '__main__':
                       2013, 2014, 2015, 2016, 2017, 2018, 2019)
 
     # flags
-    skip_create_multiband_raster = False  ###############################################################################
+    skip_create_multiband_raster = True  ###############################################################################
 
     # multi-band raster creation
     make_multiband_datasets(list_of_temporal_var_dirs=temporal_vars_dir, list_of_static_var_dirs=static_vars_dir,
@@ -163,7 +163,7 @@ if __name__ == '__main__':
     band_key_list = band_key_list[1:]
 
     # flags
-    skip_create_tile = False  ###########################################################################################
+    skip_create_tile = True  ###########################################################################################
     use_cpu_nodes = assign_cpu_nodes([skip_create_tile])
 
     tile_maker = make_training_tiles(tiff_path_list=multiband_rasters, band_key_list=band_key_list,
@@ -187,7 +187,7 @@ if __name__ == '__main__':
     test_dir = '../../Data_main/rasters/multibands/train_val_test_splits/test'
 
     # flags
-    skip_split_train_val_test = False  ##################################################################################
+    skip_split_train_val_test = True  ##################################################################################
     use_cpu_nodes = assign_cpu_nodes([skip_split_train_val_test])
 
     train_val_test_split(target_data_csv=target_csv, input_tile_dir=multiband_tile_dir,
@@ -204,7 +204,7 @@ if __name__ == '__main__':
     statistics_dir = '../../Data_main/rasters/multibands/scaling_stats'
 
     # flags
-    skip_calc_stats = False       ########################################################################################
+    skip_calc_stats = True       ########################################################################################
     use_cpu_nodes = assign_cpu_nodes([skip_calc_stats])
 
     mean_dict, std_dict, _, _ = \
@@ -227,9 +227,9 @@ if __name__ == '__main__':
     standardized_test_dir = r'../../Data_main/rasters/multibands/train_val_test_splits/standardized/test'
 
     # flags
-    skip_standardize_train = False  #####################################################################################
-    skip_standardize_val = False    #####################################################################################
-    skip_standardize_test = False   #####################################################################################
+    skip_standardize_train = True  #####################################################################################
+    skip_standardize_val = True    #####################################################################################
+    skip_standardize_test = True   #####################################################################################
 
     use_cpu_nodes = assign_cpu_nodes([skip_standardize_train, skip_standardize_val, skip_standardize_test])
 

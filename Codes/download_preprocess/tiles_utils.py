@@ -5,7 +5,7 @@
 
 """
 Acknowledgment:
-This script was developed based on the author's knowledge base on satellite data processing and pre-processing
+This script was developed based on the author's knowledge on satellite data processing and pre-processing of
 machine/deep learning inputs. Assistance and insights provided has been taken from  ChatGPT, an AI model by OpenAI,
 to improve  efficiency, accuracy, and readability of the script, considering the complex nature of this script.
 """

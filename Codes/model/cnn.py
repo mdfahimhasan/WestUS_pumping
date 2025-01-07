@@ -3,18 +3,29 @@
 # Colorado State university
 # Fahim.Hasan@colostate.edu
 
+"""
+Acknowledgment:
+This script was developed based on the author's knowledge machine/deep learning inputs. Assistance and insights have
+been taken from  ChatGPT, an AI model by OpenAI, to improve  efficiency, accuracy, and readability of the script,
+considering the complex nature of this script.
+"""
+
 import os
+import sys
 import pickle
 import numpy as np
-from glob import glob
-
 import pandas as pd
+from glob import glob
 import rasterio as rio
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
+
+from os.path import dirname, abspath
+sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
+from Codes.utils.system_ops import makedirs
 
 
 class DataLoaderCreator():
@@ -22,17 +33,22 @@ class DataLoaderCreator():
     A dataloader class to batchify tiles of input features and a single target value per tile for the model.
     """
 
-    def __init__(self, tile_dir, target_csv, batch_size=64):
+    def __init__(self, tile_dir, target_csv, batch_size=64, data_type='train'):
         """
         Initialize the DataLoader to batch the data.
 
-        :param tile_dir (str): Directory containing .tif files for tiles.
-        :param target_csv (csv): Target csv. Must have a tile_no anf value columns.
+        :param tile_dir_train (str): Directory containing .tif files for tiles.
+        :param target_csv_train (csv): Target csv. Must have a tile_no anf value columns.
                                  The tile_no column represents the corresponding tile no and value
                                  represents the value to train/validate/test on.
         :param batch_size (int): Batch size for the DataLoader.
+        :param data_type (str): Type of data passed to the DataLoader class.
         """
-        print('Initializing DataLoader to batch the data...\n')
+        if data_type in ['train', 'validation', 'test']:
+            print(f'Initializing DataLoader to batch the {data_type} data...\n')
+        else:
+            raise ValueError(f"Invalid data_type: {data_type}. Must be 'train', 'validation', or 'test'.")
+
 
         # reading target and input datasets.
         # we have to make sure that target values and tiles are matching (tiles have corresponding target values).
@@ -72,8 +88,8 @@ class DataLoaderCreator():
 
         # checking and printing the shapes of the tensors after batching
         for (feature_batch, target_batch) in self.dataloader:
-            print('\n Features Tensor Shape after batching:', feature_batch.shape)
-            print('Target Tensor Shape after batching:', target_batch.shape, '\n')
+            print('Features Tensor Shape after batching (for each batch):', feature_batch.shape)
+            print('Target Tensor Shape after batching (for each batch):', target_batch.shape, '\n')
             break
 
     def get_dataloader(self):
@@ -188,7 +204,7 @@ class CNNRegression(nn.Module):
         for out_channels, kernel_size in zip(filters, kernels):
             self.conv_layers.append(nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding))
             self.conv_layers.append(self.activation)
-            self.conv_pools.append(pooling)  # downsampling
+            self.conv_layers.append(pooling)  # pooling (downsampling)
 
             in_channels = out_channels  # at the end of each block, the in_channels of the next block is set as equal to the out_channel of the previous block
 
@@ -207,7 +223,7 @@ class CNNRegression(nn.Module):
 
         for fc_unit in fc_layers:
             self.fc_layers.append(nn.Linear(input_size, fc_unit))
-            self.fc_layer.append(self.activation)
+            self.fc_layers.append(self.activation)
 
             # output of each hidden layer step will be input of next hidden layer
             input_size = fc_unit
@@ -221,6 +237,7 @@ class CNNRegression(nn.Module):
 
         # transfers the model to 'cuda' (GPU)
         self.to(self.device)
+
 
     def _calculate_flattened_size(self, input_size, filters, kernels, stride, padding, pooling_stride=2):
         """
@@ -351,8 +368,10 @@ def train(model, train_loader, optimizer, verbose=True):
     """
     device = 'cuda'  # device is GPU by default
 
-    # set the model to training mode
+    # setting the model to training mode
     model.train()
+
+    # initiating running_loss to accumulate the total loss across all batches
     running_loss = 0.0
 
     # mse function
@@ -370,9 +389,8 @@ def train(model, train_loader, optimizer, verbose=True):
         loss.backward()
         optimizer.step()
 
-        # accumulate loss for the epoch
-        runn
-        froming_loss += loss.item()
+        # accumulates loss for each batch
+        running_loss += loss.item()
 
         # print every 10 batches
         if verbose and batch_idx % 10 == 0:
@@ -396,8 +414,10 @@ def validate(model, val_loader, verbose=True):
     """
     device = 'cuda'  # device is GPU by default
 
-    # Set the model to evaluation mode
+    # setting the model to evaluation mode
     model.eval()
+
+    # initiating running_loss to accumulate the total loss across all batches
     running_loss = 0.0
 
     # mse function
@@ -411,7 +431,7 @@ def validate(model, val_loader, verbose=True):
             predictions = model(features)
             loss = mse_func(predictions, targets)
 
-            # accumulate loss for the epoch
+            # accumulates loss for each batch
             running_loss += loss.item()
 
             # print every 10 batches
@@ -446,6 +466,9 @@ def train_validate(model, train_loader, val_loader, n_epochs, optimizer,
 
     :return: Lists of training and validation losses across all epochs.
     """
+    # making output directories
+    makedirs([os.path.dirname(model_save_path), os.path.dirname(loss_save_path)])
+
     # initializing emtpy list to track train and validation losses across all epochs
     train_losses = []
     val_losses = []
@@ -483,33 +506,106 @@ def train_validate(model, train_loader, val_loader, n_epochs, optimizer,
 
     return train_losses, val_losses
 
-# def load_losses_and_print(loss_save_path, plot_save_path):
-#     """
-#     Loads saved losses from a file, plots them, and saves the plot as an image.
-#
-#     :param loss_save_path: str. Path to the saved pickle file containing losses.
-#     :param plot_save_path: str. Path to save the plotted loss image.
-#     """
-#     # loading the losses saved during model training
-#     with open(loss_save_path, 'rb') as f:
-#         losses = pickle.load(f)
-#
-#     train_losses = losses['train_losses']
-#     val_losses = losses['val_losses']
-#
-#     # plotting losses
-#     plt.figure(figsize=(10, 6))
-#     plt.plot(train_losses, label='Training Loss', marker='o')
-#     plt.plot(val_losses, label='Validation Loss', marker='x')
-#     plt.xlabel('Epoch')
-#     plt.ylabel('Loss')
-#     plt.legend()
-#     plt.grid(True)
-#
-#     # saving the plot as an image file
-#     plt.savefig(plot_save_path)
-#     plt.close()
-#     print(f'Loss plot saved')
+
+def calculate_metrics(predictions, targets):
+    """
+    Calculates regression metrics.
+
+    :param predictions: Predicted values.
+    :param targets: Actual values.
+
+    :return: Dictionary with metrics .
+    """
+    if isinstance(predictions, list):
+        predictions = np.array(predictions)
+        targets = np.array(targets)
+
+    rmse = np.sqrt(np.mean((predictions - targets) ** 2))
+    mae = np.mean(np.abs(predictions - targets))
+    r2 = 1 - (np.sum((predictions - targets) ** 2) /
+              np.sum((targets - np.mean(targets)) ** 2))
+
+    return {'RMSE': rmse, 'MAE': mae, 'R2': r2}
+
+
+def test(model, test_loader):
+    """
+    Evaluates the model on the test dataset.
+
+    :param model: The trained model.
+    :param test_loader: DataLoader for test data.
+
+    :return: Average test loss and additional metrics.
+    """
+    # setting model to evaluation mode
+    model.eval()
+
+    # initiating running_loss to accumulate the total loss across all batches
+    running_loss = 0.0
+
+    # mse function
+    mse_func = torch.nn.MSELoss()
+
+    # empty lists to store predictions and actuals for estimating metrics
+    predictions, actuals = [], []
+
+    with torch.no_grad():    # disable gradient computation
+        for features, targets in test_loader:
+            features, targets = features.to(model.device), targets.to(model.device).view(-1, 1)
+
+            # forward pass
+            preds = model(features)
+
+            # accumulate loss for each batch
+            loss = mse_func(preds, targets)
+            running_loss += loss.item()
+
+            # collect predictions and actuals for metrics
+            predictions.extend(preds.cpu().numpy())
+            actuals.extend(targets.cpu().numpy())
+
+    # average loss for the epoch
+    avg_loss = running_loss / len(test_loader)
+
+    # additional metrics (e.g., R², MAE)
+    metrics_dict = calculate_metrics(predictions, actuals)
+
+    rmse = metrics_dict['RMSE']
+    mae = metrics_dict['MAE']
+    r2 = metrics_dict['R2']
+
+    print(f'Test Results -> Loss: {avg_loss:.4f}, RMSE: {rmse:.4f}, MAE: {mae:.4f}, R²: {r2:.4f}')
+
+    return avg_loss, rmse, mae, r2
+
+
+def plot_learning_curve(loss_save_path, plot_save_path):
+    """
+    Loads saved losses from a file, plots them, and saves the plot as an image.
+
+    :param loss_save_path: str. Path to the saved pickle file containing losses.
+    :param plot_save_path: str. Path to save the plotted loss image.
+    """
+    # loading the losses saved during model training
+    with open(loss_save_path, 'rb') as f:
+        losses = pickle.load(f)
+
+    train_losses = losses['train_losses']
+    val_losses = losses['val_losses']
+
+    # plotting losses
+    plt.figure(figsize=(10, 6))
+    plt.plot(train_losses, label='Training Loss', marker='o')
+    plt.plot(val_losses, label='Validation Loss', marker='x')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.grid(True)
+
+    # saving the plot as an image file
+    plt.savefig(plot_save_path)
+    plt.close()
+    print(f'\n Loss plot saved')
 
 # standardize and normalize code (including de-stanardization and de-normalization)
 # need a function for loading model

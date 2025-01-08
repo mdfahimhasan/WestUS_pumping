@@ -47,7 +47,13 @@ if __name__ == '__main__':
         'Landsat8_GCVI',
         'GRIDMET_Precip',
         'GRIDMET_RET',
-        'GRIDMET_Tmax'
+        'GRIDMET_Tmax',
+        'GRIDMET_maxRH',
+        'GRIDMET_minRH',
+        'GRIDMET_windVel',
+        'GRIDMET_shortRad',
+        'GRIDMET_vpd',
+        'DAYMET_sunHr',
         'MODIS_Day_LST',
         'Field_capacity',
         'Sand_content',
@@ -65,7 +71,7 @@ if __name__ == '__main__':
     months = (1, 12)
 
     # flags
-    skip_download_gee_data = True  ######################################################################################
+    skip_download_gee_data = False  ######################################################################################
     skip_download_OpenET_data = True  ###################################################################################
 
     download_all_gee_data(data_list=gee_data_list, download_dir=data_download_dir,
@@ -88,19 +94,32 @@ if __name__ == '__main__':
     years = list(range(2000, 2019 + 1))  # collecting data from 2000-2019 as growing season Peff is available upto 2019 only
 
     # flags
-    skip_process_GS_data = True  ########################################################################################
-    skip_prism_precip_processing = True  ################################################################################
-    skip_prism_tmax_processing = True  ##################################################################################
-    skip_GRIDMET_RET_processing = True  #################################################################################
-    skip_GRIDMET_precip_processing = True  ##############################################################################
-    skip_GRIDMET_tmax_processing = True  ################################################################################
+    skip_process_GS_data = True                 ########################################################################
+    skip_prism_precip_processing = True         ########################################################################
+    skip_prism_tmax_processing = True           ########################################################################
+    skip_GRIDMET_RET_processing = True          ########################################################################
+    skip_GRIDMET_precip_processing = True       ########################################################################
+    skip_GRIDMET_tmax_processing = True         ########################################################################
+    skip_gridmet_maxRH_processing = False        ########################################################################
+    skip_gridmet_minRH_processing = False        ########################################################################
+    skip_gridmet_windVel_processing = False      ########################################################################
+    skip_gridmet_shortRad_processing = False     ########################################################################
+    skip_gridmet_vpd_processing = False          ########################################################################
+    skip_daymet_sunHR_processing = False         ########################################################################
 
     run_all_preprocessing(skip_process_GrowSeason_data=skip_process_GS_data,
                           skip_prism_precip_processing=skip_prism_precip_processing,
                           skip_prism_tmax_processing=skip_prism_tmax_processing,
                           skip_gridmet_RET_processing=skip_GRIDMET_RET_processing,
                           skip_gridmet_precip_processing=skip_GRIDMET_precip_processing,
-                          skip_gridmet_tmax_processing=skip_GRIDMET_tmax_processing)
+                          skip_gridmet_tmax_processing=skip_GRIDMET_tmax_processing,
+                          skip_gridmet_maxRH_processing=skip_gridmet_maxRH_processing,
+                          skip_gridmet_minRH_processing=skip_gridmet_minRH_processing,
+                          skip_gridmet_windVel_processing=skip_gridmet_windVel_processing,
+                          skip_gridmet_shortRad_processing=skip_gridmet_shortRad_processing,
+                          skip_gridmet_vpd_processing=skip_gridmet_vpd_processing,
+                          skip_daymet_sunHR_processing=skip_daymet_sunHR_processing
+                          )
 
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -108,8 +127,7 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
 
     # directories and variables
-    datasets_dict = {'../../Data_main/pumping/rasters/Colorado/pumping_mm': 'pumping_mm',
-                     # the pumping data only has data from Colorado for now
+    datasets_dict = {'../../Data_main/pumping/rasters/Colorado/pumping_mm': 'pumping_mm',  # the pumping data only has data from Colorado for now
                      '../../Data_main/rasters/NetGW_irrigation/WesternUS': 'netGWIrr',
                      '../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled': 'peff',
                      '../../Data_main/rasters/RET/WestUS_growing_season': 'ret',

@@ -356,7 +356,14 @@ def run_all_preprocessing(skip_process_GrowSeason_data=False,
                           skip_prism_tmax_processing=False,
                           skip_gridmet_RET_processing=False,
                           skip_gridmet_precip_processing=False,
-                          skip_gridmet_tmax_processing=False):
+                          skip_gridmet_tmax_processing=False,
+                          skip_gridmet_maxRH_processing=False,
+                          skip_gridmet_minRH_processing=False,
+                          skip_gridmet_windVel_processing=False,
+                          skip_gridmet_shortRad_processing=False,
+                          skip_gridmet_vpd_processing=False,
+                          skip_daymet_sunHR_processing=False
+                          ):
     """
     Run all preprocessing steps.
 
@@ -366,6 +373,12 @@ def run_all_preprocessing(skip_process_GrowSeason_data=False,
     :param skip_gridmet_RET_processing: Set to True to skip processing RET growing season data.
     :param skip_gridmet_precip_processing: Set to True to skip processing gridmet precip growing season data.
     :param skip_gridmet_tmax_processing: Set to True to skip processing gridmet max temperature growing season data.
+    :param skip_gridmet_maxRH_processing: Set to True to skip processing gridmet max RH growing season data.
+    :param skip_gridmet_minRH_processing: Set to True to skip processing gridmet min RH growing season data.
+    :param skip_gridmet_windVel_processing: Set to True to skip processing gridmet wind velocity growing season data.
+    :param skip_gridmet_shortRad_processing: Set to True to skip processing gridmet shortwave raditaion growing season data.
+    :param skip_gridmet_vpd_processing: Set to True to skip processing gridmet vapor pressure deficit growing season data.
+    :param skip_daymet_sunHR_processing: Set to True to skip processing daymet sun hour growing season data.
 
     :return: None.
     """
@@ -418,3 +431,51 @@ def run_all_preprocessing(skip_process_GrowSeason_data=False,
                                 monthly_input_dir='../../Data_main/rasters/Tmax/WestUS_monthly',
                                 gs_output_dir='../../Data_main/rasters/Tmax/WestUS_growing_season',
                                 mean_keyword='Tmax', skip_processing=skip_gridmet_tmax_processing)
+
+    # GRIDMET max relative humidity data processing
+    dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                                growing_season_dir='../../Data_main/rasters/Growing_season',
+                                monthly_input_dir='../../Data_main/rasters/maxRH/WestUS_monthly',
+                                gs_output_dir='../../Data_main/rasters/maxRH/WestUS_growing_season',
+                                mean_keyword='maxRH', skip_processing=skip_gridmet_maxRH_processing)
+
+    # GRIDMET min relative humidity data processing
+    dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                                growing_season_dir='../../Data_main/rasters/Growing_season',
+                                monthly_input_dir='../../Data_main/rasters/minRH/WestUS_monthly',
+                                gs_output_dir='../../Data_main/rasters/minRH/WestUS_growing_season',
+                                mean_keyword='minRH', skip_processing=skip_gridmet_minRH_processing)
+
+    # GRIDMET wind velocity data processing
+    dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                                growing_season_dir='../../Data_main/rasters/Growing_season',
+                                monthly_input_dir='../../Data_main/rasters/windVel/WestUS_monthly',
+                                gs_output_dir='../../Data_main/rasters/windVel/WestUS_growing_season',
+                                mean_keyword='windVel', skip_processing=skip_gridmet_windVel_processing)
+
+    # GRIDMET shortwave radiation data processing
+    dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                                growing_season_dir='../../Data_main/rasters/Growing_season',
+                                monthly_input_dir='../../Data_main/rasters/shortRad/WestUS_monthly',
+                                gs_output_dir='../../Data_main/rasters/shortRad/WestUS_growing_season',
+                                mean_keyword='shortRad', skip_processing=skip_gridmet_shortRad_processing)
+
+    # GRIDMET vapor pressure deficit data processing
+    dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                                growing_season_dir='../../Data_main/rasters/Growing_season',
+                                monthly_input_dir='../../Data_main/rasters/vpd/WestUS_monthly',
+                                gs_output_dir='../../Data_main/rasters/vpd/WestUS_growing_season',
+                                mean_keyword='vpd', skip_processing=skip_gridmet_vpd_processing)
+
+    # DAYMET sun hour data processing
+    dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                                growing_season_dir='../../Data_main/rasters/Growing_season',
+                                monthly_input_dir='../../Data_main/rasters/sunHR/WestUS_monthly',
+                                gs_output_dir='../../Data_main/rasters/sunHR/WestUS_growing_season',
+                                mean_keyword='sunHR', skip_processing=skip_daymet_sunHR_processing)

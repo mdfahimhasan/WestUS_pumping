@@ -5,9 +5,9 @@
 
 """
 Acknowledgment:
-This script was developed based on the author's knowledge machine/deep learning inputs. Assistance and insights have
-been taken from  ChatGPT, an AI model by OpenAI, to improve  efficiency, accuracy, and readability of the script,
-considering the complex nature of this script.
+This script was developed by the author based on his knowledge and experience on machine/deep learning models.
+Some assistance and insights have been taken from  ChatGPT, an AI model by OpenAI, to improve  efficiency, accuracy,
+and readability of the script, considering the complex nature of this script.
 """
 
 import os
@@ -67,29 +67,35 @@ class DataLoaderCreator():
 
         print('Same sorting order for feature tiles and target values ensured...\n')
 
-        # creating numpy arrays for features and target
+        # creating numpy arrays for features, target, and tile_no
         features_np = np.stack(features_arrs)  # dimensions are - num of image * num features * height * width
         target_np = np.asarray(target_values)
+        tileNo_np = np.asarray(tile_no_list)  # for tracking purpose
 
         # converting to pyTorch tensor
         self.features_tensor = torch.tensor(features_np, dtype=torch.float32)
         self.target_tensor = torch.tensor(target_np, dtype=torch.float32)
+        self.tileNo_tensor = torch.tensor(tileNo_np, dtype=torch.int32)  # for tracking purpose
 
         # checking and printing the shapes of the tensors before batching
         print('Features Tensor Shape before batching:', self.features_tensor.shape)
         print('Target Tensor Shape before batching:', self.target_tensor.shape, '\n')
 
         # creating a TensorDataset
-        self.dataset = TensorDataset(self.features_tensor, self.target_tensor)
+        # tileNo kept in the DataLoader to keep track of tileNo for associated target values
+        # tileNo isn't used during initial model training/validation/testing
+        # tileNo only employed after model run has completed and to test the unstandardized value's performance
+        self.dataset = TensorDataset(self.features_tensor, self.target_tensor, self.tileNo_tensor)
 
         # creating the DataLoader
         self.dataloader = DataLoader(self.dataset, batch_size=batch_size,
                                      shuffle=True)  # shuffle True is randomizing the the data
 
         # checking and printing the shapes of the tensors after batching
-        for (feature_batch, target_batch) in self.dataloader:
+        for (feature_batch, target_batch, tileNo_batch) in self.dataloader:
             print('Features Tensor Shape after batching (for each batch):', feature_batch.shape)
-            print('Target Tensor Shape after batching (for each batch):', target_batch.shape, '\n')
+            print('Target Tensor Shape after batching (for each batch):', target_batch.shape)
+            print('Tile No Tensor Shape after batching (for each batch):', tileNo_batch.shape, '\n')
             break
 
     def get_dataloader(self):
@@ -377,7 +383,7 @@ def train(model, train_loader, optimizer, verbose=True):
     # mse function
     mse_func = torch.nn.MSELoss()
 
-    for batch_idx, (features, targets) in enumerate(train_loader):
+    for batch_idx, (features, targets, tileNo) in enumerate(train_loader):  # the 'tileNo' not used during model training/validation
         features, targets = features.to(device), targets.to(device).view(-1, 1)
 
         # forward pass
@@ -424,7 +430,7 @@ def validate(model, val_loader, verbose=True):
     mse_func = torch.nn.MSELoss()
 
     with torch.no_grad():  # disable gradient computation
-        for batch_idx, (features, targets) in enumerate(val_loader):
+        for batch_idx, (features, targets, tileNo) in enumerate(val_loader):  # the 'tileNo' not used during model training/validation
             features, targets = features.to(device), targets.to(device).view(-1, 1)
 
             # forward pass
@@ -497,7 +503,7 @@ def train_validate(model, train_loader, val_loader, n_epochs, optimizer,
 
         # printing epoch summary
         if verbose:
-            print(f"Epoch {epoch + 1} - Training Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f}")
+            print(f'Epoch {epoch + 1} - Training Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f}')
 
     # saving losses
     losses = {'train_losses': train_losses, 'val_losses': val_losses}
@@ -550,7 +556,7 @@ def test(model, test_loader):
     predictions, actuals = [], []
 
     with torch.no_grad():    # disable gradient computation
-        for features, targets in test_loader:
+        for features, targets, tileNo in test_loader:  # the 'tileNo' not used during model primary model testing
             features, targets = features.to(model.device), targets.to(model.device).view(-1, 1)
 
             # forward pass
@@ -574,9 +580,66 @@ def test(model, test_loader):
     mae = metrics_dict['MAE']
     r2 = metrics_dict['R2']
 
-    print(f'Test Results -> Loss: {avg_loss:.4f}, RMSE: {rmse:.4f}, MAE: {mae:.4f}, R²: {r2:.4f}')
+    print(f'Results -> Loss: {avg_loss:.4f}, RMSE: {rmse:.4f}, MAE: {mae:.4f}, R²: {r2:.4f}')
 
     return avg_loss, rmse, mae, r2
+
+
+def unstandardize_save_and_test(model, data_loader, target_csv, mean_csv, std_csv,
+                                output_csv, skip_processing=False):
+    if not skip_processing:
+        # empty lists to store predictions and tileNo
+        predictions, tile_no_list = [], []
+
+        # setting model to evaluation mode
+        model.eval()
+
+        with torch.no_grad():  # disable gradient computation
+            for features, targets, tileNo in data_loader:
+                features, targets = features.to(model.device), targets.to(model.device).view(-1, 1)
+
+                # forward pass
+                preds = model(features)
+
+                # collect predictions and actuals for metrics
+                predictions.extend(preds.cpu().numpy().flatten())
+                tile_no_list.extend(tileNo.cpu().numpy().flatten())
+
+        # making a new dataframe out of tile_no and standardized predictions
+        model_output_df = pd.DataFrame({'tile_no': tile_no_list, 'standardized_pred': predictions})
+
+        # unstandardizing predictions
+        mean_df = pd.read_csv(mean_csv)
+        std_df = pd.read_csv(std_csv)
+
+        target_mean = mean_df.set_index('variable').loc['target', 'value']
+        target_std = std_df.set_index('variable').loc['target', 'value']
+
+        model_output_df['unstandardized_pred'] = (model_output_df['standardized_pred'] * target_std) \
+                                                 + target_mean
+
+        # loading dataframe with actual (actual pumping values) values of target
+        original_df = pd.read_csv(target_csv)
+
+        # merging the two dataframes
+        final_df = model_output_df.merge(original_df, on='tile_no')
+
+        # saving the csv
+        makedirs([os.path.dirname(output_csv)])
+        final_df.to_csv(output_csv, index=False)
+
+        # checking scores for unstandardized model output and actual target data
+        metrics_dict = calculate_metrics(predictions=final_df['unstandardized_pred'].tolist(),
+                                         targets=final_df['target_value'].tolist())
+
+        rmse = metrics_dict['RMSE']
+        mae = metrics_dict['MAE']
+        r2 = metrics_dict['R2']
+
+        print(f'Results -> RMSE: {rmse:.4f}, MAE: {mae:.4f}, R²: {r2:.4f}')
+
+    else:
+        pass
 
 
 def plot_learning_curve(loss_save_path, plot_save_path):
@@ -600,14 +663,12 @@ def plot_learning_curve(loss_save_path, plot_save_path):
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend()
-    plt.grid(True)
 
     # saving the plot as an image file
     plt.savefig(plot_save_path)
     plt.close()
     print(f'\n Loss plot saved')
 
-# standardize and normalize code (including de-stanardization and de-normalization)
 # need a function for loading model
 # need a function for model evaluation (gives the training, validation, and testing performancne)
 # integrate de-standardization option for target data

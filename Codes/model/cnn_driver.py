@@ -8,17 +8,12 @@ from os.path import dirname, abspath
 
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
-from Codes.model.cnn import (
-    DataLoaderCreator,
-    CNNRegression,
-    train_validate,
-    plot_learning_curve,
-    test
-)
+from Codes.model.cnn import DataLoaderCreator, CNNRegression, train_validate, plot_learning_curve, \
+    test, unstandardize_save_and_test
 
 if __name__ == '__main__':
     # model version
-    model_version = 'v1'            ####################################################################################
+    model_version = 'v1'  ####################################################################################
 
     # directories
     tile_dir_train = '../../Data_main/rasters/multibands/train_val_test_splits/standardized/train'
@@ -29,26 +24,32 @@ if __name__ == '__main__':
     target_csv_val = '../../Data_main/rasters/multibands/train_val_test_splits/standardized/val/y_val.csv'
     target_csv_test = '../../Data_main/rasters/multibands/train_val_test_splits/standardized/test/y_test.csv'
 
-    model_save_path = f'../../Model_run/model/best_model_{model_version}.pth'
-    loss_save_path = f'../../Model_run/model/losses_{model_version}.pkl'
-    leaning_curve_plot = f'../../Model_run/model/learning_curve_{model_version}.jpg'
+    mean_csv = '../../Data_main/rasters/multibands/scaling_stats/mean.csv'
+    std_csv = '../../Data_main/rasters/multibands/scaling_stats/std.csv'
+
+    model_save_path = f'../../Model_run/DL_model/best_model_{model_version}.pth'
+    loss_save_path = f'../../Model_run/DL_model/losses_{model_version}.pkl'
+    leaning_curve_plot = f'../../Model_run/DL_model/learning_curve_{model_version}.jpg'
+
+    # Model switches
+    skip_unstandardizing_testing = False    #################################################################
 
     # variables
-    batch_size = 32                 ####################################################################################
-    n_epochs = 20                   ####################################################################################
-    learning_rate = 0.001           ####################################################################################
-    padding = 'same'                ####################################################################################
-    activation = 'relu'             ####################################################################################
-    pooling = 'avgpool'             ####################################################################################
-    patience = 10                    ###################################################################################
+    batch_size = 32  ####################################################################################
+    n_epochs = 100  ####################################################################################
+    learning_rate = 0.001  ####################################################################################
+    padding = 'same'  ####################################################################################
+    activation = 'relu'  ####################################################################################
+    pooling = 'avgpool'  ####################################################################################
+    patience = 10  ###################################################################################
 
     # model architecture
-    n_features = 15             # number of input channels                         #####################################
-    input_size = 7              # tiles size                                       #####################################
-    filters = [16, 32]          # number of filters for each convolutional layer   #####################################
-    kernels = [3, 3]            # kernel sizes for convolutional layers            #####################################
-    fc_layers = [128, 64]       # fully connected layers                           #####################################
-
+    n_features = 15  # number of input channels                         #####################################
+    input_size = 7  # tiles size                                       #####################################
+    filters = [16, 32]  # number of filters for each convolutional layer   #####################################
+    kernels = [3, 3]  # kernel sizes for convolutional layers            #####################################
+    fc_layers = [128, 256, 128,
+                 64]  # fully connected layers                           #####################################
 
     # dataLoader
     train_loader_creator = DataLoaderCreator(tile_dir_train, target_csv_train,
@@ -96,15 +97,40 @@ if __name__ == '__main__':
     plot_learning_curve(loss_save_path=loss_save_path,
                         plot_save_path=leaning_curve_plot)
 
-    # test the Model
-    print('Testing the model on the test set...')
+    # Model performances on standardized data
+    print('########## Model performance on standardized data ##########\n')
+    print('Train performance:')
+    test(model, train_loader)
 
-    test_loss, test_rmse, test_mae, test_r2 = test(model, test_loader)
+    print('Test performance:')
+    test(model, test_loader)
 
+    print('########## *************************************** ##########\n')
 
+    # Model performances on unstandardized (actual) data
+    print('########## Model performance on unstandardized (actual) data ##########\n')
+    print('Train performance:')
+    unstandardize_save_and_test(model, train_loader,
+                                target_csv=target_csv_train,
+                                mean_csv=mean_csv,
+                                std_csv=std_csv,
+                                output_csv=f'../../Model_run/DL_model/output_csv/trainSet_results.csv',
+                                skip_processing=skip_unstandardizing_testing)
 
+    print('Validation performance:')
+    unstandardize_save_and_test(model, val_loader,
+                                target_csv=target_csv_val,
+                                mean_csv=mean_csv,
+                                std_csv=std_csv,
+                                output_csv=f'../../Model_run/DL_model/output_csv/valSet_results.csv',
+                                skip_processing=skip_unstandardizing_testing)
 
+    print('Test performance:')
+    unstandardize_save_and_test(model, test_loader,
+                                target_csv=target_csv_test,
+                                mean_csv=mean_csv,
+                                std_csv=std_csv,
+                                output_csv=f'../../Model_run/DL_model/output_csv/testSet_results.csv',
+                                skip_processing=skip_unstandardizing_testing)
 
-
-
-
+    print('########## ************************************************* ##########\n')

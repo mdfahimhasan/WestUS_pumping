@@ -3,7 +3,7 @@
 ## running the cnn_driver.py script on CPU nodes
 
 #SBATCH --partition=smi_all
-#SBATCH --ntasks=64
+#SBATCH --ntasks=63
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1 #Request 1 GPU
 #SBATCH --time=1-0

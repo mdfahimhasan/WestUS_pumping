@@ -362,7 +362,7 @@ def run_all_preprocessing(skip_process_GrowSeason_data=False,
                           skip_gridmet_windVel_processing=False,
                           skip_gridmet_shortRad_processing=False,
                           skip_gridmet_vpd_processing=False,
-                          skip_daymet_sunHR_processing=False
+                          skip_daymet_sunHr_processing=False
                           ):
     """
     Run all preprocessing steps.
@@ -378,7 +378,7 @@ def run_all_preprocessing(skip_process_GrowSeason_data=False,
     :param skip_gridmet_windVel_processing: Set to True to skip processing gridmet wind velocity growing season data.
     :param skip_gridmet_shortRad_processing: Set to True to skip processing gridmet shortwave raditaion growing season data.
     :param skip_gridmet_vpd_processing: Set to True to skip processing gridmet vapor pressure deficit growing season data.
-    :param skip_daymet_sunHR_processing: Set to True to skip processing daymet sun hour growing season data.
+    :param skip_daymet_sunHr_processing: Set to True to skip processing daymet sun hour growing season data.
 
     :return: None.
     """
@@ -476,6 +476,6 @@ def run_all_preprocessing(skip_process_GrowSeason_data=False,
     dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
                                            2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
                                 growing_season_dir='../../Data_main/rasters/Growing_season',
-                                monthly_input_dir='../../Data_main/rasters/sunHR/WestUS_monthly',
-                                gs_output_dir='../../Data_main/rasters/sunHR/WestUS_growing_season',
-                                mean_keyword='sunHR', skip_processing=skip_daymet_sunHR_processing)
+                                monthly_input_dir='../../Data_main/rasters/sunHr/WestUS_monthly',
+                                gs_output_dir='../../Data_main/rasters/sunHr/WestUS_growing_season',
+                                mean_keyword='sunHr', skip_processing=skip_daymet_sunHr_processing)

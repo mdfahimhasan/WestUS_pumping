@@ -71,7 +71,7 @@ if __name__ == '__main__':
     months = (1, 12)
 
     # flags
-    skip_download_gee_data = False  ######################################################################################
+    skip_download_gee_data = True  ######################################################################################
     skip_download_OpenET_data = True  ###################################################################################
 
     download_all_gee_data(data_list=gee_data_list, download_dir=data_download_dir,
@@ -100,12 +100,12 @@ if __name__ == '__main__':
     skip_GRIDMET_RET_processing = True          ########################################################################
     skip_GRIDMET_precip_processing = True       ########################################################################
     skip_GRIDMET_tmax_processing = True         ########################################################################
-    skip_gridmet_maxRH_processing = False        ########################################################################
-    skip_gridmet_minRH_processing = False        ########################################################################
-    skip_gridmet_windVel_processing = False      ########################################################################
-    skip_gridmet_shortRad_processing = False     ########################################################################
-    skip_gridmet_vpd_processing = False          ########################################################################
-    skip_daymet_sunHR_processing = False         ########################################################################
+    skip_gridmet_maxRH_processing = True        ########################################################################
+    skip_gridmet_minRH_processing = True        ########################################################################
+    skip_gridmet_windVel_processing = True      ########################################################################
+    skip_gridmet_shortRad_processing = True     ########################################################################
+    skip_gridmet_vpd_processing = True          ########################################################################
+    skip_daymet_sunHR_processing = True         ########################################################################
 
     run_all_preprocessing(skip_process_GrowSeason_data=skip_process_GS_data,
                           skip_prism_precip_processing=skip_prism_precip_processing,
@@ -118,7 +118,7 @@ if __name__ == '__main__':
                           skip_gridmet_windVel_processing=skip_gridmet_windVel_processing,
                           skip_gridmet_shortRad_processing=skip_gridmet_shortRad_processing,
                           skip_gridmet_vpd_processing=skip_gridmet_vpd_processing,
-                          skip_daymet_sunHR_processing=skip_daymet_sunHR_processing
+                          skip_daymet_sunHr_processing=skip_daymet_sunHR_processing
                           )
 
 

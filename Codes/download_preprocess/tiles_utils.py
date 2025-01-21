@@ -692,7 +692,7 @@ def calc_scaling_statistics(train_dir, output_dir, num_workers=10, skip_processi
     :param num_workers: int. Number of parallel processes to use for multiprocessing. Default is 10.
     :param skip_processing: Set to True to skip processing. Default is False.
 
-    :return: Four dictionaries: mean_dict, std_dict, min_dict, and max_dict.
+    :return: Four dictionaries: mean_csv, std_csv, min_dict, and max_dict.
     """
     if not skip_processing:  # calculating the statistics
         print('calculating statistics for data scaling...')
@@ -899,3 +899,5 @@ def standardize_train_val_test(input_tile_dir, mean_dict, std_dict, output_dir,
 
     else:
         pass
+
+

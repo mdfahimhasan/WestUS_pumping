@@ -19,18 +19,14 @@ to improve  efficiency, accuracy, and readability of the script, considering the
 # use DataLoader to create batches with standardized data (DataLoader class in with the CNN script as that uses pyTorch)
 
 
-# This script has
-
 import os
 import shutil
-import pickle
-
 import numpy as np
 import pandas as pd
 from glob import glob
 import rasterio as rio
-from multiprocessing import Pool, Manager
 from rasterio.windows import Window
+from multiprocessing import Pool, Manager
 from sklearn.model_selection import train_test_split
 
 from Codes.utils.system_ops import makedirs, copy_file, clean_and_make_directory

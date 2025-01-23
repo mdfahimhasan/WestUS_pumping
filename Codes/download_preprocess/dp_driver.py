@@ -136,6 +136,12 @@ if __name__ == '__main__':
                      '../../Data_main/rasters/Irrigated_cropET/WestUS_grow_season': 'irr_cropET',
                      '../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac': 'irr_crop_frac',
                      '../../Data_main/rasters/Irrigated_cropland': 'irr_cropland',
+                     '../../Data_main/rasters/maxRH/WestUS_growing_season': 'maxRH',
+                     '../../Data_main/rasters/minRH/WestUS_growing_season': 'minRH',
+                     '../../Data_main/rasters/shortRad/WestUS_growing_season': 'shortRad',
+                     '../../Data_main/rasters/vpd/WestUS_growing_season': 'vpd',
+                     '../../Data_main/rasters/windVel/WestUS_growing_season': 'windVel',
+                     '../../Data_main/rasters/sunHr/WestUS_growing_season': 'sunHr',
                      '../../Data_main/rasters/GCVI/WestUS_yearly': 'gcvi',
                      '../../Data_main/rasters/OSAVI/WestUS_yearly': 'osavi',
                      '../../Data_main/rasters/NDVI/WestUS_yearly': 'ndvi',
@@ -148,8 +154,7 @@ if __name__ == '__main__':
                        any(var in i for var in ('Clay_content', 'Sand_content', 'Field_capacity'))]
     temporal_vars_dir = [i for i in datasets_dict.keys() if i not in static_vars_dir]
 
-    band_key_list = list(
-        datasets_dict.values())  # make sure to not include the training data's name as that band will be removed
+    band_key_list = list(datasets_dict.values())  # make sure to not include the training data's name as that band will be removed
 
     westUS_multiband_dir = '../../Data_main/rasters/multibands/training/westUS'
 
@@ -268,7 +273,3 @@ if __name__ == '__main__':
                                split_type='test', output_dir=standardized_test_dir,
                                num_workers=use_cpu_nodes,
                                skip_processing=skip_standardize_test)
-
-
-
-

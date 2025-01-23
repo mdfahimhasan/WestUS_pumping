@@ -31,7 +31,7 @@ if __name__ == '__main__':
     leaning_curve_plot = f'../../Model_run/DL_model/learning_curve_{model_version}.jpg'
 
     # Default variables
-    n_features = 15                                                     ##### number of input channel in a tile
+    n_features = 21                                                     ##### number of input channel in a tile
     n_epochs = 100                                                      #####
     input_size = 7                                                      ##### height/width dim of a tile
     padding = 'same'                                                    #####
@@ -48,15 +48,15 @@ if __name__ == '__main__':
     }
 
     # Model switches
-    tune_params = False                   #################################################################
-    n_trials_for_tunring = 100             #################################################################
+    tune_params = True                   #################################################################
+    n_trials_for_tuning = 100             #################################################################
     skip_unstandardizing_testing = False  #################################################################
 
     # Running the model
     trained_model, model_info = main(tile_dir_train=tile_dir_train, target_csv_train=target_csv_train,
                                      tile_dir_val=tile_dir_val, target_csv_val=target_csv_val,
                                      n_features=n_features, input_size=input_size, n_epochs=n_epochs,
-                                     tune_parameters=tune_params, n_trials=n_trials_for_tunring,
+                                     tune_parameters=tune_params, n_trials=n_trials_for_tuning,
                                      default_params=default_params,
                                      padding=padding, pooling=pooling,
                                      activation_func=activation,

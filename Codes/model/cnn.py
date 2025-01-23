@@ -409,7 +409,7 @@ def train(model, train_loader, optimizer, verbose=False):
     return avg_loss
 
 
-def validate(model, val_loader, verbose=True):
+def validate(model, val_loader, verbose=False):
     """
     Validates the model for one epoch.
 

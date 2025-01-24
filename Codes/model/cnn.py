@@ -157,7 +157,7 @@ class CNNRegression(nn.Module):
     """
 
     def __init__(self, n_features, input_size, filters, kernels, stride=1, padding='valid',
-                 activation_func='relu', pooling='maxpool', fc_layers=None):
+                 pooling='maxpool', activation_func='relu', fc_layers=None, dropout_rate=0.3):
         """
         Initializes a CNN with specified architecture.
 
@@ -169,9 +169,10 @@ class CNNRegression(nn.Module):
         :param padding (str or int): Padding type ('same' or 'valid'). 'valid' resembles to 0 padding.
                              'same' padding pads the input so the output has the shape as the input.
                              Can also be integer values like 1 or 2.
-        :param activation_func (str): Type of activation function ('relu', 'leakyrelu').
         :param pooling (str): Pooling option ('maxpool', 'avgpool').
+        :param activation_func (str): Type of activation function ('relu', 'leakyrelu').
         :param fc_layers (list): Number of units in each fully connected layer. Defaults to [128] if set to None.
+        :param dropout_rate (float): Dropout rate for fully connected layers.
         """
         # initialize the parent class (nn.Module) to properly set up the model.
         # This ensures that layers and parameters are registered, and functionality like
@@ -228,9 +229,13 @@ class CNNRegression(nn.Module):
 
         input_size = flattened_size  # flattened size from CNN becomes the 1st input size of the fc layers
 
+        # dropout
+        self.dropout = nn.Dropout(dropout_rate)
+
         for fc_unit in fc_layers:
             self.fc_layers.append(nn.Linear(input_size, fc_unit))
             self.fc_layers.append(self.activation)
+            self.fc_layers.append(self.dropout)
 
             # output of each hidden layer step will be input of next hidden layer
             input_size = fc_unit
@@ -458,6 +463,7 @@ def run_default_model(tile_dir_train, target_csv_train,
                       batch_size=64, padding='same', pooling='maxpool',
                       lr=1e-3, kernel_size=3, stride=1,
                       activation_func='relu', fc_units=None,
+                      weight_decay=1e-4, dropout_rate=0.2,
                       patience=10, start_EarlyStop_count_from_epoch=10,
                       verbose=True):
     """
@@ -479,9 +485,13 @@ def run_default_model(tile_dir_train, target_csv_train,
     :param lr: float. Learning rate for the optimizer. Defaults to 1e-3.
 
     :param stride: int. Stride for kernel operation. Defaults to 1.
-    :param activation_func: str. Have to be either 'relu' or 'leakyrelu'. Defaults to 'relu'
-    :param fc_units: int. Number of units in the fully connected layer. Default set to None to use [128]
+    :param activation_func: str. Have to be either 'relu' or 'leakyrelu'. Defaults to 'relu'.
+    :param fc_units: int. Number of units in the fully connected layer. Default set to None to use [128].
                      neurons in a single layer.
+    :param weight_decay: float. Weight decay (L2 regularization) coefficient to control overfitting.
+                                Default is 1e-4. A smaller value (e.g., 1e-6) penalizes large weights
+                                less, while a larger value (e.g., 1e-3) penalizes them more.
+    :param dropout_rate: float. Dropout rate for fully connected layers.
     :param patience: int. Number of epochs to wait before early stopping. Default to 10.
     :param start_EarlyStop_count_from_epoch: int. Epoch to start checking early stopping. Defaults to 10.
     :param verbose: Set to True to print training progress at each 10 epoch.
@@ -504,15 +514,16 @@ def run_default_model(tile_dir_train, target_csv_train,
         input_size=input_size,
         filters=filters,
         kernels=kernel_size,
-        fc_layers=fc_units,
+        stride=stride,
+        activation_func=activation_func,
         padding=padding,
         pooling=pooling,
-        stride=stride,
-        activation_func=activation_func
+        fc_layers=fc_units,
+        dropout_rate=dropout_rate
     )
 
     # configuring optimizer
-    optimizer = model.configure_optimizer(optimizer_name='adam', lr=lr)
+    optimizer = model.configure_optimizer(optimizer_name='adam', lr=lr, weight_decay=weight_decay)
 
     # initialize EarlyStopping
     early_stopping = EarlyStopping(save_path=model_save_path, patience=patience)
@@ -564,7 +575,7 @@ def run_and_tune_model(trial, tile_dir_train, target_csv_train,
                        n_features, input_size, n_epochs,
                        model_save_path,
                        padding='same', pooling='maxpool',
-                       activation_func='relu'):
+                       activation_func='relu', weight_decay=1e-4):
     """
     Objective function for Optuna parameter tuning.
 
@@ -587,6 +598,9 @@ def run_and_tune_model(trial, tile_dir_train, target_csv_train,
     :param padding: str. Padding type for CNN layers ('same' or 'valid'). Defaults to 'same'.
     :param pooling: str. Pooling type for CNN layers ('maxpool' or 'avgpool'). Defaults to 'maxpool'.
     :param activation_func: str. Have to be either 'relu' or 'leakyrelu'. Defaults to 'relu'.
+    :param weight_decay: float. Weight decay (L2 regularization) coefficient to control overfitting.
+                                Default is 1e-4. A smaller value (e.g., 1e-6) penalizes large weights
+                                less, while a larger value (e.g., 1e-3) penalizes them more.
 
     :return: The best validation loss (val_loss).
     """
@@ -602,6 +616,7 @@ def run_and_tune_model(trial, tile_dir_train, target_csv_train,
     # sample fully connected layer configuration
     num_fc_layers = trial.suggest_int('num_fc_layers', 1, 3)  # number of fully connected layers can be flexible from 1-3
     fc_units = [trial.suggest_int(f'fc_units_layer_{i}', 64, 256, step=32) for i in range(num_fc_layers)]
+    dropout_rate = trial.suggest_float('dropout_rate', 0.1, 0.5, step=0.1)
 
     # training the model with the sampled parameters
     _, best_model_info = run_default_model(tile_dir_train, target_csv_train,
@@ -610,6 +625,7 @@ def run_and_tune_model(trial, tile_dir_train, target_csv_train,
                                            filters=filters, batch_size=batch_size, padding=padding, pooling=pooling,
                                            lr=lr, kernel_size=kernel_size, stride=1,
                                            activation_func=activation_func, fc_units=fc_units,
+                                           weight_decay=weight_decay, dropout_rate=dropout_rate,
                                            patience=10, start_EarlyStop_count_from_epoch=10,
                                            model_save_path=model_save_path, verbose=True)
 
@@ -617,14 +633,36 @@ def run_and_tune_model(trial, tile_dir_train, target_csv_train,
     return best_model_info['val_loss']
 
 
+def save_param_importance_plot(study, save_path):
+    """
+    Generates and saves the parameter importance plot for an Optuna study.
+
+    :param study: The Optuna study object after optimization.
+    :param save_path: The file path to save the parameter importance plot.
+
+    :return None.
+    """
+    # generating the plot
+    fig = optuna.visualization.plot_param_importances(study)
+
+    # converting Optuna's plotly figure to a static matplotlib figure
+    fig.update_layout(title='Parameter Importances')
+    fig.write_image(save_path)
+
+    print(f"Parameter importance plot saved to {save_path}")
+
+
 def main(tile_dir_train, target_csv_train,
          tile_dir_val, target_csv_val,
          n_features, input_size, n_epochs,
          model_save_path, model_info_save_path,
-         tune_parameters=False, n_trials=50,
-         default_params=None,
          padding='same', pooling='maxpool',
-         activation_func='relu'):
+         activation_func='relu',
+         default_params=None,
+         tune_parameters=False, n_trials=50,
+         plot_hyperparams_importance=False,
+         hyperparam_importance_plot_path=None
+         ):
     """
     Main function to either run the model with default parameters or perform parameter tuning.
 
@@ -642,12 +680,15 @@ def main(tile_dir_train, target_csv_train,
     :param model_save_path: str. Path for saving the best model checkpoint.
     :param model_info_save_path: Filepath (pkl) to save the parameter-tuned or default model's params and
                                  losses.
-    :param tune_parameters: bool. If True, perform parameter tuning using Optuna. Defaults to False.
-    :param n_trials: int. Number of Optuna trials for parameter tuning. Defaults to 50.
-    :param default_params: dict or None. Default parameters for running the model. Ignored when `tune_parameters` is True.
     :param padding: str. Padding type for CNN layers ('same' or 'valid'). Defaults to 'same'.
     :param pooling: str. Pooling type for CNN layers ('maxpool' or 'avgpool'). Defaults to 'maxpool'.
     :param activation_func: str. Activation function ('relu' or 'leakyrelu'). Defaults to 'relu'.
+    :param default_params: dict or None. Default parameters for running the model. Ignored when `tune_parameters` is True.
+    :param tune_parameters: bool. If True, perform parameter tuning using Optuna. Defaults to False.
+    :param n_trials: int. Number of Optuna trials for parameter tuning. Defaults to 50.
+    :param plot_hyperparams_importance: bool. Set to True to plot hypapameter importance plot during tuning
+                                        parameters.
+    :param hyperparam_importance_plot_path: str. Filepath to save hypeparam importance plot. Default set to None.
 
     :return: - The trained model.
              - A dictionary containing hyperparameters, training losses, and validation losses.
@@ -709,6 +750,10 @@ def main(tile_dir_train, target_csv_train,
         print('\nBest Model Information:')
         print(best_model_info)
 
+        # plotting hyperparameter importance plot from tuning process
+        if plot_hyperparams_importance and hyperparam_importance_plot_path is not None:
+            save_param_importance_plot(study, save_path=hyperparam_importance_plot_path)
+
         return trained_model, best_model_info
 
     else:
@@ -735,6 +780,8 @@ def main(tile_dir_train, target_csv_train,
                                     pooling=pooling,
                                     lr=default_params['lr'],
                                     activation_func=activation_func,
+                                    weight_decay=default_params['weight_decay'],
+                                    dropout_rate=default_params['dropout'],
                                     patience=10,
                                     start_EarlyStop_count_from_epoch=10,
                                     model_save_path=model_save_path,

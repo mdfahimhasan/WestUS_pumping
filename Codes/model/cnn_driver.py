@@ -28,6 +28,7 @@ if __name__ == '__main__':
 
     model_save_path = f'../../Model_run/DL_model/model_{model_version}.pth'
     model_info_save_path = f'../../Model_run/DL_model/model_info_{model_version}.pth'
+    hyperparam_importance_plot = f'../../Model_run/DL_model/hyperparam_imp_{model_version}.jpg'
     leaning_curve_plot = f'../../Model_run/DL_model/learning_curve_{model_version}.jpg'
 
     # Default variables
@@ -40,28 +41,33 @@ if __name__ == '__main__':
 
     # Default model architecture
     default_params = {
-        'filters': [32, 64],  # convolutional layers                    #####
-        'kernel_size': [3, 3],  # kernel size for each Conv layer       #####
-        'fc_units': [128, 64],  # fully connected layer                 #####
-        'batch_size': 64,  # batch size for DataLoader                  #####
-        'lr': 0.001  # learning rate
+        'filters': [32, 64],                          ##### convolutional layers
+        'kernel_size': [3, 3],                        ##### kernel size for each Conv layer
+        'fc_units': [128, 64],                        ##### fully connected layer
+        'batch_size': 64,                             ##### batch size for DataLoader
+        'lr': 0.001,                                  ##### learning rate
+        'weight_decay': 1e-3,                         ##### weight decay
+        'dropout': 0.2                                ##### dropout rate
     }
 
     # Model switches
     tune_params = True                   #################################################################
-    n_trials_for_tuning = 100             #################################################################
+    n_trials_for_tuning = 10             #################################################################
+    plot_hyperparam_importance = True    #################################################################
     skip_unstandardizing_testing = False  #################################################################
 
     # Running the model
     trained_model, model_info = main(tile_dir_train=tile_dir_train, target_csv_train=target_csv_train,
                                      tile_dir_val=tile_dir_val, target_csv_val=target_csv_val,
                                      n_features=n_features, input_size=input_size, n_epochs=n_epochs,
-                                     tune_parameters=tune_params, n_trials=n_trials_for_tuning,
-                                     default_params=default_params,
                                      padding=padding, pooling=pooling,
                                      activation_func=activation,
                                      model_save_path=model_save_path,
-                                     model_info_save_path=model_info_save_path)
+                                     model_info_save_path=model_info_save_path,
+                                     tune_parameters=tune_params, n_trials=n_trials_for_tuning,
+                                     default_params=default_params,
+                                     plot_hyperparams_importance=plot_hyperparam_importance,
+                                     hyperparam_importance_plot_path=hyperparam_importance_plot)
 
 
     # Plotting learning curve

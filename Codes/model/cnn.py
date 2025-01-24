@@ -575,7 +575,7 @@ def run_and_tune_model(trial, tile_dir_train, target_csv_train,
                        n_features, input_size, n_epochs,
                        model_save_path,
                        padding='same', pooling='maxpool',
-                       activation_func='relu', weight_decay=1e-4):
+                       activation_func='relu'):
     """
     Objective function for Optuna parameter tuning.
 
@@ -598,15 +598,13 @@ def run_and_tune_model(trial, tile_dir_train, target_csv_train,
     :param padding: str. Padding type for CNN layers ('same' or 'valid'). Defaults to 'same'.
     :param pooling: str. Pooling type for CNN layers ('maxpool' or 'avgpool'). Defaults to 'maxpool'.
     :param activation_func: str. Have to be either 'relu' or 'leakyrelu'. Defaults to 'relu'.
-    :param weight_decay: float. Weight decay (L2 regularization) coefficient to control overfitting.
-                                Default is 1e-4. A smaller value (e.g., 1e-6) penalizes large weights
-                                less, while a larger value (e.g., 1e-3) penalizes them more.
 
     :return: The best validation loss (val_loss).
     """
     # sample hyperparameters
     lr = trial.suggest_loguniform('lr', 1e-5, 1e-2)
     batch_size = trial.suggest_categorical('batch_size', [32, 64, 128])
+    weight_decay = trial.suggest_loguniform('weight_decay', 1e-6, 1e-2)
 
     # sample convolutional architecture
     num_layers = 2      # keeping number of convolutional layers fixed at 2 due to our specific input size
@@ -649,7 +647,7 @@ def save_param_importance_plot(study, save_path):
     fig.update_layout(title='Parameter Importances')
     fig.write_image(save_path)
 
-    print(f"Parameter importance plot saved to {save_path}")
+    print(f'Parameter importance plot saved from paramater tuning process')
 
 
 def main(tile_dir_train, target_csv_train,
@@ -738,6 +736,8 @@ def main(tile_dir_train, target_csv_train,
                                          pooling=pooling,
                                          lr=best_params['lr'],
                                          activation_func=activation_func,
+                                         weight_decay=best_params['weight_decay'],
+                                         dropout_rate=best_params['dropout'],
                                          patience=10,
                                          start_EarlyStop_count_from_epoch=10,
                                          model_save_path=model_save_path,

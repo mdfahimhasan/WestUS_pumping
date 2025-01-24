@@ -133,7 +133,8 @@ if __name__ == '__main__':
 
 
     # # to deal with overfitting
-    # try simpler model structures
+    # remove outliers in the training data (very high or very low pumping values)
+    # try param tuning with dropout and weight decay
     # add dropout layers in the fc layers
     # weight decay (?) - I already have it, what is it and what are the ways to use it for handling overfitting
     # change learning rate and consider using learning rate scheduler

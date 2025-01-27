@@ -440,7 +440,7 @@ def pumping_pts_to_raster(state_code, years, pumping_pts_shp, pumping_attr_AF,
                                                     raster_name=output_AF_raster, use_attr=True,
                                                     attribute=pumping_attr_AF, add=True,
                                                     ref_raster=ref_raster, resolution=resolution)
-            pumping_AF_raster = os.path.join(pumping_AF_dir, output_AF_raster)
+
             # converting pumping unit from AF to mm
             # no pumping values are 0 here
             pumping_AF_arr, file = read_raster_arr_object(pumping_AF_raster)
@@ -464,10 +464,11 @@ def pumping_pts_to_raster(state_code, years, pumping_pts_shp, pumping_attr_AF,
                         "must be provided. 'surface_irrig_dir' might also be needed for some regions. "
                         "Set 'skip_outlier_removal=True' to bypass this step.")
 
-                filter_out_low_high_pumping_values(year, pumping_mm_arr, irrigated_cropET_dir,
-                                                   Peff_dir, low_fraction, high_fraction,
-                                                   surface_irrig_dir,
-                                                   skip_processing=False)
+                pumping_mm_arr = \
+                    filter_out_low_high_pumping_values(year, pumping_mm_arr, irrigated_cropET_dir,
+                                                       Peff_dir, low_fraction, high_fraction,
+                                                       surface_irrig_dir,
+                                                       skip_processing=skip_outlier_removal)
 
             # filling nan positions (0 values) with -9999 as
             # -9999 is used for discarding no pumping data for tile creation
@@ -506,6 +507,8 @@ def filter_out_low_high_pumping_values(year, pumping_arr, irrigated_cropET_dir,
 
     :return: Filtered pumping array with invalid values set to zero.
     """
+    global surf_irr_arr
+
     if not skip_processing:
         # reading growing season cropET data for irrigated croplands
         irrig_cropET = glob(os.path.join(irrigated_cropET_dir, f'*{year}*.tif'))[0]
@@ -515,9 +518,10 @@ def filter_out_low_high_pumping_values(year, pumping_arr, irrigated_cropET_dir,
         peff = glob(os.path.join(Peff_dir, f'*{year}*.tif'))[0]
         peff_arr = read_raster_arr_object(peff, get_file=False)
 
-        # reading annual surface water irrigation data (distributed using USGS HUC12 dataset)
-        surf_irr = glob(os.path.join(surface_irrig_dir, f'*{year}*.tif'))[0]
-        surf_irr_arr = read_raster_arr_object(surf_irr, get_file=False)
+        if surface_irrig_dir is not None:
+            # reading annual surface water irrigation data (distributed using USGS HUC12 dataset)
+            surf_irr = glob(os.path.join(surface_irrig_dir, f'*{year}*.tif'))[0]
+            surf_irr_arr = read_raster_arr_object(surf_irr, get_file=False)
 
         # calculating total water
         if surface_irrig_dir is None:
@@ -530,10 +534,8 @@ def filter_out_low_high_pumping_values(year, pumping_arr, irrigated_cropET_dir,
         irrig_cropET_arr = np.where(irrig_cropET_arr > 1e-6, irrig_cropET_arr, np.nan)  # 1e-6 used as threshold to avoid division by very small value
         total_water = np.where(total_water > 0, total_water, np.nan)
 
-        water_frac = np.divide(total_water, irrig_cropET_arr,
-                               out=np.full_like(total_water, -9999),  # filling invalid results with -9999
-                               where=(~np.isnan(total_water) & ~np.isnan(irrig_cropET_arr))
-                               )
+        water_frac = np.where(~np.isnan(total_water) & ~np.isnan(irrig_cropET_arr),
+                               total_water/irrig_cropET_arr, -9999)
 
         # applying filter to identify valid pumping values
         mask = (water_frac >= low_fraction) & (water_frac <= high_fraction) & (irrig_cropET_arr != -9999)
@@ -615,8 +617,8 @@ if __name__ == '__main__':
     skip_process_UT_pumping = True  # # caution: the processed files might have been further post-processed. Follow caution in setting this to 'False'.
 
     skip_make_AZ_pumping_raster = True  # #
-    skip_make_KS_pumping_raster = True  # #
-    skip_make_CO_pumping_raster = True  # #
+    skip_make_KS_pumping_raster = False  # #
+    skip_make_CO_pumping_raster = False  # #
 
     skip_combine_pumping_rasters = False  # #
 
@@ -663,9 +665,9 @@ if __name__ == '__main__':
                           skip_processing=skip_make_KS_pumping_raster,
                           irrigated_cropET_dir='../../Data_main/rasters/Irrigated_cropET/WestUS_grow_season',
                           Peff_dir='../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
-                          surface_irrig_dir='../../Data_main/rasters/SW_irrigation',
-                          low_fraction=0.8,
-                          high_fraction=1.6,
+                          surface_irrig_dir=None,
+                          low_fraction=0.7,
+                          high_fraction=1.5,
                           skip_outlier_removal=False)    # implementing low-high pumping value removal in KS
 
     # # Colorado
@@ -682,9 +684,9 @@ if __name__ == '__main__':
                           skip_processing=skip_make_CO_pumping_raster,
                           irrigated_cropET_dir='../../Data_main/rasters/Irrigated_cropET/WestUS_grow_season',
                           Peff_dir='../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
-                          surface_irrig_dir='../../Data_main/rasters/SW_irrigation',
-                          low_fraction=0.8,
-                          high_fraction=1.6,
+                          surface_irrig_dir=None,
+                          low_fraction=0.7,
+                          high_fraction=1.5,
                           skip_outlier_removal=False)  # implementing low-high pumping value removal in CO
 
     # # Utah

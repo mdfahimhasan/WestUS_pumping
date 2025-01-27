@@ -19,7 +19,6 @@ import pickle
 import numpy as np
 import pandas as pd
 from glob import glob
-from osgeo import gdal
 import geopandas as gpd
 from pyproj import Transformer
 
@@ -27,8 +26,7 @@ from os.path import dirname, abspath
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import makedirs
-from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster, shapefile_to_raster, \
-    clip_resample_reproject_raster
+from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster, shapefile_to_raster
 
 no_data_value = -9999
 model_res = 0.01976293625031605786  # in deg, ~2 km
@@ -380,8 +378,8 @@ def pumping_pts_to_raster(state_code, years, pumping_pts_shp, pumping_attr_AF,
                           skip_processing=False,
                           ref_raster=WestUS_raster, resolution=model_res,
                           irrigated_cropET_dir=None, Peff_dir=None,
-                          surface_irrig_dir=None, deviation_allowed=None,
-                          skip_low_val_removal=False):
+                          surface_irrig_dir=None, low_fraction=None, high_fraction=None,
+                          skip_outlier_removal=False):
     """
     Convert point scale (shapefile) groundwater pumping estimates to rasters in AF and mm.
     For individual pixels (2km) sums up all the pumping values inside it.
@@ -404,9 +402,9 @@ def pumping_pts_to_raster(state_code, years, pumping_pts_shp, pumping_attr_AF,
                               Default set to None.
                               Note that- this data was distributed into pixels from USGS HUC12 dataset and was used
                                          as a proxy for surface water irrigation in our effective precipitation paper.
-    :param deviation_allowed: Fractional threshold (e.g., 0.1 for 10%) to allow total water
-                              to be slightly less than irrigated crop ET. Default is 0.2.
-    :param skip_low_val_removal: Set to True to skip filtering out pixels with low pumping values.
+    :param low_fraction: The minimum threshold for `(total_water / Irr_cropET)` ratio.
+    :param high_fraction: The maximum threshold for `(total_water / Irr_cropET)` ratio.
+    :param skip_outlier_removal: Set to True to skip filtering out pixels with low pumping values.
                                  Default set to False.
 
     :return: Raster directories' path with AF and mm pumping.
@@ -442,7 +440,7 @@ def pumping_pts_to_raster(state_code, years, pumping_pts_shp, pumping_attr_AF,
                                                     raster_name=output_AF_raster, use_attr=True,
                                                     attribute=pumping_attr_AF, add=True,
                                                     ref_raster=ref_raster, resolution=resolution)
-
+            pumping_AF_raster = os.path.join(pumping_AF_dir, output_AF_raster)
             # converting pumping unit from AF to mm
             # no pumping values are 0 here
             pumping_AF_arr, file = read_raster_arr_object(pumping_AF_raster)
@@ -458,17 +456,18 @@ def pumping_pts_to_raster(state_code, years, pumping_pts_shp, pumping_attr_AF,
             pumping_mm_arr = np.where(~np.isnan(pumping_AF_arr), pumping_AF_arr * 1233481837548 /
                                       area_mm2_single_pixel, -9999)
 
-            # remove pumping values that are low (doesn't meet criteria total water > irrigated cropET
-            # or the allowed threshold)
-            if not skip_low_val_removal:
-                if irrigated_cropET_dir is None or Peff_dir is None or surface_irrig_dir is None:
+            # remove pumping values that are too low or to high
+            if not skip_outlier_removal:
+                if irrigated_cropET_dir is None or Peff_dir is None:
                     raise ValueError(
-                        "To perform low pumping value removal, 'irrigated_cropET_dir', 'Peff_dir', and 'surface_irrig_dir' "
-                        "must be provided. Set 'skip_low_val_removal=True' to bypass this step.")
+                        "To perform outlier removal, 'irrigated_cropET_dir' and 'Peff_dir'"
+                        "must be provided. 'surface_irrig_dir' might also be needed for some regions. "
+                        "Set 'skip_outlier_removal=True' to bypass this step.")
 
-                filter_out_low_pumping_values(year, pumping_mm_arr, irrigated_cropET_dir,
-                                              Peff_dir, surface_irrig_dir, deviation_allowed,
-                                              skip_processing=False)
+                filter_out_low_high_pumping_values(year, pumping_mm_arr, irrigated_cropET_dir,
+                                                   Peff_dir, low_fraction, high_fraction,
+                                                   surface_irrig_dir,
+                                                   skip_processing=False)
 
             # filling nan positions (0 values) with -9999 as
             # -9999 is used for discarding no pumping data for tile creation
@@ -480,25 +479,29 @@ def pumping_pts_to_raster(state_code, years, pumping_pts_shp, pumping_attr_AF,
         pass
 
 
-def filter_out_low_pumping_values(year, pumping_arr, irrigated_cropET_dir,
-                                  Peff_dir, surface_irrig_dir, deviation_allowed=0.2,
-                                  skip_processing=False):
+def filter_out_low_high_pumping_values(year, pumping_arr, irrigated_cropET_dir,
+                                       Peff_dir, low_fraction, high_fraction,
+                                       surface_irrig_dir=None, skip_processing=False):
     """
-    Filters the pumping array to retain values that meet the water balance criteria.
+    Filters out high and low in-situ pumping values.
 
-    The function validates pumping values by ensuring that the total water (Peff + pumping + surface irrigation)
-    meets or exceeds the irrigated crop ET or falls within a specified allowable deviation.
-    Invalid pumping values are set to zero.
+    This function processes annual pumping data by filtering out values that do not meet specific
+    conditions based on the ratio of total water to irrigated crop evapotranspiration (ET) during the
+    growing season. Invalid pumping values are set to zero in the returned array.
+
+    **Filter Conditions**:
+    - (pumping + peff) / Irr_cropET >= low fraction (depending on regions the low fraction can be 0.75 - 0.85) and Peff not Nan
+    - (pumping + peff) / Irr_cropET <= high fraction (can eb around 1.5-1.6) and Peff not Nan
 
     :param year: The year for which the data is being processed.
     :param pumping_arr: The array of pumping values to filter.
     :param irrigated_cropET_dir: Directory containing raster files of growing season irrigated crop ET data.
     :param Peff_dir: Directory containing raster files of growing season Peff data.
-    :param surface_irrig_dir: Directory containing raster files of surface water irrigation data.
-                              Note that- this data was distributed into pixels from USGS HUC12 dataset and was used
-                                         as a proxy for surface water irrigation in our effective precipitation paper.
-    :param deviation_allowed: Fractional threshold (e.g., 0.1 for 10%) to allow total water
-                              to be slightly less than irrigated crop ET. Default is 0.2.
+    :param low_fraction: The minimum threshold for `(total_water / Irr_cropET)` ratio.
+    :param high_fraction: The maximum threshold for `(total_water / Irr_cropET)` ratio.
+    :param surface_irrig_dir: Directory containing raster files of surface water distribution data.
+                              It might be needed in areas with high surface water use (like Arizona).
+                              Default set to None - to avoid its use.
     :param skip_processing: If True, skip processing. Default is False.
 
     :return: Filtered pumping array with invalid values set to zero.
@@ -506,29 +509,34 @@ def filter_out_low_pumping_values(year, pumping_arr, irrigated_cropET_dir,
     if not skip_processing:
         # reading growing season cropET data for irrigated croplands
         irrig_cropET = glob(os.path.join(irrigated_cropET_dir, f'*{year}*.tif'))[0]
-        irrig_arr = read_raster_arr_object(irrig_cropET, get_file=False)
+        irrig_cropET_arr = read_raster_arr_object(irrig_cropET, get_file=False)
 
         # reading growing season Peff data for irrigated croplands
         peff = glob(os.path.join(Peff_dir, f'*{year}*.tif'))[0]
         peff_arr = read_raster_arr_object(peff, get_file=False)
 
-        # reading surface water irrigation dataset (sourced from USGS HUC12 dataset. Distributed to
-        # pixel in our Peff paper)
-        surf_irrig = glob(os.path.join(surface_irrig_dir, f'*{year}*.tif'))[0]
-        surf_irrig_arr = read_raster_arr_object(surf_irrig, get_file=False)
+        # reading annual surface water irrigation data (distributed using USGS HUC12 dataset)
+        surf_irr = glob(os.path.join(surface_irrig_dir, f'*{year}*.tif'))[0]
+        surf_irr_arr = read_raster_arr_object(surf_irr, get_file=False)
 
         # calculating total water
-        total_water = peff_arr + pumping_arr + surf_irrig_arr
+        if surface_irrig_dir is None:
+            total_water = peff_arr + pumping_arr
 
-        # Applying filter to identify valid pumping values.
-        # A valid pumping value is one where the total water (Peff + pumping + surface irrigation) is greater than or
-        # equal to the irrigated crop ET. However, there can be issues with the data, such as incomplete pumping records,
-        # underestimated Peff, proxy surface water irrigation dataset, or bias in irrigated crop ET.
-        # To account for these potential discrepancies, a threshold (e.g., 10% or 20%) is used to include
-        # pumping values even when total water is slightly lower than the irrigated crop ET.
-        threshold = 1 - deviation_allowed
-        mask = (total_water >= irrig_arr) | (total_water >= threshold * irrig_arr)
+        else:
+            total_water = peff_arr + pumping_arr + surf_irr_arr
 
+        # fraction of total_water / irrig_cropET_arr (modified from Ott et a. (2024))
+        irrig_cropET_arr = np.where(irrig_cropET_arr > 1e-6, irrig_cropET_arr, np.nan)  # 1e-6 used as threshold to avoid division by very small value
+        total_water = np.where(total_water > 0, total_water, np.nan)
+
+        water_frac = np.divide(total_water, irrig_cropET_arr,
+                               out=np.full_like(total_water, -9999),  # filling invalid results with -9999
+                               where=(~np.isnan(total_water) & ~np.isnan(irrig_cropET_arr))
+                               )
+
+        # applying filter to identify valid pumping values
+        mask = (water_frac >= low_fraction) & (water_frac <= high_fraction) & (irrig_cropET_arr != -9999)
         pumping_arr = pumping_arr * mask  # invalid values are set to 0
 
         return pumping_arr
@@ -636,7 +644,7 @@ if __name__ == '__main__':
                           output_dir='../../Data_main/pumping/rasters/Arizona',
                           ref_raster=WestUS_raster, resolution=model_res,
                           skip_processing=skip_make_AZ_pumping_raster,
-                          skip_low_val_removal=True)  # not implementing low pumping value removal in AZ
+                          skip_outlier_removal=True)  # not implementing low pumping value removal in AZ
                                                       # Refer to top of the script for detail
 
     # # Kansas
@@ -656,8 +664,9 @@ if __name__ == '__main__':
                           irrigated_cropET_dir='../../Data_main/rasters/Irrigated_cropET/WestUS_grow_season',
                           Peff_dir='../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
                           surface_irrig_dir='../../Data_main/rasters/SW_irrigation',
-                          deviation_allowed=0.1,
-                          skip_low_val_removal=False)    # implementing low pumping value removal in KS
+                          low_fraction=0.8,
+                          high_fraction=1.6,
+                          skip_outlier_removal=False)    # implementing low-high pumping value removal in KS
 
     # # Colorado
     process_CO_pumping_data(raw_csv='../../Data_main/pumping/Colorado/raw/pumping_data.csv',
@@ -674,8 +683,9 @@ if __name__ == '__main__':
                           irrigated_cropET_dir='../../Data_main/rasters/Irrigated_cropET/WestUS_grow_season',
                           Peff_dir='../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
                           surface_irrig_dir='../../Data_main/rasters/SW_irrigation',
-                          deviation_allowed=0.1,
-                          skip_low_val_removal=False)  # implementing low pumping value removal in CO
+                          low_fraction=0.8,
+                          high_fraction=1.6,
+                          skip_outlier_removal=False)  # implementing low-high pumping value removal in CO
 
     # # Utah
     process_UT_pumping_data(raw_csv='../../Data_main/pumping/Utah/raw/WaterUse_Utah.csv',

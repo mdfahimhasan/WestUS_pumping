@@ -38,6 +38,7 @@ if __name__ == '__main__':
     padding = 'same'                                                    #####
     activation = 'relu'                                                 #####
     pooling = 'avgpool'                                                 #####
+    batch_size = 128                                                    #####
 
     # Default model architecture
     default_params = {
@@ -52,18 +53,21 @@ if __name__ == '__main__':
 
     # Model switches
     tune_params = True                   #################################################################
-    n_trials_for_tuning = 10             #################################################################
+    n_trials_for_tuning = 100             #################################################################
+    implement_earlyStopping = False       #################################################################
     plot_hyperparam_importance = True    #################################################################
     skip_unstandardizing_testing = False  #################################################################
 
     # Running the model
     trained_model, model_info = main(tile_dir_train=tile_dir_train, target_csv_train=target_csv_train,
                                      tile_dir_val=tile_dir_val, target_csv_val=target_csv_val,
+                                     batch_size=batch_size,
                                      n_features=n_features, input_size=input_size, n_epochs=n_epochs,
                                      padding=padding, pooling=pooling,
                                      activation_func=activation,
                                      model_save_path=model_save_path,
                                      model_info_save_path=model_info_save_path,
+                                     implement_earlyStopping=implement_earlyStopping,
                                      tune_parameters=tune_params, n_trials=n_trials_for_tuning,
                                      default_params=default_params,
                                      plot_hyperparams_importance=plot_hyperparam_importance,
@@ -81,13 +85,13 @@ if __name__ == '__main__':
     print('Train performance:')
     test(trained_model,
          tile_dir=tile_dir_train, target_csv=target_csv_train,
-         batch_size=model_info['hyperparameters']['batch_size'],
+         batch_size=batch_size,
          data_type='train')
 
     print('Test performance:')
     test(trained_model,
          tile_dir=tile_dir_test, target_csv=target_csv_test,
-         batch_size=model_info['hyperparameters']['batch_size'],
+         batch_size=batch_size,
          data_type='test')
 
     print('########## *************************************** ##########\n')
@@ -99,7 +103,7 @@ if __name__ == '__main__':
     unstandardize_save_and_test(trained_model,
                                 tile_dir=tile_dir_train,
                                 target_csv=target_csv_train,
-                                batch_size=model_info['hyperparameters']['batch_size'],
+                                batch_size=batch_size,
                                 data_type='train',
                                 mean_csv=mean_csv,
                                 std_csv=std_csv,
@@ -110,7 +114,7 @@ if __name__ == '__main__':
     unstandardize_save_and_test(trained_model,
                                 tile_dir=tile_dir_val,
                                 target_csv=target_csv_val,
-                                batch_size=model_info['hyperparameters']['batch_size'],
+                                batch_size=batch_size,
                                 data_type='validation',
                                 mean_csv=mean_csv,
                                 std_csv=std_csv,
@@ -121,7 +125,7 @@ if __name__ == '__main__':
     unstandardize_save_and_test(trained_model,
                                 tile_dir=tile_dir_test,
                                 target_csv=target_csv_test,
-                                batch_size=model_info['hyperparameters']['batch_size'],
+                                batch_size=batch_size,
                                 data_type='test',
                                 mean_csv=mean_csv,
                                 std_csv=std_csv,
@@ -135,7 +139,4 @@ if __name__ == '__main__':
     # # to deal with overfitting
     # remove outliers in the training data (very high or very low pumping values)
     # try param tuning with dropout and weight decay
-    # add dropout layers in the fc layers
-    # weight decay (?) - I already have it, what is it and what are the ways to use it for handling overfitting
-    # change learning rate and consider using learning rate scheduler
-    # during tiling or train-val-test split, implement ways to drop features
+    # consider using learning rate scheduler

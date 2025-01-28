@@ -456,34 +456,30 @@ def validate(model, val_loader, verbose=False):
     return avg_loss
 
 
-def run_default_model(tile_dir_train, target_csv_train,
-                      tile_dir_val, target_csv_val,
+def run_default_model(train_loader, val_loader,
                       n_features, input_size, n_epochs, 
                       filters, model_save_path,
-                      batch_size=64, padding='same', pooling='maxpool',
+                      padding='same', pooling='maxpool',
                       lr=1e-3, kernel_size=3, stride=1,
                       activation_func='relu', fc_units=None,
                       weight_decay=1e-4, dropout_rate=0.2,
+                      implement_earlyStopping=False,
                       patience=10, start_EarlyStop_count_from_epoch=10,
                       verbose=True):
     """
     Main training function to train and validate the model.
 
-    :param tile_dir_train: Directory containing training set input tiles.
-    :param target_csv_train: CSV file with training set target values.
-    :param tile_dir_val: Directory containing validation set input tiles.
-    :param target_csv_val: CSV file with validation set target values.
+    :param train_loader: Train DataLoader.
+    :param val_loader: Validation DataLoader.
     :param n_features: int.  Number of input channels in the image.
     :param input_size : int. Height/width of the square input image (e.g., 64 for 64x64).
     :param n_epochs: int. Number of training epochs.
     :param filters: list of int. Number of filters in each CNN layer.
     :param model_save_path: str. Path for saving the best model checkpoint.
     :param kernel_size: list of int. Kernel size for convolutional layers.
-    :param batch_size: int. Batch size used in the DataLoader. Defaults to 64.
     :param padding: str. Padding type for CNN layers ('same' or 'valid'). Defaults to 'same'.
     :param pooling: str. Pooling type for CNN layers ('maxpool' or 'avgpool'). Defaults to 'maxpool'.
     :param lr: float. Learning rate for the optimizer. Defaults to 1e-3.
-
     :param stride: int. Stride for kernel operation. Defaults to 1.
     :param activation_func: str. Have to be either 'relu' or 'leakyrelu'. Defaults to 'relu'.
     :param fc_units: int. Number of units in the fully connected layer. Default set to None to use [128].
@@ -492,6 +488,7 @@ def run_default_model(tile_dir_train, target_csv_train,
                                 Default is 1e-4. A smaller value (e.g., 1e-6) penalizes large weights
                                 less, while a larger value (e.g., 1e-3) penalizes them more.
     :param dropout_rate: float. Dropout rate for fully connected layers.
+    :param implement_earlyStopping: boolean. Set to True to initiate early stopping.
     :param patience: int. Number of epochs to wait before early stopping. Default to 10.
     :param start_EarlyStop_count_from_epoch: int. Epoch to start checking early stopping. Defaults to 10.
     :param verbose: Set to True to print training progress at each 10 epoch.
@@ -499,15 +496,6 @@ def run_default_model(tile_dir_train, target_csv_train,
     :return: - The trained model.
              - A dictionary containing hyperparameters, training losses, and validation losses.
     """
-    # creating train and validation DataLoaders
-    train_loader = DataLoaderCreator(tile_dir_train, target_csv_train,
-                                     batch_size=batch_size,
-                                     data_type='train').get_dataloader()
-
-    val_loader = DataLoaderCreator(tile_dir_val, target_csv_val,
-                                   batch_size=batch_size,
-                                   data_type='validation').get_dataloader()
-
     # initializing the model
     model = CNNRegression(
         n_features=n_features,
@@ -549,33 +537,39 @@ def run_default_model(tile_dir_train, target_csv_train,
             print(f'Epoch {epoch} - Train loss: {train_loss:.4f}, Validation loss: {val_loss:.4f}')
 
         # checking for early stopping
-        if epoch >= start_EarlyStop_count_from_epoch:
+        if epoch >= start_EarlyStop_count_from_epoch and implement_earlyStopping:
             early_stopping(val_loss, model)
             if early_stopping.early_stop:
                 print(f'Early stopping triggered at epoch {epoch + 1}')
                 break
 
+    # handling val_loss when early stopping is disabled
+    if not implement_earlyStopping:
+        best_val_loss = min(val_losses)
+
+    else:
+        best_val_loss = early_stopping.best_loss
+
     # saving model information and losses
     model_info['hyperparameters'] = {
         'lr': lr,
-        'batch_size': batch_size,
         'filters': filters,
         'kernel_size': kernel_size,
         'fc_units': fc_units
     }
     model_info['train_losses'] = train_losses
     model_info['val_losses'] = val_losses
-    model_info['val_loss'] = early_stopping.best_loss
+    model_info['val_loss'] = best_val_loss
 
     return model, model_info
 
 
-def run_and_tune_model(trial, tile_dir_train, target_csv_train,
-                       tile_dir_val, target_csv_val,
+def run_and_tune_model(trial, train_loader, val_loader,
                        n_features, input_size, n_epochs,
                        model_save_path,
                        padding='same', pooling='maxpool',
-                       activation_func='relu'):
+                       activation_func='relu',
+                       implement_earlyStopping=False):
     """
     Objective function for Optuna parameter tuning.
 
@@ -587,10 +581,8 @@ def run_and_tune_model(trial, tile_dir_train, target_csv_train,
 
     :param trial: optuna.trial.Trial. A trial object provided by Optuna. It is used to
                   sample parameters and record the trial's results.
-    :param tile_dir_train: Directory containing training set input tiles.
-    :param target_csv_train: CSV file with training set target values.
-    :param tile_dir_val: Directory containing validation set input tiles.
-    :param target_csv_val: CSV file with validation set target values.
+    :param train_loader: Train DataLoader.
+    :param val_loader: Validation DataLoader.
     :param n_features: int.  Number of input channels in the image.
     :param input_size : int. Height/width of the square input image (e.g., 64 for 64x64).
     :param n_epochs: int. Number of training epochs.
@@ -598,13 +590,13 @@ def run_and_tune_model(trial, tile_dir_train, target_csv_train,
     :param padding: str. Padding type for CNN layers ('same' or 'valid'). Defaults to 'same'.
     :param pooling: str. Pooling type for CNN layers ('maxpool' or 'avgpool'). Defaults to 'maxpool'.
     :param activation_func: str. Have to be either 'relu' or 'leakyrelu'. Defaults to 'relu'.
+    :param implement_earlyStopping: boolean. Set to False to not initiate early stopping.
 
     :return: The best validation loss (val_loss).
     """
     # sample hyperparameters
-    lr = trial.suggest_loguniform('lr', 1e-5, 1e-2)
-    batch_size = trial.suggest_categorical('batch_size', [32, 64, 128])
-    weight_decay = trial.suggest_loguniform('weight_decay', 1e-6, 1e-2)
+    lr = trial.suggest_float('lr', 1e-5, 1e-2, log=True)
+    weight_decay = trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)
 
     # sample convolutional architecture
     num_layers = 2      # keeping number of convolutional layers fixed at 2 due to our specific input size
@@ -613,22 +605,34 @@ def run_and_tune_model(trial, tile_dir_train, target_csv_train,
 
     # sample fully connected layer configuration
     num_fc_layers = trial.suggest_int('num_fc_layers', 1, 3)  # number of fully connected layers can be flexible from 1-3
-    fc_units = [trial.suggest_int(f'fc_units_layer_{i}', 64, 256, step=32) for i in range(num_fc_layers)]
-    dropout_rate = trial.suggest_float('dropout_rate', 0.1, 0.5, step=0.1)
+    fc_units = [trial.suggest_int(f'fc_units_layer_{i}', 32, 128, step=32) for i in range(num_fc_layers)]
+    dropout_rate = trial.suggest_float('dropout', 0.1, 0.5, step=0.1)
 
     # training the model with the sampled parameters
-    _, best_model_info = run_default_model(tile_dir_train, target_csv_train,
-                                           tile_dir_val, target_csv_val,
-                                           n_features=n_features, input_size=input_size, n_epochs=n_epochs,
-                                           filters=filters, batch_size=batch_size, padding=padding, pooling=pooling,
-                                           lr=lr, kernel_size=kernel_size, stride=1,
-                                           activation_func=activation_func, fc_units=fc_units,
-                                           weight_decay=weight_decay, dropout_rate=dropout_rate,
-                                           patience=10, start_EarlyStop_count_from_epoch=10,
-                                           model_save_path=model_save_path, verbose=True)
+    _, model_info = run_default_model(train_loader, val_loader,
+                                      n_features=n_features, input_size=input_size,
+                                      n_epochs=n_epochs, filters=filters,
+                                      padding=padding, pooling=pooling,
+                                      lr=lr, kernel_size=kernel_size, stride=1,
+                                      activation_func=activation_func, fc_units=fc_units,
+                                      weight_decay=weight_decay, dropout_rate=dropout_rate,
+                                      implement_earlyStopping=implement_earlyStopping,
+                                      patience=10, start_EarlyStop_count_from_epoch=10,
+                                      model_save_path=model_save_path, verbose=True)
 
-    # returning the validation loss for the best epoch
-    return best_model_info['val_loss']
+    # objective function
+    best_val_loss = model_info['val_loss']  # for a specific trial
+    train_loss_at_best_val = model_info['train_losses'][model_info['val_losses'].index(best_val_loss)]
+
+    alpha = 0.3  # Weight for the penalty term to minimize the gap between train and validation loss
+    objective_value = best_val_loss + alpha * abs(train_loss_at_best_val - best_val_loss)  # param tuning will minimize this value
+
+    # Store additional information for later use
+    best_epoch = model_info['val_losses'].index(best_val_loss)  # Track the best epoch
+    trial.set_user_attr("model_info", model_info)  # Save model info for the trial
+    trial.set_user_attr("best_epoch", best_epoch)  # Save best epoch for the trial
+
+    return objective_value
 
 
 def save_param_importance_plot(study, save_path):
@@ -640,23 +644,34 @@ def save_param_importance_plot(study, save_path):
 
     :return None.
     """
-    # generating the plot
-    fig = optuna.visualization.plot_param_importances(study)
+    # extracting parameter importance values
+    importance = optuna.importance.get_param_importances(study)
+    params = list(importance.keys())
+    scores = list(importance.values())
 
-    # converting Optuna's plotly figure to a static matplotlib figure
-    fig.update_layout(title='Parameter Importances')
-    fig.write_image(save_path)
+    # creating a bar plot
+    plt.figure(figsize=(10, 6))
+    plt.barh(params, scores, color='skyblue')
+    plt.xlabel('Importance Score')
+    plt.ylabel('Parameter')
+    plt.title('Parameter Importance')
+    plt.gca().invert_yaxis()
+    plt.tight_layout()
+
+    plt.savefig(save_path, format='png', dpi=300)
+    plt.close()
 
     print(f'Parameter importance plot saved from paramater tuning process')
 
 
 def main(tile_dir_train, target_csv_train,
-         tile_dir_val, target_csv_val,
+         tile_dir_val, target_csv_val, batch_size,
          n_features, input_size, n_epochs,
          model_save_path, model_info_save_path,
          padding='same', pooling='maxpool',
          activation_func='relu',
          default_params=None,
+         implement_earlyStopping=False,
          tune_parameters=False, n_trials=50,
          plot_hyperparams_importance=False,
          hyperparam_importance_plot_path=None
@@ -672,6 +687,7 @@ def main(tile_dir_train, target_csv_train,
     :param target_csv_train: CSV file with training set target values.
     :param tile_dir_val: Directory containing validation set input tiles.
     :param target_csv_val: CSV file with validation set target values.
+    :param batch_size: int. Batch size of DataLoader.
     :param n_features: int. Number of input channels in the image.
     :param input_size : int. Height/width of the square input image (e.g., 64 for 64x64).
     :param n_epochs: int. Number of training epochs.
@@ -682,11 +698,13 @@ def main(tile_dir_train, target_csv_train,
     :param pooling: str. Pooling type for CNN layers ('maxpool' or 'avgpool'). Defaults to 'maxpool'.
     :param activation_func: str. Activation function ('relu' or 'leakyrelu'). Defaults to 'relu'.
     :param default_params: dict or None. Default parameters for running the model. Ignored when `tune_parameters` is True.
+    :param implement_earlyStopping: boolean. Set to False to not initiate early stopping.
     :param tune_parameters: bool. If True, perform parameter tuning using Optuna. Defaults to False.
     :param n_trials: int. Number of Optuna trials for parameter tuning. Defaults to 50.
     :param plot_hyperparams_importance: bool. Set to True to plot hypapameter importance plot during tuning
                                         parameters.
     :param hyperparam_importance_plot_path: str. Filepath to save hypeparam importance plot. Default set to None.
+
 
     :return: - The trained model.
              - A dictionary containing hyperparameters, training losses, and validation losses.
@@ -694,50 +712,54 @@ def main(tile_dir_train, target_csv_train,
     # creating storage directory
     makedirs([os.path.dirname(model_info_save_path)])
 
+    # creating train and validation DataLoaders
+    train_loader = DataLoaderCreator(tile_dir_train, target_csv_train,
+                                     batch_size=batch_size,
+                                     data_type='train').get_dataloader()
+
+    val_loader = DataLoaderCreator(tile_dir_val, target_csv_val,
+                                   batch_size=batch_size,
+                                   data_type='validation').get_dataloader()
+
     # parameter tuning mode
     if tune_parameters:
         # checking conditions for default parameters and tuning mode
         if default_params is not None:
-            print('Warning: `default_params` is ignored when `tune_parameters=True`.')
+            print('\n`default_params` is ignored when `tune_parameters=True`.')
 
         # performing hyperparameter + configuration parameters tuning using Optuna
         print('Starting parameter tuning with Optuna...')
 
         study = optuna.create_study(direction='minimize')
         study.optimize(lambda trial: run_and_tune_model(
-            trial=trial, tile_dir_train=tile_dir_train, 
-            target_csv_train=target_csv_train,
-            tile_dir_val=tile_dir_val, target_csv_val=target_csv_val,
+            trial=trial, train_loader=train_loader, val_loader=val_loader,
             n_features=n_features, input_size=input_size, n_epochs=n_epochs,
             padding=padding, pooling=pooling, activation_func=activation_func,
             model_save_path=model_save_path,
             ), n_trials=n_trials)
 
-        # printing the best trial results
+        # best parameters achieved from hyperparameter training
         best_params = study.best_trial.params
-        print('\nBest parameters Found:')
-        print(best_params)
+        best_epoch = study.best_trial.user_attrs["best_epoch"]
 
         # retraining the best model (optional)
         print('\nRetraining the best model...')
         trained_model, best_model_info = run_default_model(
-                                         tile_dir_train=tile_dir_train,
-                                         target_csv_train=target_csv_train,
-                                         tile_dir_val=tile_dir_val,
-                                         target_csv_val=target_csv_val,
+                                         train_loader=train_loader,
+                                         val_loader=val_loader,
                                          n_features=n_features,
                                          input_size=input_size,
-                                         n_epochs=n_epochs,
+                                         n_epochs=best_epoch,
                                          filters=[best_params[f'filters_layer_{i}'] for i in range(2)],  # Num conv layers fixed at 2
                                          kernel_size=[best_params[f'kernel_size_layer_{i}'] for i in range(2)],  # Num conv layers fixed at 2
                                          fc_units=[best_params[f'fc_units_layer_{i}'] for i in range(best_params['num_fc_layers'])],
-                                         batch_size=best_params['batch_size'],
                                          padding=padding,
                                          pooling=pooling,
                                          lr=best_params['lr'],
                                          activation_func=activation_func,
                                          weight_decay=best_params['weight_decay'],
                                          dropout_rate=best_params['dropout'],
+                                         implement_earlyStopping=implement_earlyStopping,
                                          patience=10,
                                          start_EarlyStop_count_from_epoch=10,
                                          model_save_path=model_save_path,
@@ -747,8 +769,9 @@ def main(tile_dir_train, target_csv_train,
         with open(model_info_save_path, 'wb') as f:
             pickle.dump(best_model_info, f)
 
-        print('\nBest Model Information:')
-        print(best_model_info)
+        print('\nBest parameters Found:')
+        print(best_params)
+        print(f"\n val loss- {best_model_info['val_loss']}")
 
         # plotting hyperparameter importance plot from tuning process
         if plot_hyperparams_importance and hyperparam_importance_plot_path is not None:
@@ -766,22 +789,21 @@ def main(tile_dir_train, target_csv_train,
 
         # running the model with default hyperparameters and configuration parameters
         trained_model, model_info = run_default_model(
-                                    tile_dir_train=tile_dir_train,
-                                    target_csv_train=target_csv_train,
-                                    tile_dir_val=tile_dir_val,
-                                    target_csv_val=target_csv_val,                                                      n_features=n_features,
+                                    train_loader=train_loader,
+                                    val_loader=val_loader,
+                                    n_features=n_features,
                                     input_size=input_size,
                                     n_epochs=n_epochs,
                                     filters=default_params['filters'],
                                     kernel_size=default_params['kernel_size'],
                                     fc_units=default_params['fc_units'],
-                                    batch_size=default_params['batch_size'],
                                     padding=padding,
                                     pooling=pooling,
                                     lr=default_params['lr'],
                                     activation_func=activation_func,
                                     weight_decay=default_params['weight_decay'],
                                     dropout_rate=default_params['dropout'],
+                                    implement_earlyStopping=implement_earlyStopping,
                                     patience=10,
                                     start_EarlyStop_count_from_epoch=10,
                                     model_save_path=model_save_path,
@@ -950,8 +972,8 @@ def plot_learning_curve(train_loss, val_loss, plot_save_path):
     """
     # plotting losses
     plt.figure(figsize=(10, 6))
-    plt.plot(train_loss, label='Training Loss', marker='o')
-    plt.plot(val_loss, label='Validation Loss', marker='x')
+    plt.plot(train_loss, label='Training Loss')
+    plt.plot(val_loss, label='Validation Loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend()

@@ -363,6 +363,27 @@ class CNNRegression(nn.Module):
             raise ValueError(f"Unsupported optimizer: {optimizer_name}. Choose from 'adam', 'sgd', or 'adagrad'.")
 
 
+def calculate_metrics(predictions, targets):
+    """
+    Calculates regression metrics.
+
+    :param predictions: Predicted values.
+    :param targets: Actual values.
+
+    :return: Dictionary with metrics .
+    """
+    if isinstance(predictions, list):
+        predictions = np.array(predictions)
+        targets = np.array(targets)
+
+    rmse = np.sqrt(np.mean((predictions - targets) ** 2))
+    mae = np.mean(np.abs(predictions - targets))
+    r2 = 1 - (np.sum((predictions - targets) ** 2) /
+              np.sum((targets - np.mean(targets)) ** 2))
+
+    return {'RMSE': rmse, 'MAE': mae, 'R2': r2}
+
+
 def train(model, train_loader, optimizer, verbose=False):
     """
     Trains the model for one epoch.
@@ -382,6 +403,9 @@ def train(model, train_loader, optimizer, verbose=False):
     # initiating running_loss to accumulate the total loss across all batches
     running_loss = 0.0
 
+    # empty lists to store predictions and actual values
+    predictions, actuals = [], []
+
     # mse function
     mse_func = torch.nn.MSELoss()
 
@@ -389,8 +413,8 @@ def train(model, train_loader, optimizer, verbose=False):
         features, targets = features.to(device), targets.to(device).view(-1, 1)
 
         # forward pass
-        predictions = model(features)
-        loss = mse_func(predictions, targets)
+        preds = model(features)
+        loss = mse_func(preds, targets)
 
         # backward pass and optimization
         optimizer.zero_grad()
@@ -400,6 +424,10 @@ def train(model, train_loader, optimizer, verbose=False):
         # accumulates loss for each batch
         running_loss += loss.item()
 
+        # storing predictions and actuals
+        predictions.extend(preds.cpu().detach().numpy().flatten())
+        actuals.extend(targets.cpu().detach().numpy().flatten())
+
         # print every 10 batches
         if verbose and batch_idx % 10 == 0:
             print(f'Batch {batch_idx + 1}/{len(train_loader)} - Loss: {loss.item():.4f}')
@@ -407,7 +435,12 @@ def train(model, train_loader, optimizer, verbose=False):
     # average loss for the epoch
     avg_loss = running_loss / len(train_loader)
 
-    return avg_loss
+    # calculating performance metrics
+    predictions, actuals = np.array(predictions), np.array(actuals)
+    rmse = calculate_metrics(predictions, actuals)['RMSE']
+    r2 = calculate_metrics(predictions, actuals)['R2']
+
+    return avg_loss, rmse, r2
 
 
 def validate(model, val_loader, verbose=False):
@@ -429,6 +462,9 @@ def validate(model, val_loader, verbose=False):
     # initiating running_loss to accumulate the total loss across all batches
     running_loss = 0.0
 
+    # empty lists to store predictions and actual values
+    predictions, actuals = [], []
+
     # mse function
     mse_func = torch.nn.MSELoss()
 
@@ -437,11 +473,15 @@ def validate(model, val_loader, verbose=False):
             features, targets = features.to(device), targets.to(device).view(-1, 1)
 
             # forward pass
-            predictions = model(features)
-            loss = mse_func(predictions, targets)
+            preds = model(features)
+            loss = mse_func(preds, targets)
 
             # accumulates loss for each batch
             running_loss += loss.item()
+
+            # storing predictions and actuals
+            predictions.extend(preds.cpu().detach().numpy().flatten())
+            actuals.extend(targets.cpu().detach().numpy().flatten())
 
             # print every 10 batches
             if verbose and batch_idx % 10 == 0:
@@ -450,28 +490,12 @@ def validate(model, val_loader, verbose=False):
     # average loss for the epoch
     avg_loss = running_loss / len(val_loader)
 
-    return avg_loss
+    # calculating performance metrics
+    predictions, actuals = np.array(predictions), np.array(actuals)
+    rmse = calculate_metrics(predictions, actuals)['RMSE']
+    r2 = calculate_metrics(predictions, actuals)['R2']
 
-
-def calculate_metrics(predictions, targets):
-    """
-    Calculates regression metrics.
-
-    :param predictions: Predicted values.
-    :param targets: Actual values.
-
-    :return: Dictionary with metrics .
-    """
-    if isinstance(predictions, list):
-        predictions = np.array(predictions)
-        targets = np.array(targets)
-
-    rmse = np.sqrt(np.mean((predictions - targets) ** 2))
-    mae = np.mean(np.abs(predictions - targets))
-    r2 = 1 - (np.sum((predictions - targets) ** 2) /
-              np.sum((targets - np.mean(targets)) ** 2))
-
-    return {'RMSE': rmse, 'MAE': mae, 'R2': r2}
+    return avg_loss, rmse, r2
 
 
 def test(model, tile_dir, target_csv, batch_size, data_type='test'):
@@ -575,7 +599,7 @@ def run_default_model(train_loader, val_loader,
              - A dictionary containing hyperparameters, training losses, and validation losses.
     """
 
-    global train_loss, val_loss
+    global train_loss, val_loss, train_rmse, train_r2, val_rmse, val_r2
 
     # initializing the model
     model = CNNRegression(
@@ -606,9 +630,12 @@ def run_default_model(train_loader, val_loader,
     last_epoch = None  # Track the last trained epoch
 
     for epoch in range(n_epochs):
+
+        epoch = epoch + 1 # making epoch starting from 1
+
         # training and validation for one epoch
-        train_loss = train(model, train_loader, optimizer)
-        val_loss = validate(model, val_loader)
+        train_loss, train_rmse, train_r2 = train(model, train_loader, optimizer)
+        val_loss, val_rmse, val_r2 = validate(model, val_loader)
 
         # storing losses
         train_losses.append(train_loss)
@@ -619,7 +646,9 @@ def run_default_model(train_loader, val_loader,
 
         # printing progress
         if verbose and epoch % 10 == 0:
-            print(f'Epoch {epoch} - Train loss: {train_loss:.4f}, Validation loss: {val_loss:.4f}')
+            print(f'Train Epoch: {epoch} | Loss: {train_loss:.3f} | RMSE: {train_rmse:.3f} | R²: {train_r2:.3f}')
+            print(f'Val   Epoch: {epoch} | Loss: {val_loss:.3f}   | RMSE: {val_rmse:.3f}   | R²: {val_r2:.3f}')
+            print('---------------------------------------------------------------------')
 
         # checking for early stopping
         if epoch >= start_EarlyStop_count_from_epoch and implement_earlyStopping:
@@ -629,7 +658,9 @@ def run_default_model(train_loader, val_loader,
                 break
 
     # printing final performance (last trained epoch)
-    print(f'Final Epoch {last_epoch} - Train Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f}')
+    print(f'Final Train Epoch: {last_epoch} | Loss: {train_loss:.3f} | RMSE: {train_rmse:.3f} | R²: {train_r2:.3f}')
+    print(f'Final Val   Epoch: {last_epoch} | Loss: {val_loss:.3f}   | RMSE: {val_rmse:.3f}   | R²: {val_r2:.3f}')
+    print('---------------------------------------------------------------------')
 
     # handling val_loss when early stopping is disabled
     if not implement_earlyStopping:

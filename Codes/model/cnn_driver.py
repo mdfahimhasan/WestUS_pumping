@@ -159,3 +159,4 @@ if __name__ == '__main__':
     # - Implement learning rate scheduling
     # - Try different optimizers
     # - Consider early stopping based on validation loss
+    # - consider training without dropout entirely

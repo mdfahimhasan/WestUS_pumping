@@ -109,13 +109,13 @@ class EarlyStopping:
     Saves the model with the lowest validation loss.
     """
 
-    def __init__(self, save_path, patience=5, delta=0.01):
+    def __init__(self, save_path, patience=10, delta=0.01):
         """
         Initializes the early stopping mechanism.
 
         :param save_path: str. Path for saving the best model checkpoint.
         :param patience: int. Number of epochs to wait before stopping if no improvement.
-                         Default is 5.
+                         Default is 10.
         :param delta: float. Minimum change in the monitored quantity to qualify as an improvement.
                       Default is 0.01.
         """
@@ -456,369 +456,6 @@ def validate(model, val_loader, verbose=False):
     return avg_loss
 
 
-def run_default_model(train_loader, val_loader,
-                      n_features, input_size, n_epochs, 
-                      filters, model_save_path,
-                      padding='same', pooling='maxpool',
-                      lr=1e-3, kernel_size=3, stride=1,
-                      activation_func='relu', fc_units=None,
-                      weight_decay=1e-4, dropout_rate=0.2,
-                      implement_earlyStopping=False,
-                      patience=10, start_EarlyStop_count_from_epoch=10,
-                      verbose=True):
-    """
-    Main training function to train and validate the model.
-
-    :param train_loader: Train DataLoader.
-    :param val_loader: Validation DataLoader.
-    :param n_features: int.  Number of input channels in the image.
-    :param input_size : int. Height/width of the square input image (e.g., 64 for 64x64).
-    :param n_epochs: int. Number of training epochs.
-    :param filters: list of int. Number of filters in each CNN layer.
-    :param model_save_path: str. Path for saving the best model checkpoint.
-    :param kernel_size: list of int. Kernel size for convolutional layers.
-    :param padding: str. Padding type for CNN layers ('same' or 'valid'). Defaults to 'same'.
-    :param pooling: str. Pooling type for CNN layers ('maxpool' or 'avgpool'). Defaults to 'maxpool'.
-    :param lr: float. Learning rate for the optimizer. Defaults to 1e-3.
-    :param stride: int. Stride for kernel operation. Defaults to 1.
-    :param activation_func: str. Have to be either 'relu' or 'leakyrelu'. Defaults to 'relu'.
-    :param fc_units: int. Number of units in the fully connected layer. Default set to None to use [128].
-                     neurons in a single layer.
-    :param weight_decay: float. Weight decay (L2 regularization) coefficient to control overfitting.
-                                Default is 1e-4. A smaller value (e.g., 1e-6) penalizes large weights
-                                less, while a larger value (e.g., 1e-3) penalizes them more.
-    :param dropout_rate: float. Dropout rate for fully connected layers.
-    :param implement_earlyStopping: boolean. Set to True to initiate early stopping.
-    :param patience: int. Number of epochs to wait before early stopping. Default to 10.
-    :param start_EarlyStop_count_from_epoch: int. Epoch to start checking early stopping. Defaults to 10.
-    :param verbose: Set to True to print training progress at each 10 epoch.
-
-    :return: - The trained model.
-             - A dictionary containing hyperparameters, training losses, and validation losses.
-    """
-    # initializing the model
-    model = CNNRegression(
-        n_features=n_features,
-        input_size=input_size,
-        filters=filters,
-        kernels=kernel_size,
-        stride=stride,
-        activation_func=activation_func,
-        padding=padding,
-        pooling=pooling,
-        fc_layers=fc_units,
-        dropout_rate=dropout_rate
-    )
-
-    # configuring optimizer
-    optimizer = model.configure_optimizer(optimizer_name='adam', lr=lr, weight_decay=weight_decay)
-
-    # initialize EarlyStopping
-    early_stopping = EarlyStopping(save_path=model_save_path, patience=patience)
-
-    # empty dictionary to store model parameters and losses
-    model_info = {}
-
-    # empty lists to track losses
-    train_losses = []
-    val_losses = []
-
-    for epoch in range(n_epochs):
-        # training and validation for one epoch
-        train_loss = train(model, train_loader, optimizer)
-        val_loss = validate(model, val_loader)
-
-        # storing losses
-        train_losses.append(train_loss)
-        val_losses.append(val_loss)
-
-        # printing progress
-        if verbose and epoch % 10 == 0:
-            print(f'Epoch {epoch} - Train loss: {train_loss:.4f}, Validation loss: {val_loss:.4f}')
-
-        # checking for early stopping
-        if epoch >= start_EarlyStop_count_from_epoch and implement_earlyStopping:
-            early_stopping(val_loss, model)
-            if early_stopping.early_stop:
-                print(f'Early stopping triggered at epoch {epoch + 1}')
-                break
-
-    # handling val_loss when early stopping is disabled
-    if not implement_earlyStopping:
-        best_val_loss = min(val_losses)
-
-    else:
-        best_val_loss = early_stopping.best_loss
-
-    # saving model information and losses
-    model_info['hyperparameters'] = {
-        'lr': lr,
-        'filters': filters,
-        'kernel_size': kernel_size,
-        'fc_units': fc_units
-    }
-    model_info['train_losses'] = train_losses
-    model_info['val_losses'] = val_losses
-    model_info['val_loss'] = best_val_loss
-
-    return model, model_info
-
-
-def run_and_tune_model(trial, train_loader, val_loader,
-                       n_features, input_size, n_epochs,
-                       model_save_path,
-                       padding='same', pooling='maxpool',
-                       activation_func='relu',
-                       implement_earlyStopping=False):
-    """
-    Objective function for Optuna parameter tuning.
-
-    This function is called for each trial during the parameter search.
-    It defines the search space for parameters, trains a CNN model
-    using the sampled parameters, and evaluates the model's performance
-    on the validation set. The validation loss is returned to Optuna to guide
-    the optimization process.
-
-    :param trial: optuna.trial.Trial. A trial object provided by Optuna. It is used to
-                  sample parameters and record the trial's results.
-    :param train_loader: Train DataLoader.
-    :param val_loader: Validation DataLoader.
-    :param n_features: int.  Number of input channels in the image.
-    :param input_size : int. Height/width of the square input image (e.g., 64 for 64x64).
-    :param n_epochs: int. Number of training epochs.
-    :param model_save_path: str. Path for saving the best model checkpoint.
-    :param padding: str. Padding type for CNN layers ('same' or 'valid'). Defaults to 'same'.
-    :param pooling: str. Pooling type for CNN layers ('maxpool' or 'avgpool'). Defaults to 'maxpool'.
-    :param activation_func: str. Have to be either 'relu' or 'leakyrelu'. Defaults to 'relu'.
-    :param implement_earlyStopping: boolean. Set to False to not initiate early stopping.
-
-    :return: The best validation loss (val_loss).
-    """
-    # sample hyperparameters
-    lr = trial.suggest_float('lr', 1e-5, 1e-2, log=True)
-    weight_decay = trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)
-
-    # sample convolutional architecture
-    num_layers = 2      # keeping number of convolutional layers fixed at 2 due to our specific input size
-    filters = [trial.suggest_int(f'filters_layer_{i}', 32, 64, step=16) for i in range(num_layers)]
-    kernel_size = [trial.suggest_int(f'kernel_size_layer_{i}', 3, 5, step=2) for i in range(num_layers)]
-
-    # sample fully connected layer configuration
-    num_fc_layers = trial.suggest_int('num_fc_layers', 1, 3)  # number of fully connected layers can be flexible from 1-3
-    fc_units = [trial.suggest_int(f'fc_units_layer_{i}', 32, 128, step=32) for i in range(num_fc_layers)]
-    dropout_rate = trial.suggest_float('dropout', 0.1, 0.5, step=0.1)
-
-    # training the model with the sampled parameters
-    _, model_info = run_default_model(train_loader, val_loader,
-                                      n_features=n_features, input_size=input_size,
-                                      n_epochs=n_epochs, filters=filters,
-                                      padding=padding, pooling=pooling,
-                                      lr=lr, kernel_size=kernel_size, stride=1,
-                                      activation_func=activation_func, fc_units=fc_units,
-                                      weight_decay=weight_decay, dropout_rate=dropout_rate,
-                                      implement_earlyStopping=implement_earlyStopping,
-                                      patience=10, start_EarlyStop_count_from_epoch=10,
-                                      model_save_path=model_save_path, verbose=True)
-
-    # objective function
-    best_val_loss = model_info['val_loss']  # for a specific trial
-    train_loss_at_best_val = model_info['train_losses'][model_info['val_losses'].index(best_val_loss)]
-
-    alpha = 0.3  # Weight for the penalty term to minimize the gap between train and validation loss
-    objective_value = best_val_loss + alpha * abs(train_loss_at_best_val - best_val_loss)  # param tuning will minimize this value
-
-    # Store additional information for later use
-    best_epoch = model_info['val_losses'].index(best_val_loss)  # Track the best epoch
-    trial.set_user_attr("model_info", model_info)  # Save model info for the trial
-    trial.set_user_attr("best_epoch", best_epoch)  # Save best epoch for the trial
-
-    return objective_value
-
-
-def save_param_importance_plot(study, save_path):
-    """
-    Generates and saves the parameter importance plot for an Optuna study.
-
-    :param study: The Optuna study object after optimization.
-    :param save_path: The file path to save the parameter importance plot.
-
-    :return None.
-    """
-    # extracting parameter importance values
-    importance = optuna.importance.get_param_importances(study)
-    params = list(importance.keys())
-    scores = list(importance.values())
-
-    # creating a bar plot
-    plt.figure(figsize=(10, 6))
-    plt.barh(params, scores, color='skyblue')
-    plt.xlabel('Importance Score')
-    plt.ylabel('Parameter')
-    plt.title('Parameter Importance')
-    plt.gca().invert_yaxis()
-    plt.tight_layout()
-
-    plt.savefig(save_path, format='png', dpi=300)
-    plt.close()
-
-    print(f'Parameter importance plot saved from paramater tuning process')
-
-
-def main(tile_dir_train, target_csv_train,
-         tile_dir_val, target_csv_val, batch_size,
-         n_features, input_size, n_epochs,
-         model_save_path, model_info_save_path,
-         padding='same', pooling='maxpool',
-         activation_func='relu',
-         default_params=None,
-         implement_earlyStopping=False,
-         tune_parameters=False, n_trials=50,
-         plot_hyperparams_importance=False,
-         hyperparam_importance_plot_path=None
-         ):
-    """
-    Main function to either run the model with default parameters or perform parameter tuning.
-
-    ****
-    - when the model is set to tuning mode, set tune_parameters = True and default_params = None
-    - when the model is in default mode, set tune_parameters = False and default_params = a dictionary of params
-
-    :param tile_dir_train: Directory containing training set input tiles.
-    :param target_csv_train: CSV file with training set target values.
-    :param tile_dir_val: Directory containing validation set input tiles.
-    :param target_csv_val: CSV file with validation set target values.
-    :param batch_size: int. Batch size of DataLoader.
-    :param n_features: int. Number of input channels in the image.
-    :param input_size : int. Height/width of the square input image (e.g., 64 for 64x64).
-    :param n_epochs: int. Number of training epochs.
-    :param model_save_path: str. Path for saving the best model checkpoint.
-    :param model_info_save_path: Filepath (pkl) to save the parameter-tuned or default model's params and
-                                 losses.
-    :param padding: str. Padding type for CNN layers ('same' or 'valid'). Defaults to 'same'.
-    :param pooling: str. Pooling type for CNN layers ('maxpool' or 'avgpool'). Defaults to 'maxpool'.
-    :param activation_func: str. Activation function ('relu' or 'leakyrelu'). Defaults to 'relu'.
-    :param default_params: dict or None. Default parameters for running the model. Ignored when `tune_parameters` is True.
-    :param implement_earlyStopping: boolean. Set to False to not initiate early stopping.
-    :param tune_parameters: bool. If True, perform parameter tuning using Optuna. Defaults to False.
-    :param n_trials: int. Number of Optuna trials for parameter tuning. Defaults to 50.
-    :param plot_hyperparams_importance: bool. Set to True to plot hypapameter importance plot during tuning
-                                        parameters.
-    :param hyperparam_importance_plot_path: str. Filepath to save hypeparam importance plot. Default set to None.
-
-
-    :return: - The trained model.
-             - A dictionary containing hyperparameters, training losses, and validation losses.
-    """
-    # creating storage directory
-    makedirs([os.path.dirname(model_info_save_path)])
-
-    # creating train and validation DataLoaders
-    train_loader = DataLoaderCreator(tile_dir_train, target_csv_train,
-                                     batch_size=batch_size,
-                                     data_type='train').get_dataloader()
-
-    val_loader = DataLoaderCreator(tile_dir_val, target_csv_val,
-                                   batch_size=batch_size,
-                                   data_type='validation').get_dataloader()
-
-    # parameter tuning mode
-    if tune_parameters:
-        # checking conditions for default parameters and tuning mode
-        if default_params is not None:
-            print('\n`default_params` is ignored when `tune_parameters=True`.')
-
-        # performing hyperparameter + configuration parameters tuning using Optuna
-        print('Starting parameter tuning with Optuna...')
-
-        study = optuna.create_study(direction='minimize')
-        study.optimize(lambda trial: run_and_tune_model(
-            trial=trial, train_loader=train_loader, val_loader=val_loader,
-            n_features=n_features, input_size=input_size, n_epochs=n_epochs,
-            padding=padding, pooling=pooling, activation_func=activation_func,
-            model_save_path=model_save_path,
-            ), n_trials=n_trials)
-
-        # best parameters achieved from hyperparameter training
-        best_params = study.best_trial.params
-        best_epoch = study.best_trial.user_attrs["best_epoch"]
-
-        # retraining the best model (optional)
-        print('\nRetraining the best model...')
-        trained_model, best_model_info = run_default_model(
-                                         train_loader=train_loader,
-                                         val_loader=val_loader,
-                                         n_features=n_features,
-                                         input_size=input_size,
-                                         n_epochs=best_epoch,
-                                         filters=[best_params[f'filters_layer_{i}'] for i in range(2)],  # Num conv layers fixed at 2
-                                         kernel_size=[best_params[f'kernel_size_layer_{i}'] for i in range(2)],  # Num conv layers fixed at 2
-                                         fc_units=[best_params[f'fc_units_layer_{i}'] for i in range(best_params['num_fc_layers'])],
-                                         padding=padding,
-                                         pooling=pooling,
-                                         lr=best_params['lr'],
-                                         activation_func=activation_func,
-                                         weight_decay=best_params['weight_decay'],
-                                         dropout_rate=best_params['dropout'],
-                                         implement_earlyStopping=implement_earlyStopping,
-                                         patience=10,
-                                         start_EarlyStop_count_from_epoch=10,
-                                         model_save_path=model_save_path,
-                                         verbose=True)
-
-        # save the best model's information
-        with open(model_info_save_path, 'wb') as f:
-            pickle.dump(best_model_info, f)
-
-        print('\nBest parameters Found:')
-        print(best_params)
-        print(f"\n val loss- {best_model_info['val_loss']}")
-
-        # plotting hyperparameter importance plot from tuning process
-        if plot_hyperparams_importance and hyperparam_importance_plot_path is not None:
-            save_param_importance_plot(study, save_path=hyperparam_importance_plot_path)
-
-        return trained_model, best_model_info
-
-    else:
-        # check if default_params is provided for non-tuning mode
-        if default_params is None:
-            raise ValueError('`default_params` must be provided when `tune_parameters=False`.')
-
-        print('\nRunning the model with default parameters:')
-        print(default_params)
-
-        # running the model with default hyperparameters and configuration parameters
-        trained_model, model_info = run_default_model(
-                                    train_loader=train_loader,
-                                    val_loader=val_loader,
-                                    n_features=n_features,
-                                    input_size=input_size,
-                                    n_epochs=n_epochs,
-                                    filters=default_params['filters'],
-                                    kernel_size=default_params['kernel_size'],
-                                    fc_units=default_params['fc_units'],
-                                    padding=padding,
-                                    pooling=pooling,
-                                    lr=default_params['lr'],
-                                    activation_func=activation_func,
-                                    weight_decay=default_params['weight_decay'],
-                                    dropout_rate=default_params['dropout'],
-                                    implement_earlyStopping=implement_earlyStopping,
-                                    patience=10,
-                                    start_EarlyStop_count_from_epoch=10,
-                                    model_save_path=model_save_path,
-                                    verbose=True)
-
-        # saving the model information
-        with open(model_info_save_path, 'wb') as f:
-            pickle.dump(model_info, f)
-
-        print('\nDefault Model Information:')
-        print(model_info)
-
-        return trained_model, model_info
-
-
 def calculate_metrics(predictions, targets):
     """
     Calculates regression metrics.
@@ -900,6 +537,394 @@ def test(model, tile_dir, target_csv, batch_size, data_type='test'):
     return avg_loss, rmse, mae, r2
 
 
+def run_default_model(train_loader, val_loader,
+                      n_features, input_size, n_epochs, 
+                      filters, model_save_path,
+                      padding='same', pooling='maxpool',
+                      lr=1e-3, kernel_size=3, stride=1,
+                      activation_func='relu', fc_units=None,
+                      weight_decay=1e-4, dropout_rate=0.2,
+                      implement_earlyStopping=False,
+                      patience=10, start_EarlyStop_count_from_epoch=40,
+                      verbose=True):
+    """
+    Main training function to train and validate the model.
+
+    :param train_loader: Train DataLoader.
+    :param val_loader: Validation DataLoader.
+    :param n_features: int.  Number of input channels in the image.
+    :param input_size : int. Height/width of the square input image (e.g., 64 for 64x64).
+    :param n_epochs: int. Number of training epochs.
+    :param filters: list of int. Number of filters in each CNN layer.
+    :param model_save_path: str. Path for saving the best model checkpoint.
+    :param kernel_size: list of int. Kernel size for convolutional layers.
+    :param padding: str. Padding type for CNN layers ('same' or 'valid'). Defaults to 'same'.
+    :param pooling: str. Pooling type for CNN layers ('maxpool' or 'avgpool'). Defaults to 'maxpool'.
+    :param lr: float. Learning rate for the optimizer. Defaults to 1e-3.
+    :param stride: int. Stride for kernel operation. Defaults to 1.
+    :param activation_func: str. Have to be either 'relu' or 'leakyrelu'. Defaults to 'relu'.
+    :param fc_units: int. Number of units in the fully connected layer. Default set to None to use [128].
+                     neurons in a single layer.
+    :param weight_decay: float. Weight decay (L2 regularization) coefficient to control overfitting.
+                                Default is 1e-4. A smaller value (e.g., 1e-6) penalizes large weights
+                                less, while a larger value (e.g., 1e-3) penalizes them more.
+    :param dropout_rate: float. Dropout rate for fully connected layers.
+    :param implement_earlyStopping: boolean. Set to True to initiate early stopping.
+    :param patience: int. Number of epochs to wait before early stopping. Default to 10.
+    :param start_EarlyStop_count_from_epoch: int. Epoch to start checking early stopping. Defaults to 40 to enable
+                                             more early epoch before initializing early stopping.
+    :param verbose: Set to True to print training progress at each 10 epoch.
+
+    :return: - The trained model.
+             - A dictionary containing hyperparameters, training losses, and validation losses.
+    """
+
+    global train_loss, val_loss
+
+    # initializing the model
+    model = CNNRegression(
+        n_features=n_features,
+        input_size=input_size,
+        filters=filters,
+        kernels=kernel_size,
+        stride=stride,
+        activation_func=activation_func,
+        padding=padding,
+        pooling=pooling,
+        fc_layers=fc_units,
+        dropout_rate=dropout_rate
+    )
+
+    # configuring optimizer
+    optimizer = model.configure_optimizer(optimizer_name='adam', lr=lr, weight_decay=weight_decay)
+
+    # initialize EarlyStopping
+    early_stopping = EarlyStopping(save_path=model_save_path, patience=patience)
+
+    # empty dictionary to store model parameters and losses
+    model_info = {}
+
+    # empty lists to track losses
+    train_losses = []
+    val_losses = []
+    last_epoch = None  # Track the last trained epoch
+
+    for epoch in range(n_epochs):
+        # training and validation for one epoch
+        train_loss = train(model, train_loader, optimizer)
+        val_loss = validate(model, val_loader)
+
+        # storing losses
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
+
+        # storing the last trained epoch
+        last_epoch = epoch
+
+        # printing progress
+        if verbose and epoch % 10 == 0:
+            print(f'Epoch {epoch} - Train loss: {train_loss:.4f}, Validation loss: {val_loss:.4f}')
+
+        # checking for early stopping
+        if epoch >= start_EarlyStop_count_from_epoch and implement_earlyStopping:
+            early_stopping(val_loss, model)
+            if early_stopping.early_stop:
+                print(f'Early stopping triggered at epoch {epoch + 1}')
+                break
+
+    # printing final performance (last trained epoch)
+    print(f'Final Epoch {last_epoch} - Train Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f}')
+
+    # handling val_loss when early stopping is disabled
+    if not implement_earlyStopping:
+        best_val_loss = min(val_losses)
+
+    else:
+        best_val_loss = early_stopping.best_loss
+
+    # saving model information and losses
+    model_info['hyperparameters'] = {
+        'lr': lr,
+        'filters': filters,
+        'kernel_size': kernel_size,
+        'fc_units': fc_units
+    }
+    model_info['train_losses'] = train_losses
+    model_info['val_losses'] = val_losses
+    model_info['val_loss'] = best_val_loss
+
+    return model, model_info
+
+
+def run_and_tune_model(trial, train_loader, val_loader,
+                       n_features, input_size, n_epochs,
+                       model_save_path,
+                       padding='same', pooling='maxpool',
+                       activation_func='relu',
+                       implement_earlyStopping=False,
+                       patience=10, start_EarlyStop_count_from_epoch=40):
+    """
+    Objective function for Optuna parameter tuning.
+
+    This function is called for each trial during the parameter search.
+    It defines the search space for parameters, trains a CNN model
+    using the sampled parameters, and evaluates the model's performance
+    on the validation set. The validation loss is returned to Optuna to guide
+    the optimization process.
+
+    :param trial: optuna.trial.Trial. A trial object provided by Optuna. It is used to
+                  sample parameters and record the trial's results.
+    :param train_loader: Train DataLoader.
+    :param val_loader: Validation DataLoader.
+    :param n_features: int.  Number of input channels in the image.
+    :param input_size : int. Height/width of the square input image (e.g., 64 for 64x64).
+    :param n_epochs: int. Number of training epochs.
+    :param model_save_path: str. Path for saving the best model checkpoint.
+    :param padding: str. Padding type for CNN layers ('same' or 'valid'). Defaults to 'same'.
+    :param pooling: str. Pooling type for CNN layers ('maxpool' or 'avgpool'). Defaults to 'maxpool'.
+    :param activation_func: str. Have to be either 'relu' or 'leakyrelu'. Defaults to 'relu'.
+    :param implement_earlyStopping: boolean. Set to False to not initiate early stopping.
+    :param patience: int. Number of epochs to wait before early stopping. Default to 10.
+    :param start_EarlyStop_count_from_epoch: int. Epoch to start checking early stopping. Defaults to 40 to enable
+                                             more early epoch before initializing early stopping.
+
+    :return: The best validation loss (val_loss).
+    """
+    # sample hyperparameters
+    lr = trial.suggest_float('lr', 1e-5, 1e-2, log=True)
+    weight_decay = trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)
+
+    # sample convolutional architecture
+    num_layers = 2      # keeping number of convolutional layers fixed at 2 due to our specific input size
+    filters = [trial.suggest_int(f'filters_layer_{i}', 32, 64, step=16) for i in range(num_layers)]
+    kernel_size = [trial.suggest_int(f'kernel_size_layer_{i}', 3, 5, step=2) for i in range(num_layers)]
+
+    # sample fully connected layer configuration
+    num_fc_layers = trial.suggest_int('num_fc_layers', 1, 3)  # number of fully connected layers can be flexible from 1-3
+    fc_units = [trial.suggest_int(f'fc_units_layer_{i}', 32, 128, step=32) for i in range(num_fc_layers)]
+    dropout_rate = trial.suggest_float('dropout', 0.1, 0.5, step=0.1)
+
+    # training the model with the sampled parameters
+    _, model_info = run_default_model(train_loader, val_loader,
+                                      n_features=n_features, input_size=input_size,
+                                      n_epochs=n_epochs, filters=filters,
+                                      padding=padding, pooling=pooling,
+                                      lr=lr, kernel_size=kernel_size, stride=1,
+                                      activation_func=activation_func, fc_units=fc_units,
+                                      weight_decay=weight_decay, dropout_rate=dropout_rate,
+                                      implement_earlyStopping=implement_earlyStopping,
+                                      patience=patience, start_EarlyStop_count_from_epoch=start_EarlyStop_count_from_epoch,
+                                      model_save_path=model_save_path, verbose=True)
+
+    # objective function
+    best_val_loss = model_info['val_loss']  # for a specific trial
+    train_loss_at_best_val = model_info['train_losses'][model_info['val_losses'].index(best_val_loss)]
+
+    alpha = 0.3  # Weight for the penalty term to minimize the gap between train and validation loss
+    objective_value = best_val_loss + alpha * abs(train_loss_at_best_val - best_val_loss)  # param tuning will minimize this value
+
+    # storing additional information for later use
+    best_epoch = model_info['val_losses'].index(best_val_loss)          # best epoch
+    trial.set_user_attr('model_info', model_info)                       # saving model info for the trial
+    trial.set_user_attr('best_epoch', best_epoch)                       # saving best epoch for the trial
+
+    return objective_value
+
+
+def save_param_importance_plot(study, save_path):
+    """
+    Generates and saves the parameter importance plot for an Optuna study.
+
+    :param study: The Optuna study object after optimization.
+    :param save_path: The file path to save the parameter importance plot.
+
+    :return None.
+    """
+    # extracting parameter importance values
+    importance = optuna.importance.get_param_importances(study)
+    params = list(importance.keys())
+    scores = list(importance.values())
+
+    # creating a bar plot
+    plt.figure(figsize=(10, 6))
+    plt.barh(params, scores, color='skyblue')
+    plt.xlabel('Importance Score')
+    plt.ylabel('Parameter')
+    plt.title('Parameter Importance')
+    plt.gca().invert_yaxis()
+    plt.tight_layout()
+
+    plt.savefig(save_path, format='png', dpi=300)
+    plt.close()
+
+    print(f'\nParameter importance plot saved from paramater tuning process')
+
+
+def main(tile_dir_train, target_csv_train,
+         tile_dir_val, target_csv_val, batch_size,
+         n_features, input_size, n_epochs,
+         model_save_path, model_info_save_path,
+         padding='same', pooling='maxpool',
+         activation_func='relu',
+         default_params=None,
+         implement_earlyStopping=False,
+         patience=10, start_EarlyStop_count_from_epoch=40,
+         tune_parameters=False, n_trials=50,
+         plot_hyperparams_importance=False,
+         hyperparam_importance_plot_path=None
+         ):
+    """
+    Main function to either run the model with default parameters or perform parameter tuning.
+
+    ****
+    - when the model is set to tuning mode, set tune_parameters = True and default_params = None
+    - when the model is in default mode, set tune_parameters = False and default_params = a dictionary of params
+
+    :param tile_dir_train: Directory containing training set input tiles.
+    :param target_csv_train: CSV file with training set target values.
+    :param tile_dir_val: Directory containing validation set input tiles.
+    :param target_csv_val: CSV file with validation set target values.
+    :param batch_size: int. Batch size of DataLoader.
+    :param n_features: int. Number of input channels in the image.
+    :param input_size : int. Height/width of the square input image (e.g., 64 for 64x64).
+    :param n_epochs: int. Number of training epochs.
+    :param model_save_path: str. Path for saving the best model checkpoint.
+    :param model_info_save_path: Filepath (pkl) to save the parameter-tuned or default model's params and
+                                 losses.
+    :param padding: str. Padding type for CNN layers ('same' or 'valid'). Defaults to 'same'.
+    :param pooling: str. Pooling type for CNN layers ('maxpool' or 'avgpool'). Defaults to 'maxpool'.
+    :param activation_func: str. Activation function ('relu' or 'leakyrelu'). Defaults to 'relu'.
+    :param default_params: dict or None. Default parameters for running the model. Ignored when `tune_parameters` is True.
+    :param implement_earlyStopping: boolean. Set to False to not initiate early stopping.
+    :param patience: int. Number of epochs to wait before early stopping. Default to 10.
+    :param start_EarlyStop_count_from_epoch: int. Epoch to start checking early stopping. Defaults to 40 to enable
+                                             more early epoch before initializing early stopping.
+    :param tune_parameters: bool. If True, perform parameter tuning using Optuna. Defaults to False.
+    :param n_trials: int. Number of Optuna trials for parameter tuning. Defaults to 50.
+    :param plot_hyperparams_importance: bool. Set to True to plot hypapameter importance plot during tuning
+                                        parameters.
+    :param hyperparam_importance_plot_path: str. Filepath to save hypeparam importance plot. Default set to None.
+
+
+    :return: - The trained model.
+             - A dictionary containing hyperparameters, training losses, and validation losses.
+    """
+    # creating storage directory
+    makedirs([os.path.dirname(model_info_save_path)])
+
+    # creating train and validation DataLoaders
+    train_loader = DataLoaderCreator(tile_dir_train, target_csv_train,
+                                     batch_size=batch_size,
+                                     data_type='train').get_dataloader()
+
+    val_loader = DataLoaderCreator(tile_dir_val, target_csv_val,
+                                   batch_size=batch_size,
+                                   data_type='validation').get_dataloader()
+
+    # # parameter tuning mode
+    if tune_parameters:
+        # checking conditions for default parameters and tuning mode
+        if default_params is not None:
+            print('\n`default_params` is ignored when `tune_parameters=True`.')
+
+        # performing hyperparameter + configuration parameters tuning using Optuna
+        print('Starting parameter tuning with Optuna...')
+
+        study = optuna.create_study(direction='minimize')
+        study.optimize(lambda trial: run_and_tune_model(
+            trial=trial, train_loader=train_loader, val_loader=val_loader,
+            n_features=n_features, input_size=input_size, n_epochs=n_epochs,
+            padding=padding, pooling=pooling, activation_func=activation_func,
+            model_save_path=model_save_path,
+            ), n_trials=n_trials)
+
+        # best parameters achieved from hyperparameter training
+        best_params = study.best_trial.params
+        best_epoch = study.best_trial.user_attrs["best_epoch"]
+
+        # retraining the best model (optional)
+        print('\nRetraining the best model...')
+        trained_model, best_model_info = run_default_model(
+                                         train_loader=train_loader,
+                                         val_loader=val_loader,
+                                         n_features=n_features,
+                                         input_size=input_size,
+                                         n_epochs=best_epoch,
+                                         filters=[best_params[f'filters_layer_{i}'] for i in range(2)],  # Num conv layers fixed at 2
+                                         kernel_size=[best_params[f'kernel_size_layer_{i}'] for i in range(2)],  # Num conv layers fixed at 2
+                                         fc_units=[best_params[f'fc_units_layer_{i}'] for i in range(best_params['num_fc_layers'])],
+                                         padding=padding,
+                                         pooling=pooling,
+                                         lr=best_params['lr'],
+                                         activation_func=activation_func,
+                                         weight_decay=best_params['weight_decay'],
+                                         dropout_rate=best_params['dropout'],
+                                         implement_earlyStopping=implement_earlyStopping,
+                                         patience=patience,
+                                         start_EarlyStop_count_from_epoch=start_EarlyStop_count_from_epoch,
+                                         model_save_path=model_save_path,
+                                         verbose=True)
+
+        # save the best model's information
+        with open(model_info_save_path, 'wb') as f:
+            pickle.dump(best_model_info, f)
+
+        # printing model best parameters' summary
+        print('\nBest parameters found:')
+        print(best_params)
+        print(f'\nBest epoch - {best_epoch}')
+        print(f"\nBest val loss - {best_model_info['val_loss']}")
+
+        # plotting hyperparameter importance plot from tuning process
+        if plot_hyperparams_importance and hyperparam_importance_plot_path is not None:
+            save_param_importance_plot(study, save_path=hyperparam_importance_plot_path)
+
+        return trained_model, best_model_info
+
+    # # default parameter mode
+    else:
+        # check if default_params is provided for non-tuning mode
+        if default_params is None:
+            raise ValueError('`default_params` must be provided when `tune_parameters=False`.')
+
+        print('\nRunning the model with default parameters:')
+        print(default_params)
+
+        # running the model with default hyperparameters and configuration parameters
+        trained_model, model_info = run_default_model(
+                                    train_loader=train_loader,
+                                    val_loader=val_loader,
+                                    n_features=n_features,
+                                    input_size=input_size,
+                                    n_epochs=n_epochs,
+                                    filters=default_params['filters'],
+                                    kernel_size=default_params['kernel_size'],
+                                    fc_units=default_params['fc_units'],
+                                    padding=padding,
+                                    pooling=pooling,
+                                    lr=default_params['lr'],
+                                    activation_func=activation_func,
+                                    weight_decay=default_params['weight_decay'],
+                                    dropout_rate=default_params['dropout'],
+                                    implement_earlyStopping=implement_earlyStopping,
+                                    patience=patience,
+                                    start_EarlyStop_count_from_epoch=start_EarlyStop_count_from_epoch,
+                                    model_save_path=model_save_path,
+                                    verbose=True)
+
+        # saving the model information
+        with open(model_info_save_path, 'wb') as f:
+            pickle.dump(model_info, f)
+
+
+        # printing model best parameters' summary
+        print('\nDefault Model Information:')
+        print(f'\nEpoch - {n_epochs}')
+        print(f"\nLast val loss - {model_info['val_losses'][-1]}")
+
+        return trained_model, model_info
+
+
 def unstandardize_save_and_test(model, tile_dir, target_csv, mean_csv, std_csv,
                                 output_csv, batch_size, data_type, skip_processing=False):
     if not skip_processing:
@@ -972,8 +997,8 @@ def plot_learning_curve(train_loss, val_loss, plot_save_path):
     """
     # plotting losses
     plt.figure(figsize=(10, 6))
-    plt.plot(train_loss, label='Training Loss')
-    plt.plot(val_loss, label='Validation Loss')
+    plt.plot(train_loss, label='train')
+    plt.plot(val_loss, label='Validation')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend()

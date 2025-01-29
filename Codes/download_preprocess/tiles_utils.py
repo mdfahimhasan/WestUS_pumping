@@ -14,8 +14,7 @@ to improve  efficiency, accuracy, and readability of the script, considering the
 
 # create tiles (we will do odd size images, preferred size is 7*7 or 9*9 for now)
 # randomly split train-test-validation data
-# standardize or normalize input variables of training data. Might have to consider mean and std of all input variables (of training data)
-# generally standardizing/normalizing both input features and target variables are good practice (normalizing target variable might hurt interpretability)
+# standardize or normalize input variables of training data. Have to consider mean and std of all input variables (of training data)
 # use DataLoader to create batches with standardized data (DataLoader class in with the CNN script as that uses pyTorch)
 
 

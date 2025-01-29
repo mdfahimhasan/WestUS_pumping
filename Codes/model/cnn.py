@@ -109,11 +109,10 @@ class EarlyStopping:
     Saves the model with the lowest validation loss.
     """
 
-    def __init__(self, save_path, patience=10, delta=0.01):
+    def __init__(self, patience=10, delta=0.01):
         """
         Initializes the early stopping mechanism.
 
-        :param save_path: str. Path for saving the best model checkpoint.
         :param patience: int. Number of epochs to wait before stopping if no improvement.
                          Default is 10.
         :param delta: float. Minimum change in the monitored quantity to qualify as an improvement.
@@ -125,7 +124,6 @@ class EarlyStopping:
         self.counter = 0  # Count epochs with no improvement
         self.best_loss = None  # Best loss seen so far
         self.early_stop = False  # Whether to stop training
-        self.path = save_path
 
     def __call__(self, val_loss, model):
         """
@@ -139,8 +137,6 @@ class EarlyStopping:
         if (self.best_loss is None) or (val_loss < self.best_loss - self.delta):
             self.best_loss = val_loss  # Update best loss
             self.counter = 0  # Reset the counter
-
-            torch.save(model.state_dict(), self.path)
 
         # increment the counter for no improvement and early stops training if patience is reached
         else:
@@ -427,6 +423,7 @@ def validate(model, val_loader, verbose=False):
     device = 'cuda'  # device is GPU by default
 
     # setting the model to evaluation mode
+    # in evaluation mode, PyTorch removes all dropout layers
     model.eval()
 
     # initiating running_loss to accumulate the total loss across all batches
@@ -496,6 +493,7 @@ def test(model, tile_dir, target_csv, batch_size, data_type='test'):
                                    data_type=data_type).get_dataloader()
 
     # setting model to evaluation mode
+    # in evaluation mode, PyTorch removes all dropout layers
     model.eval()
 
     # initiating running_loss to accumulate the total loss across all batches
@@ -539,8 +537,7 @@ def test(model, tile_dir, target_csv, batch_size, data_type='test'):
 
 def run_default_model(train_loader, val_loader,
                       n_features, input_size, n_epochs, 
-                      filters, model_save_path,
-                      padding='same', pooling='maxpool',
+                      filters, padding='same', pooling='maxpool',
                       lr=1e-3, kernel_size=3, stride=1,
                       activation_func='relu', fc_units=None,
                       weight_decay=1e-4, dropout_rate=0.2,
@@ -556,7 +553,6 @@ def run_default_model(train_loader, val_loader,
     :param input_size : int. Height/width of the square input image (e.g., 64 for 64x64).
     :param n_epochs: int. Number of training epochs.
     :param filters: list of int. Number of filters in each CNN layer.
-    :param model_save_path: str. Path for saving the best model checkpoint.
     :param kernel_size: list of int. Kernel size for convolutional layers.
     :param padding: str. Padding type for CNN layers ('same' or 'valid'). Defaults to 'same'.
     :param pooling: str. Pooling type for CNN layers ('maxpool' or 'avgpool'). Defaults to 'maxpool'.
@@ -599,7 +595,7 @@ def run_default_model(train_loader, val_loader,
     optimizer = model.configure_optimizer(optimizer_name='adam', lr=lr, weight_decay=weight_decay)
 
     # initialize EarlyStopping
-    early_stopping = EarlyStopping(save_path=model_save_path, patience=patience)
+    early_stopping = EarlyStopping(patience=patience)
 
     # empty dictionary to store model parameters and losses
     model_info = {}
@@ -658,7 +654,6 @@ def run_default_model(train_loader, val_loader,
 
 def run_and_tune_model(trial, train_loader, val_loader,
                        n_features, input_size, n_epochs,
-                       model_save_path,
                        padding='same', pooling='maxpool',
                        activation_func='relu',
                        implement_earlyStopping=False,
@@ -679,7 +674,6 @@ def run_and_tune_model(trial, train_loader, val_loader,
     :param n_features: int.  Number of input channels in the image.
     :param input_size : int. Height/width of the square input image (e.g., 64 for 64x64).
     :param n_epochs: int. Number of training epochs.
-    :param model_save_path: str. Path for saving the best model checkpoint.
     :param padding: str. Padding type for CNN layers ('same' or 'valid'). Defaults to 'same'.
     :param pooling: str. Pooling type for CNN layers ('maxpool' or 'avgpool'). Defaults to 'maxpool'.
     :param activation_func: str. Have to be either 'relu' or 'leakyrelu'. Defaults to 'relu'.
@@ -714,7 +708,7 @@ def run_and_tune_model(trial, train_loader, val_loader,
                                       weight_decay=weight_decay, dropout_rate=dropout_rate,
                                       implement_earlyStopping=implement_earlyStopping,
                                       patience=patience, start_EarlyStop_count_from_epoch=start_EarlyStop_count_from_epoch,
-                                      model_save_path=model_save_path, verbose=True)
+                                      verbose=True)
 
     # objective function
     best_val_loss = model_info['val_loss']  # for a specific trial
@@ -835,7 +829,6 @@ def main(tile_dir_train, target_csv_train,
             trial=trial, train_loader=train_loader, val_loader=val_loader,
             n_features=n_features, input_size=input_size, n_epochs=n_epochs,
             padding=padding, pooling=pooling, activation_func=activation_func,
-            model_save_path=model_save_path,
             ), n_trials=n_trials)
 
         # best parameters achieved from hyperparameter training
@@ -862,12 +855,14 @@ def main(tile_dir_train, target_csv_train,
                                          implement_earlyStopping=implement_earlyStopping,
                                          patience=patience,
                                          start_EarlyStop_count_from_epoch=start_EarlyStop_count_from_epoch,
-                                         model_save_path=model_save_path,
                                          verbose=True)
 
-        # save the best model's information
+        # save the best model's information and the best model
         with open(model_info_save_path, 'wb') as f:
             pickle.dump(best_model_info, f)
+
+        torch.save(trained_model.state_dict(), model_save_path)
+        print(f'\nFinal model saved at {model_save_path}')
 
         # printing model best parameters' summary
         print('\nBest parameters found:')
@@ -909,16 +904,17 @@ def main(tile_dir_train, target_csv_train,
                                     implement_earlyStopping=implement_earlyStopping,
                                     patience=patience,
                                     start_EarlyStop_count_from_epoch=start_EarlyStop_count_from_epoch,
-                                    model_save_path=model_save_path,
                                     verbose=True)
 
-        # saving the model information
+        # saving the model information and model
         with open(model_info_save_path, 'wb') as f:
             pickle.dump(model_info, f)
 
+        torch.save(trained_model.state_dict(), model_save_path)
+        print(f'\nModel saved at {model_save_path}')
 
         # printing model best parameters' summary
-        print('\nDefault Model Information:')
+        print('\nModel default params:')
         print(f'\nEpoch - {n_epochs}')
         print(f"\nLast val loss - {model_info['val_losses'][-1]}")
 
@@ -937,6 +933,7 @@ def unstandardize_save_and_test(model, tile_dir, target_csv, mean_csv, std_csv,
         predictions, tile_no_list = [], []
 
         # setting model to evaluation mode
+        # in evaluation mode, PyTorch removes all dropout layers
         model.eval()
 
         with torch.no_grad():  # disable gradient computation
@@ -998,9 +995,9 @@ def plot_learning_curve(train_loss, val_loss, plot_save_path):
     # plotting losses
     plt.figure(figsize=(10, 6))
     plt.plot(train_loss, label='train')
-    plt.plot(val_loss, label='Validation')
+    plt.plot(val_loss, label='validation')
     plt.xlabel('Epoch')
-    plt.ylabel('Loss')
+    plt.ylabel('Loss (mean squared error)')
     plt.legend()
 
     # saving the plot as an image file

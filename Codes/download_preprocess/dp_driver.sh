@@ -3,7 +3,7 @@
 ## running the dp_driver.py script on CPU nodes
 
 #SBATCH --partition=smi_all
-#SBATCH --ntasks=63
+#SBATCH --ntasks=20
 #SBATCH --nodes=1
 #SBATCH --time=1-0
 #SBATCH --mail-type=BEGIN,END,FAIL,TIME_LIMIT

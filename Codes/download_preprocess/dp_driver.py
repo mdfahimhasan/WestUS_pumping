@@ -32,7 +32,7 @@ if __name__ == '__main__':
 
     # directories and variables
     data_download_dir = '../../Data_main/rasters'
-    gee_grid_shape_large = '../../Data_main/ref_shapes/WestUS_gee_grid.shp'
+    gee_grid_shape_large = '../../Data_main/ref_shapes/WestUS_gee_grid_large.shp'
     gee_grid_shape_for30m_IrrMapper = '../../Data_main/ref_shapes/WestUS_gee_grid_for30m_IrrMapper.shp'
     gee_grid_shape_for30m_LANID = '../../Data_main/ref_shapes/WestUS_gee_grid_for30m_LANID.shp'
 
@@ -60,10 +60,13 @@ if __name__ == '__main__':
         'Clay_content'
     ]
 
-    openET_data_list = ['Irrig_crop_OpenET_IrrMapper',
-                        'Irrig_crop_OpenET_LANID',
-                        'Irrigation_Frac_IrrMapper',
-                        'Irrigation_Frac_LANID']
+    openET_data_list = [
+                        'OpenET_ensemble',
+                        # 'Irrig_crop_OpenET_IrrMapper',
+                        # 'Irrig_crop_OpenET_LANID',
+                        # 'Irrigation_Frac_IrrMapper',
+                        # 'Irrigation_Frac_LANID'
+                        ]
 
     years = [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
              2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015,
@@ -72,7 +75,7 @@ if __name__ == '__main__':
 
     # flags
     skip_download_gee_data = True  ######################################################################################
-    skip_download_OpenET_data = True  ###################################################################################
+    skip_download_OpenET_data = False  ###################################################################################
 
     download_all_gee_data(data_list=gee_data_list, download_dir=data_download_dir,
                           year_list=years, month_range=months,
@@ -81,7 +84,7 @@ if __name__ == '__main__':
     download_all_openET_datasets(year_list=years, month_range=months,
                                  openET_data_list=openET_data_list,
                                  data_download_dir=data_download_dir,
-                                 grid_shape_for_2km_ensemble=None,
+                                 grid_shape_for_2km_ensemble=gee_grid_shape_large,
                                  grid_shape_for30m_irrmapper=gee_grid_shape_for30m_IrrMapper,
                                  grid_shape_for30m_lanid=gee_grid_shape_for30m_LANID,
                                  skip_download_OpenET_data=skip_download_OpenET_data)
@@ -163,7 +166,7 @@ if __name__ == '__main__':
                       2013, 2014, 2015, 2016, 2017, 2018, 2019)
 
     # flags
-    skip_create_multiband_raster = False  ###############################################################################
+    skip_create_multiband_raster = True  ###############################################################################
 
     # multi-band raster creation
     make_multiband_datasets(list_of_temporal_var_dirs=temporal_vars_dir, list_of_static_var_dirs=static_vars_dir,
@@ -186,7 +189,7 @@ if __name__ == '__main__':
     band_key_list = band_key_list[1:]
 
     # flags
-    skip_create_tile = False  ###########################################################################################
+    skip_create_tile = True  ###########################################################################################
     use_cpu_nodes = assign_cpu_nodes([skip_create_tile])
 
     tile_maker = make_training_tiles(tiff_path_list=multiband_rasters, band_key_list=band_key_list,
@@ -210,7 +213,7 @@ if __name__ == '__main__':
     test_dir = '../../Data_main/rasters/multibands/train_val_test_splits/test'
 
     # flags
-    skip_split_train_val_test = False  ##################################################################################
+    skip_split_train_val_test = True  ##################################################################################
     use_cpu_nodes = assign_cpu_nodes([skip_split_train_val_test])
 
     train_val_test_split(target_data_csv=target_csv, input_tile_dir=multiband_tile_dir,
@@ -227,7 +230,7 @@ if __name__ == '__main__':
     statistics_dir = '../../Data_main/rasters/multibands/scaling_stats'
 
     # flags
-    skip_calc_stats = False       ########################################################################################
+    skip_calc_stats = True       ########################################################################################
     use_cpu_nodes = assign_cpu_nodes([skip_calc_stats])
 
     mean_dict, std_dict, _, _ = \
@@ -250,9 +253,9 @@ if __name__ == '__main__':
     standardized_test_dir = r'../../Data_main/rasters/multibands/train_val_test_splits/standardized/test'
 
     # flags
-    skip_standardize_train = False  #####################################################################################
-    skip_standardize_val = False    #####################################################################################
-    skip_standardize_test = False   #####################################################################################
+    skip_standardize_train = True  #####################################################################################
+    skip_standardize_val = True    #####################################################################################
+    skip_standardize_test = True   #####################################################################################
 
     use_cpu_nodes = assign_cpu_nodes([skip_standardize_train, skip_standardize_val, skip_standardize_test])
 

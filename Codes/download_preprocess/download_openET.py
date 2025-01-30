@@ -41,9 +41,9 @@ from Codes.utils.raster_ops import read_raster_arr_object, clip_resample_reproje
 
 no_data_value = -9999
 model_res = 0.01976293625031605786  # in deg, ~2 km
-WestUS_shape = '../../Data_main/shapefiles/Western_US_ref_shapes/WestUS_states.shp'
-WestUS_raster = '../../Data_main/reference_rasters/Western_US_refraster_2km.tif'
-GEE_merging_refraster_large_grids = '../../Data_main/reference_rasters/GEE_merging_refraster_larger_grids.tif'
+WestUS_shape = '../../Data_main/shapefiles/ref_shapes/WestUS_states.shp'
+WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
+GEE_merging_refraster_large_grids = '../../Data_main/ref_rasters/GEE_merging_refraster_larger_grids.tif'
 
 
 def get_openet_gee_dict(data_name):

@@ -82,19 +82,7 @@ if __name__ == '__main__':
                         plot_save_path=leaning_curve_plot)
 
     # Model performances on standardized data
-    print('\n########## Model performance on standardized data ##########\n')
-
-    print('Train performance:')
-    test(trained_model,
-         tile_dir=tile_dir_train, target_csv=target_csv_train,
-         batch_size=batch_size,
-         data_type='train')
-
-    print('Validation performance:')
-    test(trained_model,
-         tile_dir=tile_dir_val, target_csv=target_csv_val,
-         batch_size=batch_size,
-         data_type='validation')
+    print('\n############## Model performance on standardized data ###############\n')
 
     print('Test performance:')
     test(trained_model,
@@ -102,32 +90,9 @@ if __name__ == '__main__':
          batch_size=batch_size,
          data_type='test')
 
-    print('########## *************************************** ##########\n')
 
     # Model performances on unstandardized (actual) data
     print('########## Model performance on unstandardized (actual) data ##########\n')
-
-    print('Train performance:')
-    unstandardize_save_and_test(trained_model,
-                                tile_dir=tile_dir_train,
-                                target_csv=target_csv_train,
-                                batch_size=batch_size,
-                                data_type='train',
-                                mean_csv=mean_csv,
-                                std_csv=std_csv,
-                                output_csv=f'../../Model_run/DL_model/output_csv/trainSet_results.csv',
-                                skip_processing=skip_unstandardizing_testing)
-
-    print('Validation performance:')
-    unstandardize_save_and_test(trained_model,
-                                tile_dir=tile_dir_val,
-                                target_csv=target_csv_val,
-                                batch_size=batch_size,
-                                data_type='validation',
-                                mean_csv=mean_csv,
-                                std_csv=std_csv,
-                                output_csv=f'../../Model_run/DL_model/output_csv/valSet_results.csv',
-                                skip_processing=skip_unstandardizing_testing)
 
     print('Test performance:')
     unstandardize_save_and_test(trained_model,
@@ -139,9 +104,6 @@ if __name__ == '__main__':
                                 std_csv=std_csv,
                                 output_csv=f'../../Model_run/DL_model/output_csv/testSet_results.csv',
                                 skip_processing=skip_unstandardizing_testing)
-
-
-    print('########## ************************************************* ##########\n')
 
     # Recommendations for Improvement:
 

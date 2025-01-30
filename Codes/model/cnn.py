@@ -946,8 +946,9 @@ def main(tile_dir_train, target_csv_train,
 
         # printing model best parameters' summary
         print('\nModel default params:')
+        print(default_params)
         print(f'\nEpoch - {n_epochs}')
-        print(f"\nLast val loss - {model_info['val_losses'][-1]}")
+        print(f"\nLast val loss - {model_info['val_losses'][-1]:.3f}")
 
         return trained_model, model_info
 
@@ -1034,4 +1035,4 @@ def plot_learning_curve(train_loss, val_loss, plot_save_path):
     # saving the plot as an image file
     plt.savefig(plot_save_path)
     plt.close()
-    print(f'\n Loss plot saved')
+    print(f'\nLoss plot saved...')

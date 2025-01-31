@@ -213,20 +213,7 @@ class make_training_tiles:
         1. The first band of the multi-band raster must be target band (train data-pumping. This class extracts the center pixel
         value of the first band as the target variable for each loop and saves it separately, while the remaining
         bands are used as features (saved a tiled multi-band GeoTIFF) for the deep learning model.
-        2. The 2nd and 3rd bands must be net groundwater irrigation (netGW_Irr) and effective precipitation (Peff), respectively.
         3. The `band_key_list` should only contain the names of the feature bands and exclude the target variable's name.
-
-
-    Filters out tiles based on the following conditions (applied in the _process_chunk_worker() function:
-
-        1. Skips tiles where the center pixel of the training band has a NoData value.
-        2. Skips tiles where the center pixel of the netGW_Irr band has a value of 0.
-        3. Skips tiles where the center pixel of the Peff band has a NoData value.
-        4. Skips tiles where the center pixel's training band value (e.g., pumping data) is less than 50% of the
-           center pixel's netGW_Irr value.
-           - This avoids cases where pumping is disproportionately low compared to net groundwater irrigation,
-             i.e., pumping data doesn't represent the total pumping in thta pixel.
-
     """
 
     def __init__(self, tiff_path_list, band_key_list,
@@ -380,8 +367,6 @@ class make_training_tiles:
         with rio.open(tiff_path) as tiff:
             tile_radius = config['tile_size'] // 2
             training_band = tiff.read(1)  # 1st band is training data (pumping). Rasterio uses 1-based indexing
-            netGW_band = tiff.read(2)     # 2nd band - netGW_Irr
-            Peff_band = tiff.read(3)      # 3rd band - effective precipitation
 
             # The first loop iterates across chunk (each chunk has 100 rows by default) and
             # the second loop across the width (columns) of the raster.

@@ -399,23 +399,17 @@ class make_training_tiles:
                         if center_train_value == self.nodata_value:
                             continue
 
-                        # skipping tile where center pixel's (of the tile) netGW_Irr value is 0
-                        netGW_value = netGW_band[row, col]
-                        if netGW_value == 0:
-                            continue
+                        # # skipping tile where center pixel's (of the tile) netGW_Irr value is 0
+                        # netGW_value = netGW_band[row, col]
+                        # if netGW_value == 0:
+                        #     continue
 
                         # skipping tile where center pixel's (of the tile) Peff value is no data
                         peff_value = Peff_band[row, col]
                         if peff_value == self.nodata_value:
                             continue
 
-                        # skipping tile if pumping (center pixel value for 1st band) is less than 50% of the
-                        # netGW_Irr value
-                        if center_train_value < 0.5 * netGW_value:
-                            continue
-
-                        # If the center value has valid value for training data, netGW_Irr, and Peff,
-                        # creating a window around it and read the data
+                        # creating a window around the central pixel and reading the data
                         window = Window(col_off=col - tile_radius, row_off=row - tile_radius,
                                         width=self.tile_size, height=self.tile_size)
                         tile_arr = tiff.read(window=window)

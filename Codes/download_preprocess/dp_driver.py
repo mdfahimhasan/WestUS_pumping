@@ -75,7 +75,7 @@ if __name__ == '__main__':
 
     # flags
     skip_download_gee_data = True  ######################################################################################
-    skip_download_OpenET_data = False  ###################################################################################
+    skip_download_OpenET_data = True  ###################################################################################
 
     download_all_gee_data(data_list=gee_data_list, download_dir=data_download_dir,
                           year_list=years, month_range=months,

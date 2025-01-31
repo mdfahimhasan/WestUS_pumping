@@ -399,11 +399,6 @@ class make_training_tiles:
                         if center_train_value == self.nodata_value:
                             continue
 
-                        # skipping tile where center pixel's (of the tile) Peff value is no data
-                        peff_value = Peff_band[row, col]
-                        if peff_value == self.nodata_value:
-                            continue
-
                         # creating a window around the central pixel and reading the data
                         window = Window(col_off=col - tile_radius, row_off=row - tile_radius,
                                         width=self.tile_size, height=self.tile_size)

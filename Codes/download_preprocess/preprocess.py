@@ -352,6 +352,7 @@ def process_prism_data(prism_bil_dir, prism_tif_dir, output_dir_prism_monthly, g
 
 
 def run_all_preprocessing(skip_process_GrowSeason_data=False,
+                          skip_ET_processing=False,
                           skip_prism_precip_processing=False,
                           skip_prism_tmax_processing=False,
                           skip_gridmet_RET_processing=False,
@@ -368,6 +369,7 @@ def run_all_preprocessing(skip_process_GrowSeason_data=False,
     Run all preprocessing steps.
 
     :param skip_process_GrowSeason_data: Set to True to skip processing growing season data.
+    :param skip_ET_processing: Set to True to skip processing grwing season ET data.
     :param skip_prism_precip_processing: Set True if want to skip prism precipitation data preprocessing.
     :param skip_prism_tmax_processing: Set True if want to skip prism temperature data preprocessing.
     :param skip_gridmet_RET_processing: Set to True to skip processing RET growing season data.
@@ -385,6 +387,14 @@ def run_all_preprocessing(skip_process_GrowSeason_data=False,
     # process growing season data
     extract_month_from_GrowSeason_data(GS_data_dir='../../Data_main/rasters/Growing_season',
                                        skip_processing=skip_process_GrowSeason_data)
+
+    # OpenET ensemble processing
+    dynamic_gs_sum_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+                                          2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                               growing_season_dir='../../Data_main/rasters/Growing_season',
+                               monthly_input_dir='../../Data_main/rasters/OpenET_ensemble/WestUS_monthly',
+                               gs_output_dir='../../Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
+                               sum_keyword='OpenET', skip_processing=skip_ET_processing)
 
     # prism precipitation data processing
     process_prism_data(year_list=(1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,

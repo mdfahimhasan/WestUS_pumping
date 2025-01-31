@@ -61,12 +61,12 @@ if __name__ == '__main__':
     ]
 
     openET_data_list = [
-                        'OpenET_ensemble',
-                        # 'Irrig_crop_OpenET_IrrMapper',
-                        # 'Irrig_crop_OpenET_LANID',
-                        # 'Irrigation_Frac_IrrMapper',
-                        # 'Irrigation_Frac_LANID'
-                        ]
+        'OpenET_ensemble',
+        'Irrig_crop_OpenET_IrrMapper',
+        'Irrig_crop_OpenET_LANID',
+        'Irrigation_Frac_IrrMapper',
+        'Irrigation_Frac_LANID'
+    ]
 
     years = [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
              2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015,
@@ -98,6 +98,7 @@ if __name__ == '__main__':
 
     # flags
     skip_process_GS_data = True                 ########################################################################
+    skip_ET_processing = True                   ########################################################################
     skip_prism_precip_processing = True         ########################################################################
     skip_prism_tmax_processing = True           ########################################################################
     skip_GRIDMET_RET_processing = True          ########################################################################
@@ -111,6 +112,7 @@ if __name__ == '__main__':
     skip_daymet_sunHR_processing = True         ########################################################################
 
     run_all_preprocessing(skip_process_GrowSeason_data=skip_process_GS_data,
+                          skip_ET_processing=skip_ET_processing,
                           skip_prism_precip_processing=skip_prism_precip_processing,
                           skip_prism_tmax_processing=skip_prism_tmax_processing,
                           skip_gridmet_RET_processing=skip_GRIDMET_RET_processing,

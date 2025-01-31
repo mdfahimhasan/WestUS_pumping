@@ -399,11 +399,6 @@ class make_training_tiles:
                         if center_train_value == self.nodata_value:
                             continue
 
-                        # # skipping tile where center pixel's (of the tile) netGW_Irr value is 0
-                        # netGW_value = netGW_band[row, col]
-                        # if netGW_value == 0:
-                        #     continue
-
                         # skipping tile where center pixel's (of the tile) Peff value is no data
                         peff_value = Peff_band[row, col]
                         if peff_value == self.nodata_value:

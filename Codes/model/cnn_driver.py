@@ -105,6 +105,33 @@ if __name__ == '__main__':
                                 output_csv=f'../../Model_run/DL_model/output_csv/testSet_results.csv',
                                 skip_processing=skip_unstandardizing_testing)
 
+    ####################################################################################################################
+    ####################################################################################################################
+    # # Model performances on Kansas (without training on kansas)
+    # print('\n############## Model performance on Kansas ###############\n')
+    #
+    # print('Model performance on kansas (standardized):')
+    #
+    # tile_dir_KS = '../../Data_main/rasters/multibands/KS/train_val_test_splits/standardized/train'
+    # target_csv_KS = '../../Data_main/rasters/multibands/KS/train_val_test_splits/standardized/train/y_train.csv'
+    #
+    # test(trained_model,
+    #      tile_dir=tile_dir_KS, target_csv=target_csv_KS,
+    #      batch_size=batch_size,
+    #      data_type='test')
+    #
+    # print('Model performance on kansas (unstandardized):')
+    # unstandardize_save_and_test(trained_model,
+    #                             tile_dir=tile_dir_KS,
+    #                             target_csv=target_csv_KS,
+    #                             batch_size=batch_size,
+    #                             data_type='test',
+    #                             mean_csv=mean_csv,
+    #                             std_csv=std_csv,
+    #                             output_csv=f'../../Model_run/DL_model/KS/KS_results.csv',
+    #                             skip_processing=skip_unstandardizing_testing)
+
+
     # Recommendations for Improvement:
 
     # Address Overfitting:

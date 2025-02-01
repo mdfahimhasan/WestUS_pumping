@@ -24,6 +24,8 @@ from Codes.download_preprocess.tiles_utils import make_multiband_datasets, make_
 # is only executed when the script is run directly. This prevents recursive imports and ensures that worker processes
 # are correctly spawned without re-running the entire script in each process.
 
+# Includes train_val_test split and standardization
+
 if __name__ == '__main__':
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -62,8 +64,8 @@ if __name__ == '__main__':
 
     openET_data_list = [
         'OpenET_ensemble',
-        'Irrig_crop_OpenET_IrrMapper',
-        'Irrig_crop_OpenET_LANID',
+        # 'Irrig_crop_OpenET_IrrMapper',
+        # 'Irrig_crop_OpenET_LANID',
         'Irrigation_Frac_IrrMapper',
         'Irrigation_Frac_LANID'
     ]
@@ -132,13 +134,13 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
 
     # directories and variables
-    datasets_dict = {'../../Data_main/pumping/rasters/Colorado/pumping_mm': 'pumping_mm',  # the pumping data only has data from Colorado for now
+    datasets_dict = {'../../Data_main/pumping/rasters/WestUS_pumping': 'pumping_mm',
                      '../../Data_main/rasters/NetGW_irrigation/WesternUS': 'netGWIrr',
                      '../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled': 'peff',
                      '../../Data_main/rasters/RET/WestUS_growing_season': 'ret',
                      '../../Data_main/rasters/Precip/WestUS_growing_season': 'precip',
                      '../../Data_main/rasters/Tmax/WestUS_growing_season': 'tmax',
-                     '../../Data_main/rasters/Irrigated_cropET/WestUS_grow_season': 'irr_cropET',
+                     '../../Data_main/rasters/ET/WestUS_growing_season': 'ET',
                      '../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac': 'irr_crop_frac',
                      '../../Data_main/rasters/Irrigated_cropland': 'irr_cropland',
                      '../../Data_main/rasters/maxRH/WestUS_growing_season': 'maxRH',

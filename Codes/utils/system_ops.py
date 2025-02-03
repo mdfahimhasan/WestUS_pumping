@@ -123,7 +123,7 @@ def assign_cpu_nodes(flags):
         else:
             raise ValueError(f'Unsupported OS: {os_name}. Must be Windows or Linux.')
 
-        print(f'\n Using {use_cpu_nodes} CPU nodes on {os_name} \n...')
+        print(f'\nUsing {use_cpu_nodes} CPU nodes on {os_name} \n...')
         return use_cpu_nodes
 
     else:

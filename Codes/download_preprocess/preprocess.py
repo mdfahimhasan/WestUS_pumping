@@ -16,7 +16,7 @@ from os.path import dirname, abspath
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import makedirs
-from Codes.utils.raster_ops import read_raster_arr_object, clip_resample_reproject_raster
+from Codes.utils.raster_ops import read_raster_arr_object, clip_resample_reproject_raster, shapefile_to_raster
 
 no_data_value = -9999
 model_res = 0.01976293625031605786  # in deg, ~2 km
@@ -351,7 +351,30 @@ def process_prism_data(prism_bil_dir, prism_tif_dir, output_dir_prism_monthly, g
         pass
 
 
-def run_all_preprocessing(skip_process_GrowSeason_data=False,
+def create_stateID_raster(westUS_shp, output_dir, skip_processing=False):
+    """
+    Create a stateID reference raster.
+
+    :param westUS_shp: Western US shapefile with the attribute 'stateID'.
+    :param output_dir: Output directory to save the created raster.
+    :param skip_processing: Set to True to skip this process.
+
+    :return: None.
+    """
+    if not skip_processing:
+        shapefile_to_raster(input_shape=westUS_shp, output_dir=output_dir, raster_name='stateID.tif',
+                            burnvalue=None, use_attr=True,
+                            attribute='stateID', add=None, ref_raster=WestUS_raster,
+                            resolution=model_res, alltouched=False)
+
+        print('created stateID reference raster...')
+
+    else:
+        pass
+
+
+def run_all_preprocessing(skip_stateID_raster_creation=False,
+                          skip_process_GrowSeason_data=False,
                           skip_ET_processing=False,
                           skip_prism_precip_processing=False,
                           skip_prism_tmax_processing=False,
@@ -368,6 +391,7 @@ def run_all_preprocessing(skip_process_GrowSeason_data=False,
     """
     Run all preprocessing steps.
 
+    :param skip_stateID_raster_creation: Set to True to skip stateID raster creation.
     :param skip_process_GrowSeason_data: Set to True to skip processing growing season data.
     :param skip_ET_processing: Set to True to skip processing grwing season ET data.
     :param skip_prism_precip_processing: Set True if want to skip prism precipitation data preprocessing.
@@ -384,6 +408,11 @@ def run_all_preprocessing(skip_process_GrowSeason_data=False,
 
     :return: None.
     """
+    # create stateID raster
+    create_stateID_raster(westUS_shp='../../Data_main/ref_shapes/WestUS_states.shp',
+                          output_dir='../../Data_main/ref_rasters',
+                          skip_processing=skip_stateID_raster_creation)
+
     # process growing season data
     extract_month_from_GrowSeason_data(GS_data_dir='../../Data_main/rasters/Growing_season',
                                        skip_processing=skip_process_GrowSeason_data)

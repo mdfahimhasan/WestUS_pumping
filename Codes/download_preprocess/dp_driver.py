@@ -99,6 +99,7 @@ if __name__ == '__main__':
     years = list(range(2000, 2019 + 1))  # collecting data from 2000-2019 as growing season Peff is available upto 2019 only
 
     # flags
+    skip_stateID_raster_creation = True         ############################ this won't run on linux
     skip_process_GS_data = True                 ########################################################################
     skip_ET_processing = True                   ########################################################################
     skip_prism_precip_processing = True         ########################################################################
@@ -113,7 +114,8 @@ if __name__ == '__main__':
     skip_gridmet_vpd_processing = True          ########################################################################
     skip_daymet_sunHR_processing = True         ########################################################################
 
-    run_all_preprocessing(skip_process_GrowSeason_data=skip_process_GS_data,
+    run_all_preprocessing(skip_stateID_raster_creation=skip_stateID_raster_creation,
+                          skip_process_GrowSeason_data=skip_process_GS_data,
                           skip_ET_processing=skip_ET_processing,
                           skip_prism_precip_processing=skip_prism_precip_processing,
                           skip_prism_tmax_processing=skip_prism_tmax_processing,
@@ -135,6 +137,7 @@ if __name__ == '__main__':
 
     # directories and variables
     datasets_dict = {'../../Data_main/pumping/rasters/WestUS_pumping': 'pumping_mm',
+
                      '../../Data_main/rasters/NetGW_irrigation/WesternUS': 'netGWIrr',
                      '../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled': 'peff',
                      '../../Data_main/rasters/RET/WestUS_growing_season': 'ret',
@@ -170,7 +173,7 @@ if __name__ == '__main__':
                       2013, 2014, 2015, 2016, 2017, 2018, 2019)
 
     # flags
-    skip_create_multiband_raster = True  ###############################################################################
+    skip_create_multiband_raster = False  ###############################################################################
 
     # multi-band raster creation
     make_multiband_datasets(list_of_temporal_var_dirs=temporal_vars_dir, list_of_static_var_dirs=static_vars_dir,
@@ -193,7 +196,7 @@ if __name__ == '__main__':
     band_key_list = band_key_list[1:]
 
     # flags
-    skip_create_tile = True  ###########################################################################################
+    skip_create_tile = False  ###########################################################################################
     use_cpu_nodes = assign_cpu_nodes([skip_create_tile])
 
     tile_maker = make_training_tiles(tiff_path_list=multiband_rasters, band_key_list=band_key_list,
@@ -217,7 +220,7 @@ if __name__ == '__main__':
     test_dir = '../../Data_main/rasters/multibands/train_val_test_splits/test'
 
     # flags
-    skip_split_train_val_test = True  ##################################################################################
+    skip_split_train_val_test = False  ##################################################################################
     use_cpu_nodes = assign_cpu_nodes([skip_split_train_val_test])
 
     train_val_test_split(target_data_csv=target_csv, input_tile_dir=multiband_tile_dir,
@@ -234,7 +237,7 @@ if __name__ == '__main__':
     statistics_dir = '../../Data_main/rasters/multibands/scaling_stats'
 
     # flags
-    skip_calc_stats = True       ########################################################################################
+    skip_calc_stats = False       ########################################################################################
     use_cpu_nodes = assign_cpu_nodes([skip_calc_stats])
 
     mean_dict, std_dict, _, _ = \
@@ -257,9 +260,9 @@ if __name__ == '__main__':
     standardized_test_dir = r'../../Data_main/rasters/multibands/train_val_test_splits/standardized/test'
 
     # flags
-    skip_standardize_train = True  #####################################################################################
-    skip_standardize_val = True    #####################################################################################
-    skip_standardize_test = True   #####################################################################################
+    skip_standardize_train = False  #####################################################################################
+    skip_standardize_val = False    #####################################################################################
+    skip_standardize_test = False   #####################################################################################
 
     use_cpu_nodes = assign_cpu_nodes([skip_standardize_train, skip_standardize_val, skip_standardize_test])
 

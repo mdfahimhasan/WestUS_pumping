@@ -34,7 +34,7 @@ if __name__ == '__main__':
     # Default variables
     batch_size = 128                                                    ##### batch size of DataLoader
     n_features = 21                                                     ##### number of input channel in a tile
-    n_epochs = 100                                                      #####
+    n_epochs = 90                                                       #####
     input_size = 7                                                      ##### height/width dim of a tile
     padding = 'same'                                                    #####
     activation = 'relu'                                                 #####
@@ -47,14 +47,14 @@ if __name__ == '__main__':
     default_params = {
         'filters': [48, 64],                                          ##### convolutional layers
         'kernel_size': [5, 5],                                        ##### kernel size for each Conv layer
-        'fc_units': [96, 64, 32],                                     ##### fully connected layer
-        'lr': 0.0011093037471973399,                                  ##### learning rate
-        'weight_decay':  0.001545836081846879,                        ##### weight decay
+        'fc_units': [32],                                             ##### fully connected layer
+        'lr': 0.00034424691202725654,                                 ##### learning rate
+        'weight_decay': 0.0002954114285538287,                        ##### weight decay
         'dropout': 0.5                                                ##### dropout rate
     }
 
     # Model switches
-    tune_params = True                   #################################################################
+    tune_params = False                   #################################################################
     n_trials_for_tuning = 200             #################################################################
     implement_earlyStopping = False       #################################################################
     plot_hyperparam_importance = True    #################################################################

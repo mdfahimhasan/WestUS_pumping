@@ -15,16 +15,16 @@ if __name__ == '__main__':
     model_version = 'v2'                                                 #####
 
     # directories
-    tile_dir_train = '../../Data_main/rasters/multibands/train_val_test_splits/standardized/train'
-    tile_dir_val = '../../Data_main/rasters/multibands/train_val_test_splits/standardized/val'
-    tile_dir_test = '../../Data_main/rasters/multibands/train_val_test_splits/standardized/test'
+    tile_dir_train = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/standardized/train'
+    tile_dir_val = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/standardized/val'
+    tile_dir_test = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/standardized/test'
 
-    target_csv_train = '../../Data_main/rasters/multibands/train_val_test_splits/standardized/train/y_train.csv'
-    target_csv_val = '../../Data_main/rasters/multibands/train_val_test_splits/standardized/val/y_val.csv'
-    target_csv_test = '../../Data_main/rasters/multibands/train_val_test_splits/standardized/test/y_test.csv'
+    target_csv_train = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/standardized/train/y_train.csv'
+    target_csv_val = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/standardized/val/y_val.csv'
+    target_csv_test = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/standardized/test/y_test.csv'
 
-    mean_csv = '../../Data_main/rasters/multibands/scaling_stats/mean.csv'
-    std_csv = '../../Data_main/rasters/multibands/scaling_stats/std.csv'
+    mean_csv = '../../Data_main/rasters/multibands_westUS/scaling_stats/mean.csv'
+    std_csv = '../../Data_main/rasters/multibands_westUS/scaling_stats/std.csv'
 
     model_save_path = f'../../Model_run/DL_model/model_{model_version}.pth'
     model_info_save_path = f'../../Model_run/DL_model/model_info_{model_version}.pth'

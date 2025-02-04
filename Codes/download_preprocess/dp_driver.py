@@ -166,7 +166,7 @@ if __name__ == '__main__':
 
     multiband_key_list = list(datasets_dict.values())  # 'pumping_mm' and 'stateID' included here
 
-    westUS_multiband_dir = '../../Data_main/rasters/multibands/training/westUS'
+    westUS_multiband_dir = '../../Data_main/rasters/multibands_westUS/training/westUS'
 
     training_years = (2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
                       # 2012,   # 2012 skipped as no GCVI/NDVI/NDVI/NDMi data available due to gap in Landsat data; will think an alternative
@@ -189,10 +189,10 @@ if __name__ == '__main__':
 
     # directories and variables
     multiband_rasters = glob(os.path.join(westUS_multiband_dir, '*.tif'))
-    interim_multiband_tile_dir = '../../Data_main/rasters/multibands/training/tiles/interim'
-    interim_target_csv = '../../Data_main/rasters/multibands/training/tiles/interim/target.csv'
-    final_multiband_tile_dir = '../../Data_main/rasters/multibands/training/tiles'
-    final_target_csv = '../../Data_main/rasters/multibands/training/tiles/target.csv'
+    interim_multiband_tile_dir = '../../Data_main/rasters/multibands_westUS/training/tiles/interim'
+    interim_target_csv = '../../Data_main/rasters/multibands_westUS/training/tiles/interim/target.csv'
+    final_multiband_tile_dir = '../../Data_main/rasters/multibands_westUS/training/tiles'
+    final_target_csv = '../../Data_main/rasters/multibands_westUS/training/tiles/target.csv'
 
     tile_band_list = [i for i in list(datasets_dict.values())
                       if i not in ['pumping_mm', 'stateID']]  # making sure to not include 'pumping_mm' and 'stateID' here
@@ -217,9 +217,9 @@ if __name__ == '__main__':
     # directories
     multiband_tile_dir = final_multiband_tile_dir
     target_csv = final_target_csv
-    train_dir = '../../Data_main/rasters/multibands/train_val_test_splits/train'
-    val_dir = '../../Data_main/rasters/multibands/train_val_test_splits/val'
-    test_dir = '../../Data_main/rasters/multibands/train_val_test_splits/test'
+    train_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/train'
+    val_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/val'
+    test_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/test'
 
     # flags
     skip_split_train_val_test = False  ##################################################################################
@@ -236,7 +236,7 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
 
     # directories
-    statistics_dir = '../../Data_main/rasters/multibands/scaling_stats'
+    statistics_dir = '../../Data_main/rasters/multibands_westUS/scaling_stats'
 
     # flags
     skip_calc_stats = False       ########################################################################################
@@ -252,14 +252,14 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
 
     # directories
-    train_dir = '../../Data_main/rasters/multibands/train_val_test_splits/train'
-    standardized_train_dir = '../../Data_main/rasters/multibands/train_val_test_splits/standardized/train'
+    train_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/train'
+    standardized_train_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/standardized/train'
 
-    val_dir = '../../Data_main/rasters/multibands/train_val_test_splits/val'
-    standardized_val_dir = '../../Data_main/rasters/multibands/train_val_test_splits/standardized/val'
+    val_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/val'
+    standardized_val_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/standardized/val'
 
-    test_dir = '../../Data_main/rasters/multibands/train_val_test_splits/test'
-    standardized_test_dir = r'../../Data_main/rasters/multibands/train_val_test_splits/standardized/test'
+    test_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/test'
+    standardized_test_dir = r'../../Data_main/rasters/multibands_westUS/train_val_test_splits/standardized/test'
 
     # flags
     skip_standardize_train = False  #####################################################################################

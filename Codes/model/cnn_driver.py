@@ -105,47 +105,64 @@ if __name__ == '__main__':
                                 output_csv=f'../../Model_run/DL_model/output_csv/testSet_results.csv',
                                 skip_processing=skip_unstandardizing_testing)
 
+
     ####################################################################################################################
     ####################################################################################################################
-    # # Model performances on Kansas (without training on kansas)
-    # print('\n############## Model performance on Kansas ###############\n')
-    #
-    # print('Model performance on kansas (standardized):')
-    #
-    # tile_dir_KS = '../../Data_main/rasters/multibands/KS/train_val_test_splits/standardized/train'
-    # target_csv_KS = '../../Data_main/rasters/multibands/KS/train_val_test_splits/standardized/train/y_train.csv'
-    #
-    # test(trained_model,
-    #      tile_dir=tile_dir_KS, target_csv=target_csv_KS,
-    #      batch_size=batch_size,
-    #      data_type='test')
-    #
-    # print('Model performance on kansas (unstandardized):')
-    # unstandardize_save_and_test(trained_model,
-    #                             tile_dir=tile_dir_KS,
-    #                             target_csv=target_csv_KS,
-    #                             batch_size=batch_size,
-    #                             data_type='test',
-    #                             mean_csv=mean_csv,
-    #                             std_csv=std_csv,
-    #                             output_csv=f'../../Model_run/DL_model/KS/KS_results.csv',
-    #                             skip_processing=skip_unstandardizing_testing)
+    # # created dataset for each state and will test model's performance on individual state
 
+    skip_perState_performance_evaluation = False   #####################################################################
 
-    # Recommendations for Improvement:
+    if not skip_perState_performance_evaluation:
 
-    # Address Overfitting:
-    # - Consider increasing weight decay
-    # - Try adding more dropout layers
-    # - Experiment with data augmentation if applicable
+        # # # # # # # # # # # # # # # # # # # Model performances on Kansas # # # # # # # # # # # # # # # # # # # # # # #
+        print('\n********************* Model performance on Kansas *********************\n')
 
-    # Architecture Adjustments:
-    # - The model might benefit from batch normalization layers
-    # - Consider adding skip connections
-    # - Experiment with different kernel sizes
+        print('Standardized performance:')
 
-    # Training Strategy:
-    # - Implement learning rate scheduling
-    # - Try different optimizers
-    # - Consider early stopping based on validation loss
-    # - consider training without dropout entirely
+        tile_dir_KS = '../../Data_main/rasters/multibands_perState/KS/train_val_test_splits/standardized/train'
+        target_csv_KS = '../../Data_main/rasters/multibands_perState/KS/train_val_test_splits/standardized/train/y_train.csv'
+
+        test(trained_model,
+             tile_dir=tile_dir_KS, target_csv=target_csv_KS,
+             batch_size=batch_size,
+             data_type='test')
+
+        print('UnStandardized performance:')
+        unstandardize_save_and_test(trained_model, tile_dir=tile_dir_KS, target_csv=target_csv_KS,
+                                    batch_size=batch_size, data_type='test', mean_csv=mean_csv, std_csv=std_csv,
+                                    output_csv=f'../../Model_run/DL_model/output_csv/perState/KS_results.csv',
+                                    skip_processing=False)
+
+        # # # # # # # # # # # # # # # # # # Model performances on Colorado # # # # # # # # # # # # # # # # # # # # # # #
+        print('\n********************* Model performance on Colorado *********************\n')
+
+        print('Standardized performance:')
+
+        tile_dir_CO = '../../Data_main/rasters/multibands_perState/CO/train_val_test_splits/standardized/train'
+        target_csv_CO = '../../Data_main/rasters/multibands_perState/CO/train_val_test_splits/standardized/train/y_train.csv'
+
+        test(trained_model, tile_dir=tile_dir_CO, target_csv=target_csv_CO,
+             batch_size=batch_size, data_type='test')
+
+        print('UnStandardized performance:')
+        unstandardize_save_and_test(trained_model, tile_dir=tile_dir_CO, target_csv=target_csv_CO,
+                                    batch_size=batch_size, data_type='test', mean_csv=mean_csv, std_csv=std_csv,
+                                    output_csv=f'../../Model_run/DL_model/output_csv/perState/CO_results.csv',
+                                    skip_processing=False)
+
+        # # # # # # # # # # # # # # # # # # Model performances on Arizona # # # # # # # # # # # # # # # # # # # # # # #
+        print('\n********************* Model performance on Arizona *********************\n')
+
+        print('Standardized performance:')
+
+        tile_dir_AZ = '../../Data_main/rasters/multibands_perState/AZ/train_val_test_splits/standardized/train'
+        target_csv_AZ = '../../Data_main/rasters/multibands_perState/AZ/train_val_test_splits/standardized/train/y_train.csv'
+
+        test(trained_model, tile_dir=tile_dir_AZ, target_csv=target_csv_AZ,
+             batch_size=batch_size, data_type='test')
+
+        print('UnStandardized performance:')
+        unstandardize_save_and_test(trained_model, tile_dir=tile_dir_AZ, target_csv=target_csv_AZ,
+                                    batch_size=batch_size, data_type='test', mean_csv=mean_csv, std_csv=std_csv,
+                                    output_csv=f'../../Model_run/DL_model/output_csv/perState/AZ_results.csv',
+                                    skip_processing=False)

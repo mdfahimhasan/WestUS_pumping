@@ -229,6 +229,7 @@ if __name__ == '__main__':
                          train_dir=train_dir, val_dir=val_dir, test_dir=test_dir,
                          train_size=0.7, val_size=0.2, test_size=0.1,
                          random_state=42, num_workers=use_cpu_nodes,
+                         stratify=True,                                # stratified split based on 'stateID'
                          skip_processing=skip_split_train_val_test)
 
     # ------------------------------------------------------------------------------------------------------------------

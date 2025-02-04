@@ -557,7 +557,8 @@ def copy_tiles_parallel(splitted_target_df, input_dir, copy_dir, num_workers):
 
 def train_val_test_split(target_data_csv, input_tile_dir, train_dir, val_dir, test_dir,
                          train_size=0.7, val_size=0.15, test_size=0.15,
-                         random_state=42, num_workers=10, skip_processing=False):
+                         random_state=42, num_workers=10,
+                         stratify=True, skip_processing=False):
     """
     Splits the tiles into train, validation, and test datasets, along with their target values.
 
@@ -571,6 +572,7 @@ def train_val_test_split(target_data_csv, input_tile_dir, train_dir, val_dir, te
     :param test_size: float. Proportion of the dataset to include in the test split. Default is 0.15.
     :param random_state: int. Random seed for reproducibility. Default is 42.
     :param num_workers: int. Number of parallel processes to use for multiprocessing. Default is 10.
+    :param stratify: Whether to staritify based on 'stateID'. Default set to True to do stratified split.
     :param skip_processing: Set to True to skip processing. Default is False.
 
     :return: None.
@@ -584,10 +586,15 @@ def train_val_test_split(target_data_csv, input_tile_dir, train_dir, val_dir, te
         target_df = pd.read_csv(target_data_csv)
 
         # performing the split for train, validation, and test based on target values
-        train_data, temp_data = train_test_split(target_df, train_size=train_size,
-                                                 stratify=target_df['stateID'], random_state=random_state)
-        val_data, test_data = train_test_split(temp_data, test_size=test_size / (val_size + test_size),
-                                               stratify=temp_data['stateID'], random_state=random_state)
+        if stratify:
+            train_data, temp_data = train_test_split(target_df, train_size=train_size,
+                                                     stratify=target_df['stateID'], random_state=random_state)
+            val_data, test_data = train_test_split(temp_data, test_size=test_size / (val_size + test_size),
+                                                   stratify=temp_data['stateID'], random_state=random_state)
+        else:
+            train_data, temp_data = train_test_split(target_df, train_size=train_size, random_state=random_state)
+            val_data, test_data = train_test_split(temp_data, test_size=test_size / (val_size + test_size),
+                                                   random_state=random_state)
 
         # cleaning existing data from the directories
         clean_and_make_directory(train_dir)

@@ -201,14 +201,14 @@ if __name__ == '__main__':
     skip_create_tile = True  ###########################################################################################
     use_cpu_nodes = assign_cpu_nodes([skip_create_tile])
 
-    tile_maker = make_training_tiles(tiff_path_list=multiband_rasters, band_key_list=tile_band_list,
-                                     interim_tile_output_dir=interim_multiband_tile_dir,
-                                     interim_target_data_output_csv=interim_target_csv,
-                                     final_tile_output_dir=final_multiband_tile_dir,
-                                     final_target_data_output_csv=final_target_csv,
-                                     start_tile_no=1,
-                                     num_workers=use_cpu_nodes,
-                                     skip_processing=skip_create_tile)
+    make_training_tiles(tiff_path_list=multiband_rasters, band_key_list=tile_band_list,
+                        interim_tile_output_dir=interim_multiband_tile_dir,
+                        interim_target_data_output_csv=interim_target_csv,
+                        final_tile_output_dir=final_multiband_tile_dir,
+                        final_target_data_output_csv=final_target_csv,
+                        start_tile_no=1,
+                        num_workers=use_cpu_nodes,
+                        skip_processing=skip_create_tile)
 
     # ------------------------------------------------------------------------------------------------------------------
     # 5. Train-validation-test split

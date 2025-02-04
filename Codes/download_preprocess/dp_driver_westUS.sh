@@ -1,6 +1,6 @@
 #!/bin/bash
 
-## running the dp_driver.py script on CPU nodes
+## running the dp_driver_westUS.py script on CPU nodes
 
 #SBATCH --partition=smi_all
 #SBATCH --ntasks=30
@@ -9,5 +9,5 @@
 #SBATCH --mail-type=BEGIN,END,FAIL,TIME_LIMIT
 #SBATCH --mail-user=Fahim.Hasan@colostate.edu
 
-python dp_driver.py
+python dp_driver_westUS.py
 

@@ -177,7 +177,7 @@ class CNNRegression(nn.Module):
 
         # device
         self.device = 'cuda'  # running the code on GPU
-        print(f'Model running on {self.device}....')
+        print(f'\nModel running on {self.device}....')
 
         # activation
         self.activations = {'relu': nn.ReLU(),
@@ -247,7 +247,8 @@ class CNNRegression(nn.Module):
         self.to(self.device)
 
 
-    def _calculate_flattened_size(self, input_size, filters, kernels, stride, padding, pooling_stride=2):
+    @staticmethod
+    def _calculate_flattened_size(input_size, filters, kernels, stride, padding, pooling_stride=2):
         """
         Dynamically calculates the flattened size after all convolutional and pooling layers.
 
@@ -715,6 +716,8 @@ def run_and_tune_model(trial, train_loader, val_loader,
 
     :return: The best validation loss (val_loss).
     """
+    print(f'\nStarting trial number {trial.number}...\n')
+
     # sample hyperparameters
     lr = trial.suggest_float('lr', 1e-5, 1e-2, log=True)
     weight_decay = trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)

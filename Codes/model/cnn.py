@@ -52,9 +52,9 @@ class DataLoaderCreator:
             raise ValueError(f"Invalid data_type: {data_type}. Must be 'train', 'validation', or 'test'.")
 
 
-        # reading target and input datasets.
+        # reading target and input datasets:
         # we have to make sure that target values and tiles are matching (tiles have corresponding target values).
-        # so, creating a dictionary mapping tile_no (from the file name) to its full file path for quick lookup.
+        # so, creating a dictionary for mapping tile_no (from the file name) to its full file path for quick lookup.
         # then, sorting tiles to match the order of tile_no_list from the target CSV.
         # finally, reading the sorted tiles as arrays
         target_df = pd.read_csv(target_csv)
@@ -725,8 +725,8 @@ def run_and_tune_model(trial, train_loader, val_loader,
     kernel_size = [trial.suggest_int(f'kernel_size_layer_{i}', 3, 5, step=2) for i in range(num_layers)]
 
     # sample fully connected layer configuration
-    num_fc_layers = trial.suggest_int('num_fc_layers', 1, 3)  # number of fully connected layers can be flexible from 1-3
-    fc_units = [trial.suggest_int(f'fc_units_layer_{i}', 32, 128, step=32) for i in range(num_fc_layers)]
+    num_fc_layers = trial.suggest_int('num_fc_layers', 1, 4)  # number of fully connected layers can be flexible from 1-3
+    fc_units = [trial.suggest_int(f'fc_units_layer_{i}', 32, 256, step=32) for i in range(num_fc_layers)]
     dropout_rate = trial.suggest_float('dropout', 0.1, 0.5, step=0.1)
 
     # training the model with the sampled parameters

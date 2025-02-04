@@ -362,6 +362,8 @@ def create_stateID_raster(westUS_shp, output_dir, skip_processing=False):
     :return: None.
     """
     if not skip_processing:
+        makedirs([output_dir])
+
         shapefile_to_raster(input_shape=westUS_shp, output_dir=output_dir, raster_name='stateID.tif',
                             burnvalue=None, use_attr=True,
                             attribute='stateID', add=None, ref_raster=WestUS_raster,
@@ -410,7 +412,7 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     """
     # create stateID raster
     create_stateID_raster(westUS_shp='../../Data_main/ref_shapes/WestUS_states.shp',
-                          output_dir='../../Data_main/ref_rasters',
+                          output_dir='../../Data_main/ref_rasters/stateID',
                           skip_processing=skip_stateID_raster_creation)
 
     # process growing season data

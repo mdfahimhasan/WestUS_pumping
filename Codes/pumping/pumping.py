@@ -727,7 +727,7 @@ if __name__ == '__main__':
                              year_attr='Year',
                              output_dir='../../Data_main/pumping/rasters/Arizona',
                              lower_outlier_range=20,                        # ********* not sure *************
-                             upper_outlier_range=2200,                      # based on Majumdar et al. (2022)
+                             upper_outlier_range=3000,                      # based on Majumdar et al. (2022)
                              ref_raster=WestUS_raster, resolution=model_res,
                              skip_processing=skip_make_AZ_pumping_raster)
 

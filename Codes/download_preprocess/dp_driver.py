@@ -137,13 +137,12 @@ if __name__ == '__main__':
 
     # directories and variables
     datasets_dict = {'../../Data_main/pumping/rasters/WestUS_pumping': 'pumping_mm',
-
                      '../../Data_main/rasters/NetGW_irrigation/WesternUS': 'netGWIrr',
                      '../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled': 'peff',
                      '../../Data_main/rasters/RET/WestUS_growing_season': 'ret',
                      '../../Data_main/rasters/Precip/WestUS_growing_season': 'precip',
                      '../../Data_main/rasters/Tmax/WestUS_growing_season': 'tmax',
-                     '../../Data_main/rasters/ET/WestUS_growing_season': 'ET',
+                     '../../Data_main/rasters/OpenET_ensemble/WestUS_growing_season': 'ET',
                      '../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac': 'irr_crop_frac',
                      '../../Data_main/rasters/Irrigated_cropland': 'irr_cropland',
                      '../../Data_main/rasters/maxRH/WestUS_growing_season': 'maxRH',
@@ -156,15 +155,16 @@ if __name__ == '__main__':
                      '../../Data_main/rasters/OSAVI/WestUS_yearly': 'osavi',
                      '../../Data_main/rasters/NDVI/WestUS_yearly': 'ndvi',
                      '../../Data_main/rasters/NDMI/WestUS_yearly': 'ndmi',
+                     '../../Data_main/ref_rasters/stateID': 'stateID',
                      '../../Data_main/rasters/Clay_content/WestUS': 'clay',
                      '../../Data_main/rasters/Sand_content/WestUS': 'sand',
                      '../../Data_main/rasters/Field_capacity/WestUS': 'fc'}
 
     static_vars_dir = [i for i in datasets_dict.keys() if
-                       any(var in i for var in ('Clay_content', 'Sand_content', 'Field_capacity'))]
+                       any(var in i for var in ('stateID', 'Clay_content', 'Sand_content', 'Field_capacity'))]
     temporal_vars_dir = [i for i in datasets_dict.keys() if i not in static_vars_dir]
 
-    band_key_list = list(datasets_dict.values())  # make sure to not include the training data's name as that band will be removed
+    multiband_key_list = list(datasets_dict.values())  # 'pumping_mm' and 'stateID' included here
 
     westUS_multiband_dir = '../../Data_main/rasters/multibands/training/westUS'
 
@@ -173,11 +173,12 @@ if __name__ == '__main__':
                       2013, 2014, 2015, 2016, 2017, 2018, 2019)
 
     # flags
-    skip_create_multiband_raster = False  ###############################################################################
+    skip_create_multiband_raster = True  ###############################################################################
 
     # multi-band raster creation
-    make_multiband_datasets(list_of_temporal_var_dirs=temporal_vars_dir, list_of_static_var_dirs=static_vars_dir,
-                            band_key_list=band_key_list,
+    make_multiband_datasets(list_of_temporal_var_dirs=temporal_vars_dir,
+                            list_of_static_var_dirs=static_vars_dir,
+                            band_key_list=multiband_key_list,
                             output_dir=westUS_multiband_dir,
                             years_list=training_years, skip_processing=skip_create_multiband_raster)
 
@@ -193,13 +194,14 @@ if __name__ == '__main__':
     final_multiband_tile_dir = '../../Data_main/rasters/multibands/training/tiles'
     final_target_csv = '../../Data_main/rasters/multibands/training/tiles/target.csv'
 
-    band_key_list = band_key_list[1:]
+    tile_band_list = [i for i in list(datasets_dict.values())
+                      if i not in ['pumping_mm', 'stateID']]  # making sure to not include 'pumping_mm' and 'stateID' here
 
     # flags
-    skip_create_tile = False  ###########################################################################################
+    skip_create_tile = True  ###########################################################################################
     use_cpu_nodes = assign_cpu_nodes([skip_create_tile])
 
-    tile_maker = make_training_tiles(tiff_path_list=multiband_rasters, band_key_list=band_key_list,
+    tile_maker = make_training_tiles(tiff_path_list=multiband_rasters, band_key_list=tile_band_list,
                                      interim_tile_output_dir=interim_multiband_tile_dir,
                                      interim_target_data_output_csv=interim_target_csv,
                                      final_tile_output_dir=final_multiband_tile_dir,

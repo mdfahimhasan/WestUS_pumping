@@ -162,28 +162,6 @@ def make_multiband_datasets(list_of_temporal_var_dirs, list_of_static_var_dirs,
                                     list_of_static_var_dirs=list_of_static_var_dirs,
                                     years_list=years_list)
 
-        # # creating a nan mask (1 - valid, 0 -  nan) raster and adding it's path to each nested list in data_paths_lists
-        # data_paths_lists_with_nan = []
-        #
-        # for nan_no, paths in enumerate(data_paths_lists):
-        #     path_arrs = np.array([read_raster_arr_object(each, get_file=False) for each in paths])
-        #     nan_mask = np.any(np.isnan(path_arrs), axis=0)
-        #
-        #     # inverting the mask: True becomes 0, False becomes 1
-        #     # Then, converting boolean to integer: True as 0, False as 1
-        #     inverted_mask = ~nan_mask
-        #     nan_arr = inverted_mask.astype(int)
-        #
-        #     # saving as a raster and adding to each nested list in data_paths_lists
-        #     nan_mask_dir = '../../Data_main/rasters/nan_mask'
-        #     makedirs([nan_mask_dir])
-        #
-        #     nan_raster_path = os.path.join(nan_mask_dir, f'nanmask{nan_no + 1}.tif')
-        #     _, file = read_raster_arr_object(paths[0])
-        #     write_array_to_raster(nan_arr, file, file.transform, nan_raster_path)
-        #
-        #     data_paths_lists_with_nan.append(paths + [nan_raster_path])
-
         # # multi-band raster creation
         for paths in data_paths_lists:
 
@@ -209,11 +187,9 @@ class make_training_tiles:
     """
     Processes a multi-band raster image into tiles of training data and associated feature attributes.
 
-     **Caution**:
-        1. The first band of the multi-band raster must be target band (train data-pumping. This class extracts the center pixel
-        value of the first band as the target variable for each loop and saves it separately, while the remaining
-        bands are used as features (saved a tiled multi-band GeoTIFF) for the deep learning model.
-        3. The `band_key_list` should only contain the names of the feature bands and exclude the target variable's name.
+    **Caution**:
+    The `band_key_list` should only contain the names of the feature bands and exclude the target variable
+    and stateID name.
     """
 
     def __init__(self, tiff_path_list, band_key_list,
@@ -289,7 +265,7 @@ class make_training_tiles:
         year = os.path.basename(tiff_path).split('.')[0].split('_')[-1]
         band_key_list_mod = [(i + '_' + year) for i in band_key_list]
 
-        print(f'\n creating multi-band tiles for {year}...')
+        print(f'\ncreating multi-band tiles for {year}...')
 
         # opening a multi-band image file. The tile-ing operation will be done inside the opened image file.
         with rio.open(tiff_path) as tiff:
@@ -298,7 +274,7 @@ class make_training_tiles:
             row_chunks = [range(start, min(start + 100, tiff_height - tile_radius))
                           for start in range(tile_radius, tiff_height - tile_radius, 100)]  # Chunk size of 100 rows
 
-            print(f"processing multi-band raster in {len(row_chunks)} chunks \n")
+            print(f'processing multi-band raster in {len(row_chunks)} chunks \n')
 
             # Manager() is used to create a shared list (`target_data_list`) for storing target data across worker processes.
             manager = Manager()
@@ -326,7 +302,7 @@ class make_training_tiles:
                 start_tile_no = cumulative_tile_no
                 cumulative_tile_no += len(chunk) * (tiff.width - 2 * tile_radius)  # approximate number of tile in this chunk
 
-                print(f"Chunk {chunk_idx} starts with tile_no {start_tile_no}")  # debugging
+                print(f'Chunk {chunk_idx} starts with tile_no {start_tile_no}')  # debugging
                 pool_input.append((chunk, tiff_path, band_key_list_mod, start_tile_no, target_data_list, config))
 
 
@@ -366,7 +342,15 @@ class make_training_tiles:
 
         with rio.open(tiff_path) as tiff:
             tile_radius = config['tile_size'] // 2
-            training_band = tiff.read(1)  # 1st band is training data (pumping). Rasterio uses 1-based indexing
+
+            # reading pumping and stateID array
+            bands = tiff.descriptions  # list of band names
+
+            pumping_band_idx = bands.index('pumping_mm') + 1   # +1 due to rasterio-based indexing
+            training_band = tiff.read(pumping_band_idx)        # reading pumping_mm band (training data)
+
+            stateID_idx = bands.index('stateID') + 1           # +1 due to rasterio-based indexing
+            stateID_band = tiff.read(stateID_idx)              # reading stateID band
 
             # The first loop iterates across chunk (each chunk has 100 rows by default) and
             # the second loop across the width (columns) of the raster.
@@ -379,6 +363,9 @@ class make_training_tiles:
             for row in chunk:
                 for col in range(tile_radius, tiff.width - tile_radius):
                     try:
+                        # extracting stateID of the center pixel
+                        stateID_val = stateID_band[row, col]
+
                         # skipping tile with NoData in the center pixel of the tile
                         center_train_value = training_band[row, col]
                         if center_train_value == self.nodata_value:
@@ -387,10 +374,15 @@ class make_training_tiles:
                         # creating a window around the central pixel and reading the data
                         window = Window(col_off=col - tile_radius, row_off=row - tile_radius,
                                         width=self.tile_size, height=self.tile_size)
-                        tile_arr = tiff.read(window=window)
 
-                        # keeping only the arrays except the first band (indexed 0, as that is training data)
-                        tile_arr = tile_arr[1:]
+                        # keeping only the arrays except the pumping and stateID band
+                        all_band_idxs = list(range(len(bands)))                      # 0-based indices
+                        exclude_band_idxs = [pumping_band_idx - 1, stateID_idx - 1]  # -1 as the indices were 1-based
+                        valid_band_idxs = [i + 1 for i in all_band_idxs
+                                           if i not in exclude_band_idxs]            # +1 again to convert to 1-based indexing
+
+                        # reading multi-band array for the window and with pumping and stateID bands excluded
+                        tile_arr = tiff.read(valid_band_idxs, window=window)
 
                         # checking if any array in the windowed tiff in entirely null (only no data values)
                         if self.is_image_null(tile_arr):
@@ -404,7 +396,7 @@ class make_training_tiles:
                         # replacing NoData values with np.nan
                         tile_arr[tile_arr == self.nodata_value] = np.nan
 
-                        # Save the tile
+                        # saving the tile
                         crs = tiff.crs
                         window_transform = tiff.window_transform(window)
 
@@ -415,16 +407,17 @@ class make_training_tiles:
                             self.save_tile(output_file, tile_arr, crs, window_transform, band_key_list)
 
                         except Exception as e:
-                            print(f"Skipping tile {tile_name} due to save error: {e}")
+                            print(f'Skipping tile {tile_name} due to save error: {e}')
                             continue
 
-                        # append target (training) data to target_data_list
-                        target_data_list.append({'tile_no': current_tile_no, 'target_value': center_train_value})
+                        # append target (training) data to target_data_list, along with tile_no and stateID
+                        target_data_list.append({'tile_no': current_tile_no, 'stateID': stateID_val,
+                                                 'target_value': center_train_value})
                         current_tile_no += 1
 
                     except Exception as e:
                         # Log and skip problematic tiles
-                        print(f"Skipping tile at row {row}, col {col} due to read error: {e}")
+                        print(f'Skipping tile at row {row}, col {col} due to read error: {e}')
                         continue
 
     def calculate_nodata_percentage(self, tile_arr):
@@ -472,7 +465,8 @@ class make_training_tiles:
         # If no bands are null, return False
         return False
 
-    def save_tile(self, output_file, tile_arr, crs, transform, band_key_list):
+    @staticmethod
+    def save_tile(output_file, tile_arr, crs, transform, band_key_list):
         with rio.open(
                 output_file,
                 'w',
@@ -490,7 +484,7 @@ class make_training_tiles:
                 dst.set_band_description(band_id + 1, band_key_list[band_id])
 
     def _final_update_tile_no(self):
-        print('\n finalizing tile_no for tiled rasters and target data...')
+        print('\nfinalizing tile_no for tiled rasters and target data...')
         all_tiles = glob(os.path.join(self.interim_tile_output_dir, '*tif'))
         old_tile_no = [os.path.basename(i).split('.')[0].split('_')[-1] for i in all_tiles]
 
@@ -510,11 +504,16 @@ class make_training_tiles:
                       rename=new_file_name)
 
         # replacing old tile no in target data csv with new tile no
-        target_csv = pd.read_csv(self.interim_target_data_output_csv)
-        target_csv['tile_no'] = target_csv['tile_no'].astype(str).map(old_to_new_map)
+        target_df = pd.read_csv(self.interim_target_data_output_csv)
+        target_df['tile_no'] = target_df['tile_no'].astype(str).map(old_to_new_map)
+
+        # replacing samples (very few) with stateID 3 - Nebraska and 1 -  Oklahoma. They belong to kansas
+        # but came in Nebraska and Oklahoma during stateID raster creation (along state border)
+        target_df.loc[target_df['stateID'] == 3, 'stateID'] = 12
+        target_df.loc[target_df['stateID'] == 1, 'stateID'] = 12
 
         # save final csv
-        target_csv.to_csv(self.final_target_data_output_csv, index=False)
+        target_df.to_csv(self.final_target_data_output_csv, index=False)
 
 
 def copy_tiles(row, input_dir, copy_dir):
@@ -557,7 +556,7 @@ def copy_tiles_parallel(splitted_target_df, input_dir, copy_dir, num_workers):
 
 
 def train_val_test_split(target_data_csv, input_tile_dir, train_dir, val_dir, test_dir,
-                         train_size=0.7, val_size=0.2, test_size=0.1,
+                         train_size=0.7, val_size=0.15, test_size=0.15,
                          random_state=42, num_workers=10, skip_processing=False):
     """
     Splits the tiles into train, validation, and test datasets, along with their target values.
@@ -568,8 +567,8 @@ def train_val_test_split(target_data_csv, input_tile_dir, train_dir, val_dir, te
     :param val_dir: str. Directory to save the validation tiles and target csv.
     :param test_dir: str. Directory to save the test tiles and target csv.
     :param train_size: float. Proportion of the dataset to include in the train split. Default is 0.7.
-    :param val_size: float. Proportion of the dataset to include in the validation split. Default is 0.2.
-    :param test_size: float. Proportion of the dataset to include in the test split. Default is 0.1.
+    :param val_size: float. Proportion of the dataset to include in the validation split. Default is 0.15.
+    :param test_size: float. Proportion of the dataset to include in the test split. Default is 0.15.
     :param random_state: int. Random seed for reproducibility. Default is 42.
     :param num_workers: int. Number of parallel processes to use for multiprocessing. Default is 10.
     :param skip_processing: Set to True to skip processing. Default is False.
@@ -582,12 +581,13 @@ def train_val_test_split(target_data_csv, input_tile_dir, train_dir, val_dir, te
         makedirs([train_dir, val_dir, test_dir])
 
         # loading the target data CSV
-        target_data = pd.read_csv(target_data_csv)
+        target_df = pd.read_csv(target_data_csv)
 
         # performing the split for train, validation, and test based on target values
-        train_data, temp_data = train_test_split(target_data, train_size=train_size, random_state=random_state)
+        train_data, temp_data = train_test_split(target_df, train_size=train_size,
+                                                 stratify=target_df['stateID'], random_state=random_state)
         val_data, test_data = train_test_split(temp_data, test_size=test_size / (val_size + test_size),
-                                               random_state=random_state)
+                                               stratify=temp_data['stateID'], random_state=random_state)
 
         # cleaning existing data from the directories
         clean_and_make_directory(train_dir)

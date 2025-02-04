@@ -8,11 +8,11 @@ from os.path import dirname, abspath
 
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
-from Codes.model.cnn import     main, plot_learning_curve, test, unstandardize_save_and_test
+from Codes.model.cnn import main, plot_learning_curve, test, unstandardize_save_and_test
 
 if __name__ == '__main__':
     # model version
-    model_version = 'v1'                                                 #####
+    model_version = 'v2'                                                 #####
 
     # directories
     tile_dir_train = '../../Data_main/rasters/multibands/train_val_test_splits/standardized/train'
@@ -54,8 +54,8 @@ if __name__ == '__main__':
     }
 
     # Model switches
-    tune_params = False                   #################################################################
-    n_trials_for_tuning = 100             #################################################################
+    tune_params = True                   #################################################################
+    n_trials_for_tuning = 200             #################################################################
     implement_earlyStopping = False       #################################################################
     plot_hyperparam_importance = True    #################################################################
     skip_unstandardizing_testing = False  #################################################################

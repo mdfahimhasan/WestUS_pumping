@@ -8,11 +8,12 @@ from os.path import dirname, abspath
 
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
-from Codes.model.cnn import main, plot_learning_curve, test, unstandardize_save_and_test
+from Codes.model.cnn import main, plot_learning_curve, test, unstandardize_save_and_test, plot_shap_values
 
 if __name__ == '__main__':
     # model version
-    model_version = 'v2'                                                 #####
+    model_version = 'v4'                                                 #####
+
 
     # directories
     tile_dir_train = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/standardized/train'
@@ -31,7 +32,8 @@ if __name__ == '__main__':
     hyperparam_importance_plot = f'../../Model_run/DL_model/hyperparam_imp_{model_version}.jpg'
     leaning_curve_plot = f'../../Model_run/DL_model/learning_curve_{model_version}.jpg'
 
-    # Default variables
+
+    # Default variables (from hyperparameter tuning process)
     batch_size = 128                                                    ##### batch size of DataLoader
     n_features = 21                                                     ##### number of input channel in a tile
     n_epochs = 90                                                       #####
@@ -53,12 +55,14 @@ if __name__ == '__main__':
         'dropout': 0.5                                                ##### dropout rate
     }
 
+
     # Model switches
     tune_params = False                   #################################################################
     n_trials_for_tuning = 200             #################################################################
-    implement_earlyStopping = False       #################################################################
+    implement_earlyStopping = True       #################################################################
     plot_hyperparam_importance = True    #################################################################
     skip_unstandardizing_testing = False  #################################################################
+
 
     # Running the model
     trained_model, model_info = main(tile_dir_train=tile_dir_train, target_csv_train=target_csv_train,
@@ -104,6 +108,21 @@ if __name__ == '__main__':
                                 std_csv=std_csv,
                                 output_csv=f'../../Model_run/DL_model/output_csv/testSet_results.csv',
                                 skip_processing=skip_unstandardizing_testing)
+
+
+    # Explainable AI plots (using SHAP)
+    skip_plot_SHAP_plot = False          ############################################################################
+
+    feature_names = ['netGWIrr', 'peff', 'ret', 'precip', 'tmax', 'ET', 'irr_crop_frac', 'irr_cropland',
+                     'maxRH', 'minRH', 'shortRad', 'vpd', 'windVel', 'sunHr', 'gcvi', 'osavi', 'ndvi',
+                     'ndmi', 'clay', 'sand', 'fc']
+
+
+    plot_shap_values(trained_model, tile_dir=tile_dir_train,
+                     target_csv=target_csv_train, batch_size=batch_size,
+                     plot_save_path=f'../../Model_run/DL_model/SHAP_summary_{model_version}.jpg',
+                     feature_names=feature_names, data_type='test',
+                     skip_processing=skip_plot_SHAP_plot)
 
 
     ####################################################################################################################
@@ -166,3 +185,4 @@ if __name__ == '__main__':
                                     batch_size=batch_size, data_type='test', mean_csv=mean_csv, std_csv=std_csv,
                                     output_csv=f'../../Model_run/DL_model/output_csv/perState/AZ_results.csv',
                                     skip_processing=False)
+

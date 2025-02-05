@@ -12,6 +12,8 @@ and readability of the script, considering the complex nature of this script.
 
 import os
 import sys
+import shap
+import random
 import pickle
 import numpy as np
 import pandas as pd
@@ -27,6 +29,16 @@ from torch.utils.data import DataLoader, TensorDataset
 from os.path import dirname, abspath
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 from Codes.utils.system_ops import makedirs
+
+
+# Setting seeds for reproducibility
+seed = 42
+torch.manual_seed(seed)
+torch.cuda.manual_seed_all(seed)
+np.random.seed(seed)
+random.seed(seed)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 
 class DataLoaderCreator:
@@ -109,14 +121,14 @@ class EarlyStopping:
     Saves the model with the lowest validation loss.
     """
 
-    def __init__(self, patience=10, delta=0.01):
+    def __init__(self, patience=10, delta=0.001):
         """
         Initializes the early stopping mechanism.
 
         :param patience: int. Number of epochs to wait before stopping if no improvement.
                          Default is 10.
         :param delta: float. Minimum change in the monitored quantity to qualify as an improvement.
-                      Default is 0.01.
+                      Default is 0.001.
         """
 
         self.patience = patience  # Number of epochs to wait for improvement
@@ -950,7 +962,7 @@ def main(tile_dir_train, target_csv_train,
         # printing model best parameters' summary
         print('\nModel default params:')
         print(default_params)
-        print(f'\nEpoch - {n_epochs}')
+        print(f"\nEpochs ran - {len(model_info['val_losses'])}")
         print(f"\nLast val loss - {model_info['val_losses'][-1]:.3f}")
 
         return trained_model, model_info
@@ -1039,3 +1051,67 @@ def plot_learning_curve(train_loss, val_loss, plot_save_path):
     plt.savefig(plot_save_path)
     plt.close()
     print(f'\nLoss plot saved...')
+
+
+def plot_shap_values(trained_model, tile_dir, target_csv, batch_size,
+                     plot_save_path, feature_names, data_type='test',
+                     skip_processing=False):
+    if not skip_processing:
+        # loading data
+        print('\n____________________________________________')
+        print(f'\nplotting SHAP feature importance...')
+        dataloader = DataLoaderCreator(tile_dir, target_csv,
+                                       batch_size=batch_size,
+                                       data_type=data_type).get_dataloader()
+
+        # setting model to evaluation mode
+        trained_model.eval()
+
+        # extracting a batch of data for SHAP computation
+        batch = next(iter(dataloader))
+        features, _, _ = batch
+        features = features.to(trained_model.device)
+
+        # using SHAP GradientExplainer designed for PyTorch/TensorFlow (DeepExplainer doesn't work for some reasons)
+        explainer = shap.GradientExplainer(trained_model, features)
+        shap_values = explainer.shap_values(features)
+
+        # converting to numpy
+        shap_values = np.array(shap_values)
+        shap_values = np.squeeze(shap_values)  # removing the extra dimensions of size 1
+
+        print(f'features shape: {features.shape}')
+        print(f'shape values shape: {shap_values.shape}')
+
+        # Computing the absolute mean SHAP values across spatial dimensions (height & width)
+        # Shape: (num of samples in subset/batch, num features)
+        mean_shap_values_per_feature = np.mean(np.abs(shap_values), axis=(2, 3))
+
+        # averaging across all samples of the subset/batch
+        mean_shap_values = np.mean(mean_shap_values_per_feature, axis=0)  # Shape: (num features,)
+
+        # sorting in descending order
+        sorted_indices = np.argsort(mean_shap_values)[::-1]
+        sorted_mean_shap_values = mean_shap_values[sorted_indices]
+        sorted_feature_names = [feature_names[i] for i in sorted_indices]
+
+        # plotting
+        plt.figure(figsize=(8, 5))
+        plt.barh(sorted_feature_names, sorted_mean_shap_values, color='crimson')
+
+        # # Add text labels for each bar
+        # for i, v in enumerate(mean_shap_values):
+        #     plt.text(v + 0.02, i, f'+{v:.2f}', color='crimson', fontweight='bold', va='center')
+
+        plt.xlabel('Mean absolute SHAP value')
+        plt.ylabel('Feature')
+        plt.gca().invert_yaxis()  # To have the most important feature on top
+        plt.savefig(plot_save_path, dpi=200, bbox_inches='tight')
+        plt.close()
+
+    else:
+        pass
+
+
+
+

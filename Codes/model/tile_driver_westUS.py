@@ -12,8 +12,7 @@ from os.path import dirname, abspath
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import assign_cpu_nodes
-from Codes.download_preprocess.preprocess import run_all_preprocessing
-from Codes.download_preprocess.tiles_utils import make_multiband_datasets, make_training_tiles, \
+from tiles_utils import make_multiband_datasets, make_training_tiles, \
         train_val_test_split, calc_scaling_statistics, standardize_train_val_test
 
 
@@ -46,22 +45,17 @@ if __name__ == '__main__':
                      '../../Data_main/rasters/vpd/WestUS_growing_season': 'vpd',
                      '../../Data_main/rasters/windVel/WestUS_growing_season': 'windVel',
                      '../../Data_main/rasters/sunHr/WestUS_growing_season': 'sunHr',
-                     '../../Data_main/rasters/GCVI/WestUS_yearly': 'gcvi',
-                     '../../Data_main/rasters/OSAVI/WestUS_yearly': 'osavi',
-                     '../../Data_main/rasters/NDVI/WestUS_yearly': 'ndvi',
-                     '../../Data_main/rasters/NDMI/WestUS_yearly': 'ndmi',
                      '../../Data_main/ref_rasters/stateID': 'stateID'}
 
-    static_vars_dir = [i for i in datasets_dict.keys() if i == 'stateID']
+    static_vars_dir = [i for i in datasets_dict.keys() if 'stateID' in i]
     temporal_vars_dir = [i for i in datasets_dict.keys() if i not in static_vars_dir]
 
     multiband_key_list = list(datasets_dict.values())  # 'pumping_mm' and 'stateID' included here
-
+    print(static_vars_dir)
     westUS_multiband_dir = '../../Data_main/rasters/multibands_westUS/training/westUS'
 
     training_years = (2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
-                      # 2012,   # 2012 skipped as no GCVI/NDVI/NDVI/NDMi data available due to gap in Landsat data; will think an alternative
-                      2013, 2014, 2015, 2016, 2017, 2018, 2019)
+                      2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019)
 
     # flags
     skip_create_multiband_raster = False  ###############################################################################
@@ -71,7 +65,8 @@ if __name__ == '__main__':
                             list_of_static_var_dirs=static_vars_dir,
                             band_key_list=multiband_key_list,
                             output_dir=westUS_multiband_dir,
-                            years_list=training_years, skip_processing=skip_create_multiband_raster)
+                            years_list=training_years,
+                            skip_processing=skip_create_multiband_raster)
 
 
     # ------------------------------------------------------------------------------------------------------------------

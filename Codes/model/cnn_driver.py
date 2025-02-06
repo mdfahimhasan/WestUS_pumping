@@ -12,7 +12,7 @@ from Codes.model.cnn import main, plot_learning_curve, test, unstandardize_save_
 
 if __name__ == '__main__':
     # model version
-    model_version = 'v4'                                                 #####
+    model_version = 'v5'                                                 #####
 
 
     # directories
@@ -57,7 +57,7 @@ if __name__ == '__main__':
 
 
     # Model switches
-    tune_params = False                   #################################################################
+    tune_params = True                   #################################################################
     n_trials_for_tuning = 200             #################################################################
     implement_earlyStopping = True       #################################################################
     plot_hyperparam_importance = True    #################################################################

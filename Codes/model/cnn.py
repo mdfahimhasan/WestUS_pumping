@@ -1058,7 +1058,7 @@ def plot_shap_values(trained_model, tile_dir, target_csv, batch_size,
                      skip_processing=False):
     if not skip_processing:
         # loading data
-        print('\n____________________________________________')
+        print('\n___________________________________________________________________________')
         print(f'\nplotting SHAP feature importance...')
         dataloader = DataLoaderCreator(tile_dir, target_csv,
                                        batch_size=batch_size,

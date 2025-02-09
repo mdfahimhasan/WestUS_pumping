@@ -1,6 +1,6 @@
 #!/bin/bash
 
-## running the cnn_driver.py script on CPU nodes
+## running the dr02_driver.py script on CPU nodes
 
 #SBATCH --partition=smi_all
 #SBATCH --ntasks=43
@@ -10,5 +10,5 @@
 #SBATCH --mail-type=BEGIN,END,FAIL,TIME_LIMIT
 #SBATCH --mail-user=Fahim.Hasan@colostate.edu
 
-python cnn_driver.py
+python dr02_driver.py
 

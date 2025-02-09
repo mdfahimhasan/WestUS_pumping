@@ -394,7 +394,14 @@ def calculate_metrics(predictions, targets):
     r2 = 1 - (np.sum((predictions - targets) ** 2) /
               np.sum((targets - np.mean(targets)) ** 2))
 
-    return {'RMSE': rmse, 'MAE': mae, 'R2': r2}
+    normalized_rmse = rmse / np.mean(targets)
+    normalized_mae = mae / np.mean(targets)
+
+    return {'RMSE': rmse,
+            'MAE': mae,
+            'R2': r2,
+            'Normalized RMSE': normalized_rmse,
+            'Normalized MAE': normalized_mae}
 
 
 def train(model, train_loader, optimizer, verbose=False):
@@ -450,8 +457,9 @@ def train(model, train_loader, optimizer, verbose=False):
 
     # calculating performance metrics
     predictions, actuals = np.array(predictions), np.array(actuals)
-    rmse = calculate_metrics(predictions, actuals)['RMSE']
-    r2 = calculate_metrics(predictions, actuals)['R2']
+    metrics_dict = calculate_metrics(predictions, actuals)
+    rmse = metrics_dict['RMSE']
+    r2 = metrics_dict['R2']
 
     return avg_loss, rmse, r2
 
@@ -505,8 +513,9 @@ def validate(model, val_loader, verbose=False):
 
     # calculating performance metrics
     predictions, actuals = np.array(predictions), np.array(actuals)
-    rmse = calculate_metrics(predictions, actuals)['RMSE']
-    r2 = calculate_metrics(predictions, actuals)['R2']
+    metrics_dict = calculate_metrics(predictions, actuals)
+    rmse = metrics_dict['RMSE']
+    r2 = metrics_dict['R2']
 
     return avg_loss, rmse, r2
 
@@ -1024,8 +1033,9 @@ def unstandardize_save_and_test(model, tile_dir, target_csv, mean_csv, std_csv,
         rmse = metrics_dict['RMSE']
         mae = metrics_dict['MAE']
         r2 = metrics_dict['R2']
+        nrmse = metrics_dict['Normalized RMSE']
 
-        print(f'Results -> RMSE: {rmse:.4f}, MAE: {mae:.4f}, R²: {r2:.4f}\n')
+        return rmse, mae, r2, nrmse
 
     else:
         pass

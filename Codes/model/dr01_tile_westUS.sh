@@ -1,6 +1,6 @@
 #!/bin/bash
 
-## running the tile_driver_westUS.py script on CPU nodes
+## running the dr01_tile_westUS.py script on CPU nodes
 
 #SBATCH --partition=smi_all
 #SBATCH --ntasks=30
@@ -10,5 +10,5 @@
 #SBATCH --mail-type=BEGIN,END,FAIL,TIME_LIMIT
 #SBATCH --mail-user=Fahim.Hasan@colostate.edu
 
-python tile_driver_westUS.py
+python dr01_tile_westUS.py
 

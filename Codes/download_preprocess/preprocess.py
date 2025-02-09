@@ -16,7 +16,8 @@ from os.path import dirname, abspath
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import makedirs
-from Codes.utils.raster_ops import read_raster_arr_object, clip_resample_reproject_raster, shapefile_to_raster
+from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster, \
+    clip_resample_reproject_raster, shapefile_to_raster
 
 no_data_value = -9999
 model_res = 0.01976293625031605786  # in deg, ~2 km
@@ -375,6 +376,98 @@ def create_stateID_raster(westUS_shp, output_dir, skip_processing=False):
         pass
 
 
+def create_HUC12_SW_irrigation_rasters(HUC12_SW_shape, output_dir, resolution=model_res,
+                                       ref_raster=WestUS_raster, skip_processing=False):
+    """
+    Rasterize USGS HUC12 level SW dataset. The created rasters has similar SW irrigation values for each pixel in
+    a HUC12. Units are in  MG (million gallon).
+
+    :param HUC12_SW_shape: Shapefile of HUC12 SW irrigation shapefile.
+    :param output_dir: Directory path to save outputs.
+    :param resolution: Resolution. Default set to model resolution.
+    :param ref_raster: Reference raster. Default set to Western US reference raster.
+    :param skip_processing: Set to True to skip processing.
+
+    :return: None.
+    """
+    if not skip_processing:
+        print('rasterizing HUC12 SW irrigation datasets...')
+
+        # making output directories
+        interim_outdir = os.path.join(output_dir, 'interim')
+        makedirs([output_dir, interim_outdir])
+
+        years = list(range(2000, 2020 + 1))  # years from 2000 to 2020
+
+        for year in years:
+
+            column_to_rasterize = str(year)
+
+            interim_raster = shapefile_to_raster(input_shape=HUC12_SW_shape, output_dir=interim_outdir,
+                                                 raster_name=f'HUC12_SW_{year}.tif',
+                                                 burnvalue=None, use_attr=True,
+                                                 attribute=column_to_rasterize,
+                                                 add=None, ref_raster=ref_raster,
+                                                 resolution=resolution, alltouched=False)
+
+            # the produced interim raster has no data values in a few HUCs
+            # setting them to 0 to create a continuous raster
+            ref_arr = read_raster_arr_object(ref_raster, get_file=False)
+
+            interim_sw_arr, file = read_raster_arr_object(interim_raster)
+            final_sw_arr = np.where(np.isnan(interim_sw_arr) & (ref_arr == 0), 0, interim_sw_arr)
+
+            output_raster = os.path.join(output_dir, f'HUC12_SW_{year}.tif')
+            write_array_to_raster(final_sw_arr, file, file.transform, output_raster)
+
+
+def create_GW_use_perc_rasters(HUC12_GW_perc_shape, output_dir, resolution=model_res,
+                               ref_raster=WestUS_raster, skip_processing=False):
+    """
+    Rasterize USGS HUC12 level GW use % (GW use % w.r.t. total water use) dataset.
+    The created rasters has similar GW use % values for each pixel in
+    a HUC12.
+
+    :param HUC12_GW_perc_shape: Shapefile of HUC12 GW use % shapefile.
+    :param output_dir: Directory path to save outputs.
+    :param resolution: Resolution. Default set to model resolution.
+    :param ref_raster: Reference raster. Default set to Western US reference raster.
+    :param skip_processing: Set to True to skip processing.
+
+    :return: None.
+    """
+    if not skip_processing:
+        print('rasterizing HUC12 GW % datasets...')
+
+        # making output directories
+        interim_outdir = os.path.join(output_dir, 'interim')
+        makedirs([output_dir, interim_outdir])
+
+        years = list(range(2000, 2020 + 1))  # years from 2000 to 2020
+
+        for year in years:
+
+            column_to_rasterize = f'{year}_gw_%'
+
+            interim_raster = shapefile_to_raster(input_shape=HUC12_GW_perc_shape,
+                                                 output_dir=interim_outdir,
+                                                 raster_name=f'HUC12_GW_perc_{year}.tif',
+                                                 burnvalue=None, use_attr=True,
+                                                 attribute=column_to_rasterize,
+                                                 add=None, ref_raster=ref_raster,
+                                                 resolution=resolution, alltouched=False)
+
+            # the produced interim raster has no data values in a few HUCs
+            # setting them to 0 to create a continuous raster
+            ref_arr = read_raster_arr_object(ref_raster, get_file=False)
+
+            interim_sw_arr, file = read_raster_arr_object(interim_raster)
+            final_sw_arr = np.where(np.isnan(interim_sw_arr) & (ref_arr == 0), 0, interim_sw_arr)
+
+            output_raster = os.path.join(output_dir, f'HUC12_GW_perc_{year}.tif')
+            write_array_to_raster(final_sw_arr, file, file.transform, output_raster)
+
+
 def run_all_preprocessing(skip_stateID_raster_creation=False,
                           skip_process_GrowSeason_data=False,
                           skip_ET_processing=False,
@@ -388,8 +481,9 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
                           skip_gridmet_windVel_processing=False,
                           skip_gridmet_shortRad_processing=False,
                           skip_gridmet_vpd_processing=False,
-                          skip_daymet_sunHr_processing=False
-                          ):
+                          skip_daymet_sunHr_processing=False,
+                          skip_HUC12_SW_processing=False,
+                          skip_HUC12_GW_perc_processing=False):
     """
     Run all preprocessing steps.
 
@@ -407,6 +501,8 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     :param skip_gridmet_shortRad_processing: Set to True to skip processing gridmet shortwave raditaion growing season data.
     :param skip_gridmet_vpd_processing: Set to True to skip processing gridmet vapor pressure deficit growing season data.
     :param skip_daymet_sunHr_processing: Set to True to skip processing daymet sun hour growing season data.
+    :param skip_HUC12_SW_processing: Set to True to skip create SW irrigation dataset.
+    :param skip_HUC12_GW_perc_processing: Set to True to skip create GW use % dataset.
 
     :return: None.
     """
@@ -520,3 +616,14 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
                                 monthly_input_dir='../../Data_main/rasters/sunHr/WestUS_monthly',
                                 gs_output_dir='../../Data_main/rasters/sunHr/WestUS_growing_season',
                                 mean_keyword='sunHr', skip_processing=skip_daymet_sunHr_processing)
+
+    # HUC12 SW rasterization
+    create_HUC12_SW_irrigation_rasters(HUC12_SW_shape='../../Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_with_Annual_SW.shp',
+                                       output_dir='../../Data_main/rasters/HUC12_SW',
+                                       resolution=model_res, ref_raster=WestUS_raster,
+                                       skip_processing=skip_HUC12_SW_processing)
+
+    # HUC12 GW use % rasterization
+    create_GW_use_perc_rasters(HUC12_GW_perc_shape='../../Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_with_GW_use_perc.shp',
+                               output_dir='../../Data_main/rasters/HUC12_GW_perc', resolution=model_res,
+                               ref_raster=WestUS_raster, skip_processing=skip_HUC12_GW_perc_processing)

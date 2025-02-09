@@ -108,6 +108,8 @@ if __name__ == '__main__':
     skip_gridmet_shortRad_processing = True     ########################################################################
     skip_gridmet_vpd_processing = True          ########################################################################
     skip_daymet_sunHR_processing = True         ########################################################################
+    skip_HUC12_SW_processing = True             ########################################################################
+    skip_HUC12_GW_perc_processing = True        ########################################################################
 
     run_all_preprocessing(skip_stateID_raster_creation=skip_stateID_raster_creation,
                           skip_process_GrowSeason_data=skip_process_GS_data,
@@ -122,5 +124,7 @@ if __name__ == '__main__':
                           skip_gridmet_windVel_processing=skip_gridmet_windVel_processing,
                           skip_gridmet_shortRad_processing=skip_gridmet_shortRad_processing,
                           skip_gridmet_vpd_processing=skip_gridmet_vpd_processing,
-                          skip_daymet_sunHr_processing=skip_daymet_sunHR_processing
+                          skip_daymet_sunHr_processing=skip_daymet_sunHR_processing,
+                          skip_HUC12_SW_processing=skip_HUC12_SW_processing,
+                          skip_HUC12_GW_perc_processing=skip_HUC12_GW_perc_processing
                           )

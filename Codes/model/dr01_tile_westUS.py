@@ -43,7 +43,6 @@ if __name__ == '__main__':
                      '../../Data_main/rasters/minRH/WestUS_growing_season': 'minRH',
                      '../../Data_main/rasters/shortRad/WestUS_growing_season': 'shortRad',
                      '../../Data_main/rasters/vpd/WestUS_growing_season': 'vpd',
-                     '../../Data_main/rasters/windVel/WestUS_growing_season': 'windVel',
                      '../../Data_main/rasters/sunHr/WestUS_growing_season': 'sunHr',
                      '../../Data_main/rasters/HUC12_SW': 'sw_huc12',
                      '../../Data_main/rasters/HUC12_GW_perc': 'gw_perc_huc12',

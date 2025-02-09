@@ -35,7 +35,7 @@ if __name__ == '__main__':
 
     # Default variables (from hyperparameter tuning process)
     batch_size = 128                                                    ##### batch size of DataLoader
-    n_features = 16                                                     ##### number of input channel in a tile
+    n_features = 15                                                     ##### number of input channel in a tile
     n_epochs = 90                                                       #####
     input_size = 7                                                      ##### height/width dim of a tile
     padding = 'same'                                                    #####
@@ -61,8 +61,8 @@ if __name__ == '__main__':
     n_trials_for_tuning = 200                           ################################################################
     implement_earlyStopping = True                     #################################################################
     plot_hyperparam_importance = True                  #################################################################
-    skip_unstandardizing_training = False               ################################################################
-    skip_unstandardizing_testing = True                ################################################################
+    skip_unstandardizing_training = True               ################################################################
+    skip_unstandardizing_testing = False                ################################################################
 
     # Running the model
     trained_model, model_info = main(tile_dir_train=tile_dir_train, target_csv_train=target_csv_train,
@@ -112,25 +112,30 @@ if __name__ == '__main__':
 
 
     print('Test performance:')
-    test_rmse, test_mae, test_r2, test_nrmse = unstandardize_save_and_test(trained_model,
-                                                                           tile_dir=tile_dir_test,
-                                                                           target_csv=target_csv_test,
-                                                                           batch_size=batch_size,
-                                                                           data_type='test',
-                                                                           mean_csv=mean_csv,
-                                                                           std_csv=std_csv,
-                                                                           output_csv=f'../../Model_run/DL_model/output_csv/testSet_results.csv',
-                                                                           skip_processing=skip_unstandardizing_testing)
+    test_rmse, test_mae, test_r2, test_nrmse = \
+        unstandardize_save_and_test(trained_model,
+                                    tile_dir=tile_dir_test,
+                                    target_csv=target_csv_test,
+                                    batch_size=batch_size,
+                                    data_type='test',
+                                    mean_csv=mean_csv,
+                                    std_csv=std_csv,
+                                    output_csv=f'../../Model_run/DL_model/output_csv/testSet_results.csv',
+                                    skip_processing=skip_unstandardizing_testing)
+
     print(f'Results -> RMSE: {test_rmse:.4f}, MAE: {test_mae:.4f}, NRMSE: {test_nrmse:.4f}, R²: {test_r2:.4f}\n')
 
     # Explainable AI plots (using SHAP)
-    skip_plot_SHAP_plot = False          ############################################################################
+    skip_plot_SHAP_plot = False          ################################################################################
 
     # current input variables' name in the model are as follows, replaces by representative names
     # ['netGWIrr', 'peff', 'ret', 'precip', 'tmax', 'ET', 'irr_crop_frac', 'irr_cropland',
     # 'maxRH', 'minRH', 'shortRad', 'vpd', 'windVel', 'sunHr', 'sw_huc12', 'gw_perc_huc12']
-    feature_names = ['Consumptive groundwater use', 'peff', 'ret', 'precip', 'tmax', 'ET', 'irr_crop_frac', 'irr_cropland',
-                     'maxRH', 'minRH', 'shortRad', 'vpd', 'windVel', 'sunHr', '', '']
+    feature_names = ['consumptive groundwater use', 'effective precipitation', 'reference ET', 'precipitation',
+                     'maximum temperature', 'ET', 'fraction of irrigated cropland', 'irrigated cropland',
+                     'maximum relative humidity', 'minimum relative humidity', 'downward shortwave radiation',
+                     'vapor pressure deficit', 'daylight duration', 'HUC12 surface water irrigation',
+                     'HUC12 groundwater use %']
 
 
     plot_shap_values(trained_model, tile_dir=tile_dir_train,

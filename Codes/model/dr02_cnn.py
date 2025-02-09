@@ -35,7 +35,7 @@ if __name__ == '__main__':
 
     # Default variables (from hyperparameter tuning process)
     batch_size = 128                                                    ##### batch size of DataLoader
-    n_features = 14                                                     ##### number of input channel in a tile
+    n_features = 16                                                     ##### number of input channel in a tile
     n_epochs = 90                                                       #####
     input_size = 7                                                      ##### height/width dim of a tile
     padding = 'same'                                                    #####
@@ -126,8 +126,11 @@ if __name__ == '__main__':
     # Explainable AI plots (using SHAP)
     skip_plot_SHAP_plot = False          ############################################################################
 
-    feature_names = ['netGWIrr', 'peff', 'ret', 'precip', 'tmax', 'ET', 'irr_crop_frac', 'irr_cropland',
-                     'maxRH', 'minRH', 'shortRad', 'vpd', 'windVel', 'sunHr']
+    # current input variables' name in the model are as follows, replaces by representative names
+    # ['netGWIrr', 'peff', 'ret', 'precip', 'tmax', 'ET', 'irr_crop_frac', 'irr_cropland',
+    # 'maxRH', 'minRH', 'shortRad', 'vpd', 'windVel', 'sunHr', 'sw_huc12', 'gw_perc_huc12']
+    feature_names = ['Consumptive groundwater use', 'peff', 'ret', 'precip', 'tmax', 'ET', 'irr_crop_frac', 'irr_cropland',
+                     'maxRH', 'minRH', 'shortRad', 'vpd', 'windVel', 'sunHr', '', '']
 
 
     plot_shap_values(trained_model, tile_dir=tile_dir_train,

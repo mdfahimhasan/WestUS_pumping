@@ -978,7 +978,25 @@ def main(tile_dir_train, target_csv_train,
 
 
 def unstandardize_save_and_test(model, tile_dir, target_csv, mean_csv, std_csv,
-                                output_csv, batch_size, data_type, skip_processing=False):
+                                output_csv, batch_size, data_type='test',
+                                skip_processing=False):
+    """
+    Unstandardizes the trained model's prediction, saves the results in a csv, and does performance testing on the
+    unstandardized data.
+
+    :param model: The trained model object.
+    :param tile_dir: Directory containing train/test/validation set input tiles.
+    :param target_csv: CSV file with train/test/validation set target values.
+    :param mean_csv: Filepath of csv with mean values of features and target data. Used in unstandardizing.
+    :param std_csv: Filepath of csv with standard deviation values of features and target data. Used in unstandardizing.
+    :param output_csv: Filepath of output csv that will hold the unstandardized results.
+    :param batch_size: Batch size used in the DataLoader.
+    :param data_type: Default set to 'test' as we generally apply model.eval() mode to do
+                      model performance testing on any data by regarding them as 'test' data.
+    :param skip_processing: Set to True to skip this step.
+
+    :return: None.
+    """
     if not skip_processing:
         # DataLoader
         DataLoader = DataLoaderCreator(tile_dir, target_csv,
@@ -1066,6 +1084,28 @@ def plot_learning_curve(train_loss, val_loss, plot_save_path):
 def plot_shap_values(trained_model, tile_dir, target_csv, batch_size,
                      plot_save_path, feature_names, data_type='test',
                      skip_processing=False):
+    """
+    Plot input variables importance plot based on SHAP values.
+
+    **Note**
+    The feature name list must be in the same order of input features (follow the dataset order of
+    dr01_tile_westUS.py file's datasets_dict()). The code will then automatically sort the
+    feature names based on their importance from SHAP values.
+
+    :param trained_model: Trained model object.
+    :param tile_dir: Directory containing train/test/validation set input tiles.
+    :param target_csv: CSV file with train/test/validation set target values.
+    :param batch_size: Batch size used in the DataLoader.
+    :param plot_save_path: Filepath to save the plot.
+    :param feature_names: List of representative feature names.
+                         They must be in the same order of input features (follow the dataset order of
+                         dr01_tile_westUS.py file's datasets_dict()). The code will then automatically sort the
+                         feature names based on their importance from SHAP values.
+    :param data_type: Either of 'train'/'test'/'validation'.
+    :param skip_processing: Set to True to skip making this plot.
+
+    :return: None.
+    """
     if not skip_processing:
         # loading data
         print('\n___________________________________________________________________________')
@@ -1098,7 +1138,7 @@ def plot_shap_values(trained_model, tile_dir, target_csv, batch_size,
         mean_shap_values_per_feature = np.mean(np.abs(shap_values), axis=(2, 3))
 
         # averaging across all samples of the subset/batch
-        mean_shap_values = np.mean(mean_shap_values_per_feature, axis=0)  # Shape: (num features,)
+        mean_shap_values = np.mean(mean_shap_values_per_feature, axis=0)  # Shape: (num features, )
 
         # sorting in descending order
         sorted_indices = np.argsort(mean_shap_values)[::-1]

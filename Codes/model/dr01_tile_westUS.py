@@ -16,13 +16,6 @@ from utils_tiles import make_multiband_datasets, make_training_tiles, \
         train_val_test_split, calc_scaling_statistics, standardize_train_val_test
 
 
-# The `if __name__ == "__main__":` guard is required when using Python's multiprocessing module
-# (used in make_training_tiles() class), especially on Windows and macOS. It ensures that the code inside this block
-# is only executed when the script is run directly. This prevents recursive imports and ensures that worker processes
-# are correctly spawned without re-running the entire script in each process.
-
-# Includes train_val_test split and standardization
-
 if __name__ == '__main__':
     # flags
     skip_create_multiband_raster = False    #############################################################################
@@ -59,7 +52,7 @@ if __name__ == '__main__':
     temporal_vars_dir = [i for i in datasets_dict.keys() if i not in static_vars_dir]
 
     multiband_key_list = list(datasets_dict.values())  # 'pumping_mm' and 'stateID' included here
-    print(static_vars_dir)
+
     westUS_multiband_dir = '../../Data_main/rasters/multibands_westUS/training/westUS'
 
     training_years = (2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,

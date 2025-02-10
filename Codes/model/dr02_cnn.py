@@ -34,7 +34,6 @@ if __name__ == '__main__':
     patience = 10                                                       ##### early stopping counter patient set to 10 epoch
     start_earlyStopping_at_epoch = 40                                   ##### early stopping will initialize after 40 epochs
 
-
     # default model architecture
     default_params = {
         'filters': [64, 64],                                            ##### convolutional layers
@@ -44,7 +43,6 @@ if __name__ == '__main__':
         'weight_decay': 6.86933341560855e-05,                           ##### weight decay
         'dropout': 0.5                                                  ##### dropout rate
     }
-
 
     # directories
     tile_dir_train = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/standardized/train'

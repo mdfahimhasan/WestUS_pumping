@@ -916,7 +916,7 @@ def main(tile_dir_train, target_csv_train,
         with open(model_info_save_path, 'wb') as f:
             pickle.dump(best_model_info, f)
 
-        torch.save(trained_model.state_dict(), model_save_path)
+        torch.save(trained_model, model_save_path)
         print(f'\nFinal model saved at {model_save_path}')
 
         # printing model best parameters' summary
@@ -965,7 +965,7 @@ def main(tile_dir_train, target_csv_train,
         with open(model_info_save_path, 'wb') as f:
             pickle.dump(model_info, f)
 
-        torch.save(trained_model.state_dict(), model_save_path)
+        torch.save(trained_model, model_save_path)
         print(f'\nModel saved at {model_save_path}')
 
         # printing model best parameters' summary

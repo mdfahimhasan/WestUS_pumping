@@ -13,7 +13,7 @@ import geopandas as gpd
 from rasterio.mask import mask
 from rasterio.merge import merge
 from rasterio.enums import Resampling
-from shapely.geometry import box, mapping
+from shapely.geometry import mapping
 
 from Codes.utils.system_ops import make_gdal_sys_call
 from Codes.utils.system_ops import makedirs
@@ -94,49 +94,143 @@ def write_array_to_raster(raster_arr, raster_file, transform, output_path, dtype
     return output_path
 
 
-def mask_raster_by_extent(input_raster, ref_file, output_dir, raster_name, invert=False, crop=True,
-                           nodata=no_data_value):
+def mask_raster_by_shape(input_raster, input_shape, output_dir,
+                         raster_name, band_names=None,
+                         nodata=no_data_value):
     """
     Crop/mask a raster with a given shapefile/raster's extent. Only use to crop to extent.
     Cannot perform cropping to exact shapefile.
 
     :param input_raster: Filepath of input raster.
-    :param ref_file: Filepath of raster or shape file to crop input_raster.
+    :param input_shape: Filepath of shape file to crop input_raster.
     :param output_dir: Filepath of output directory.
     :param raster_name: Masked raster name.
-    :param invert: If False (default) pixels outside shapes will be masked.
-                   If True, pixels inside shape will be masked.
-    :param crop: Whether to crop the raster to the extent of the shapes. Change to False if invert=True is used.
+    :param band_names: A list of band names (str) to set with the output raster. Default set to None.
+    :param nodata: No data value. Default set to -9999.
 
     :return: Filepath of cropped raster.
     """
+    makedirs([output_dir])
+
     # opening input raster
-    raster_arr, input_file = read_raster_arr_object(input_raster, change_dtype=False)
+    raster_file = rio.open(input_raster)
+    raster_arr = raster_file.read()
 
-    if '.shp' in ref_file:
-        ref_extent = gpd.read_file(ref_file)
-    else:
-        ref_raster = rio.open(ref_file)
-        minx, miny, maxx, maxy = ref_raster.bounds
-        ref_extent = gpd.GeoDataFrame({'geometry': box(minx, miny, maxx, maxy)}, index=[0],
-                                      crs=ref_raster.crs.to_string())
-
-    ref_extent = ref_extent.to_crs(crs=input_file.crs.data)
-    geoms = ref_extent['geometry'].values  # list of shapely geometries
-    geoms = [mapping(geoms[0])]   # geometry in json format
+    # opening input shapefile and taking it to a GeoJSON format
+    shp_extent = gpd.read_file(input_shape)
+    shp_extent = shp_extent.to_crs(crs=raster_file.crs)
+    geoms = [geom.__geo_interface__ for geom in shp_extent.geometry]  # GeoJSON format
 
     # masking
-    masked_arr, mask_transform = mask(dataset=input_file, shapes=geoms, filled=True, crop=crop, invert=invert,
-                                          all_touched=False)
-    masked_arr = masked_arr.squeeze()  # Remove axes of length 1 from the array
+    masked_arr, mask_transform = mask(dataset=raster_file, shapes=geoms, filled=True,
+                                      crop=True, invert=False, all_touched=False)
+    masked_arr = masked_arr.squeeze()  # Remove axes of length 1 from the array if any
 
     # naming output file
     makedirs([output_dir])
     output_raster = os.path.join(output_dir, raster_name)
 
     # saving output raster
-    write_array_to_raster(raster_arr=masked_arr, raster_file=input_file, transform=mask_transform,
-                          output_path=output_raster, nodata=nodata)
+    if band_names is not None:
+        with rio.open(
+                output_raster,
+                'w',
+                driver='GTiff',
+                height=masked_arr.shape[-2],  # using reverse indexing to handle multiband rasters
+                width=masked_arr.shape[-1],
+                dtype=raster_arr.dtype,
+                count=raster_file.count,
+                crs=raster_file.crs,
+                transform=mask_transform,
+                nodata=nodata
+        ) as dst:
+            dst.write(masked_arr)
+            dst.descriptions = tuple(band_names)
+
+    else:
+        with rio.open(
+                output_raster,
+                'w',
+                driver='GTiff',
+                height=masked_arr.shape[-2],  # using reverse indexing to handle multiband rasters
+                width=masked_arr.shape[-1],
+                dtype=raster_arr.dtype,
+                count=raster_file.count,
+                crs=raster_file.crs,
+                transform=raster_file.transform,
+                nodata=nodata
+        ) as dst:
+            dst.write(masked_arr)
+
+    return output_raster
+
+
+def set_nodata_inside_shapefile(input_raster, input_shape, output_dir,
+                                raster_name, band_names=None,
+                                nodata=no_data_value):
+    """
+    Set nodata to pixels of the raster outside the shapefile. uses rasterio.mask.mask()
+
+    :param input_raster: Filepath of input raster.
+    :param input_shape: Filepath of shape file to crop input_raster.
+    :param output_dir: Filepath of output directory.
+    :param raster_name: Masked raster name.
+    :param band_names: A list of band names (str) to set with the output raster. Default set to None.
+    :param nodata: No data value. Default set to -9999.
+
+    :return: Filepath of masked raster.
+    """
+    makedirs([output_dir])
+
+    # opening input raster
+    raster_file = rio.open(input_raster)
+    raster_arr = raster_file.read()
+
+    # opening input shapefile and taking it to a GeoJSON format
+    shp_extent = gpd.read_file(input_shape)
+    shp_extent = shp_extent.to_crs(crs=raster_file.crs)
+    geoms = [geom.__geo_interface__ for geom in shp_extent.geometry]   #GeoJSON format
+
+    # masking
+    masked_arr, mask_transform = mask(dataset=raster_file, shapes=geoms, filled=False,
+                                      crop=False, invert=True, all_touched=False)
+    masked_arr = masked_arr.squeeze()  # Remove axes of length 1 from the array if any
+
+    # naming output file
+    makedirs([output_dir])
+    output_raster = os.path.join(output_dir, raster_name)
+
+    # saving output raster
+    if band_names is not None:
+        with rio.open(
+                output_raster,
+                'w',
+                driver='GTiff',
+                height=masked_arr.shape[-2],          # using reverse indexing to handle multiband rasters
+                width=masked_arr.shape[-1],
+                dtype=raster_arr.dtype,
+                count=raster_file.count,
+                crs=raster_file.crs,
+                transform=mask_transform,
+                nodata=nodata
+        ) as dst:
+            dst.write(masked_arr)
+            dst.descriptions = tuple(band_names)
+
+    else:
+        with rio.open(
+                output_raster,
+                'w',
+                driver='GTiff',
+                height=masked_arr.shape[-2],          # using reverse indexing to handle multiband rasters
+                width=masked_arr.shape[-1],
+                dtype=raster_arr.dtype,
+                count=raster_file.count,
+                crs=raster_file.crs,
+                transform=raster_file.transform,
+                nodata=nodata
+        ) as dst:
+            dst.write(masked_arr)
 
     return output_raster
 
@@ -279,7 +373,7 @@ def clip_resample_reproject_raster(input_raster, input_shape, output_raster_dir,
     :param resample: Set to True to resample only. When True, clip and clip_and_resample should be False. Need to set
                      a resolution.
     :param clip_and_resample: Set to True to both clip and resample. When True, clip and resample should be False. Need
-                              to set a resolution. Set input_shape to None.
+                              to set a resolution. Set basin_shape to None.
     :param targetaligned: Set to False if pixels don't need to be aligned in case of clip_and_resample=True. Look into
                           the result when using this to be sure about expected outcome.
     :param resample_algorithm: Resample algorithm to use in resampling. Can take near/bilinear/average/mode/max/min/cubic etc.
@@ -335,7 +429,7 @@ def clip_resample_reproject_raster(input_raster, input_shape, output_raster_dir,
         if use_ref_width_height:
             # have to provide a reference raster
             # resolution can be set to None
-            # input_shape can be set to None
+            # basin_shape can be set to None
             ref_arr = read_raster_arr_object(ref_raster, get_file=False)
             height, width = ref_arr.shape
             processed_data = gdal.Warp(destNameOrDestDS=output_filepath, srcDSOrSrcDSTab=raster_file, dstSRS=crs,
@@ -344,7 +438,7 @@ def clip_resample_reproject_raster(input_raster, input_shape, output_raster_dir,
                                        outputType=output_datatype)
         else:
             # have to provide a resolution value in argument
-            # input_shape can be set to None
+            # basin_shape can be set to None
             processed_data = gdal.Warp(destNameOrDestDS=output_filepath, srcDSOrSrcDSTab=raster_file, dstSRS=crs,
                                        targetAlignedPixels=targetaligned, xRes=resolution, yRes=resolution,
                                        dstNodata=no_data_value, resampleAlg=resample_algorithm,
@@ -361,7 +455,7 @@ def clip_resample_reproject_raster(input_raster, input_shape, output_raster_dir,
                                        cutlineDSName=input_shape, cropToCutline=True, dstNodata=no_data_value,
                                        resampleAlg=resample_algorithm, outputType=output_datatype)
         else:
-            # argument must have input_shape and resolution value
+            # argument must have basin_shape and resolution value
             processed_data = gdal.Warp(destNameOrDestDS=output_filepath, srcDSOrSrcDSTab=raster_file, dstSRS=crs,
                                        targetAlignedPixels=targetaligned, xRes=resolution, yRes=resolution,
                                        cutlineDSName=input_shape, cropToCutline=True, dstNodata=no_data_value,

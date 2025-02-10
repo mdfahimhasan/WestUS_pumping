@@ -134,7 +134,7 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
     # current input variables' name in the model are as follows, replaces by representative names
     # ['netGWIrr', 'peff', 'ret', 'precip', 'tmax', 'ET', 'irr_crop_frac', 'irr_cropland',
-    # 'maxRH', 'minRH', 'shortRad', 'vpd', 'windVel', 'sunHr', 'sw_huc12', 'gw_perc_huc12']
+    # 'maxRH', 'minRH', 'shortRad', 'vpd', 'sunHr', 'sw_huc12', 'gw_perc_huc12']
     feature_names = ['consumptive groundwater use', 'effective precipitation', 'reference ET', 'precipitation',
                      'maximum temperature', 'ET', 'fraction of irrigated cropland', 'irrigated cropland',
                      'maximum relative humidity', 'minimum relative humidity', 'downward shortwave radiation',

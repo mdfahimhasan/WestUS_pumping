@@ -12,7 +12,7 @@ from os.path import dirname, abspath
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import assign_cpu_nodes
-from tiles_utils import make_multiband_datasets, make_training_tiles, \
+from utils_tiles import make_multiband_datasets, make_training_tiles, \
         train_val_test_split, calc_scaling_statistics, standardize_train_val_test
 
 

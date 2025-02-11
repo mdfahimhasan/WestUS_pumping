@@ -851,12 +851,9 @@ def standardize_train_val_test(input_tile_dir, mean_dict, std_dict, output_dir,
         with Pool(processes=num_workers) as pool:
             pool.starmap(standardize_single_tile, args)
 
-        # standardizing target values
-        if split_type not in ['train', 'val', 'test']:
-            raise ValueError(f"Invalid split_type '{split_type}'. Must be one of 'train'/'val'/'test'")
 
         # reading target data csv
-        target_df = pd.read_csv(os.path.join(input_tile_dir, f'y_{split_type}.csv'))
+        target_df = pd.read_csv(os.path.join(input_tile_dir, '*.csv'))
 
         # extracting mean and std values from respective dictionaries
         mean_val = mean_dict['target']

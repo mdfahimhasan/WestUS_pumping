@@ -853,7 +853,7 @@ def standardize_train_val_test(input_tile_dir, mean_dict, std_dict, output_dir,
 
 
         # reading target data csv
-        target_df = pd.read_csv(glob(os.path.join(input_tile_dir, '*.csv')))
+        target_df = pd.read_csv(glob(os.path.join(input_tile_dir, '*.csv'))[0])
 
         # extracting mean and std values from respective dictionaries
         mean_val = mean_dict['target']

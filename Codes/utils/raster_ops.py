@@ -196,7 +196,6 @@ def set_nodata_inside_shapefile(input_raster, input_shape, output_dir,
     # masking
     masked_arr, mask_transform = mask(dataset=raster_file, shapes=geoms, filled=False,
                                       crop=False, invert=True, all_touched=False)
-    masked_arr = masked_arr.squeeze()  # Remove axes of length 1 from the array if any
 
     # naming output file
     makedirs([output_dir])

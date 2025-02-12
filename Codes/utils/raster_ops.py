@@ -95,17 +95,20 @@ def write_array_to_raster(raster_arr, raster_file, transform, output_path, dtype
 
 
 def mask_raster_by_shape(input_raster, input_shape, output_dir,
-                         raster_name, band_names=None,
+                         raster_name, band_names=None, crop=True,
                          nodata=no_data_value):
     """
-    Crop/mask a raster with a given shapefile/raster's extent. Only use to crop to extent.
-    Cannot perform cropping to exact shapefile.
+    Crop/mask a raster with a given shapefile/raster's extent.
 
     :param input_raster: Filepath of input raster.
     :param input_shape: Filepath of shape file to crop input_raster.
     :param output_dir: Filepath of output directory.
     :param raster_name: Masked raster name.
     :param band_names: A list of band names (str) to set with the output raster. Default set to None.
+    :param crop: Set to False to set no data in pixels outside shape. Only the pixels inside will have values
+                 and the row and column size will be the same as input raster.
+                 Default set to True. The pixels outside the shape will be discarded totally and row and column values
+                 will change.
     :param nodata: No data value. Default set to -9999.
 
     :return: Filepath of cropped raster.
@@ -123,8 +126,8 @@ def mask_raster_by_shape(input_raster, input_shape, output_dir,
 
     # masking
     masked_arr, mask_transform = mask(dataset=raster_file, shapes=geoms, filled=True,
-                                      crop=True, invert=False, all_touched=False)
-    print(masked_arr.shape)
+                                      crop=crop, invert=False, all_touched=False)
+
     # naming output file
     makedirs([output_dir])
     output_raster = os.path.join(output_dir, raster_name)

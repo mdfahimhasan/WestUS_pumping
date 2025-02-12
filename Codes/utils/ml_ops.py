@@ -55,7 +55,7 @@ def apply_OneHotEncoding(input_df):
 
 def create_train_test_dataframe(years_list, yearly_data_path_dict,
                                 static_data_path_dict, datasets_to_include, output_parquet,
-                                apply_outlier_removal= True, n_partitions=20, skip_processing=False):
+                                n_partitions=20, skip_processing=False):
     """
     Compile yearly/static datasets into a dataframe. This function-generated dataframe will be used as
     train-test data for ML model at annual scale.
@@ -70,14 +70,13 @@ def create_train_test_dataframe(years_list, yearly_data_path_dict,
     :param datasets_to_include: A list of datasets to include in the dataframe.
     :param output_parquet: Output filepath of the parquet file to save. Using parquet as it requires lesser memory.
                             Can also save smaller dataframe as csv file if name has '.csv' extension.
-    :param apply_outlier_removal: Set to False if don't want to apply outlier removal for pumping (target variable).
     :param n_partitions: Number of partitions to save the parquet file in using dask dataframe.
     :param skip_processing: Set to True to skip this dataframe creation process.
 
     :return: The filepath of the output parquet file.
     """
     if not skip_processing:
-        print('creating train-test dataframe for annual model...')
+        print('\ncreating train-test dataframe for annual model...')
 
         output_dir = os.path.dirname(output_parquet)
         makedirs([output_dir])
@@ -115,10 +114,6 @@ def create_train_test_dataframe(years_list, yearly_data_path_dict,
         train_test_ddf = ddf.from_dict(variable_dict, npartitions=n_partitions)
         train_test_ddf = train_test_ddf.dropna()
 
-        if apply_outlier_removal:  # based on Ott and Majumdar et al. (2024) outlier removal for pumping data
-            train_test_ddf = train_test_ddf[(train_test_ddf['pumping_mm']/train_test_ddf['irr_cropET'] > 0.7) &
-                                            (train_test_ddf['pumping_mm']/train_test_ddf['irr_cropET'] < 1.5)]
-
         if '.parquet' in output_parquet:
             train_test_ddf.to_parquet(output_parquet, write_index=False)
 
@@ -132,8 +127,8 @@ def create_train_test_dataframe(years_list, yearly_data_path_dict,
         return output_parquet
 
 
-def split_train_val_test_set(input_csv, pred_attr, exclude_columns, output_dir, model_version,
-                             test_perc=0.3, validation_perc=0,
+def split_train_val_test_set(input_csv, pred_attr, exclude_columns, output_dir,
+                             model_version, test_perc=0.3, validation_perc=0,
                              random_state=0, verbose=True, n_bins=6,
                              skip_processing=False):
     """
@@ -158,7 +153,7 @@ def split_train_val_test_set(input_csv, pred_attr, exclude_columns, output_dir, 
     global x_val, y_val, x
 
     if not skip_processing:
-        print('Splitting train-test dataframe into train and test dataset...')
+        print('\nSplitting train-test dataframe into train and test dataset...')
 
         input_df = pd.read_parquet(input_csv)
 

@@ -468,6 +468,62 @@ def create_GW_use_perc_rasters(HUC12_GW_perc_shape, output_dir, resolution=model
             write_array_to_raster(final_sw_arr, file, file.transform, output_raster)
 
 
+def process_and_OneHotEncode_Koppen_Geiger(koppen_geiger_raster, output_dir, skip_processing=False):
+    """
+    Process (clip + resample + reclassify + OneHotEncode) Kopen-Heiger climate data.
+
+    :param koppen_geiger_raster: Filepath of raw Koppen-Heiger raster data.
+    :param output_dir: Filepath of output dir.
+    :param skip_processing: Set to True to skip this process.
+
+    :return: None.
+    """
+    if not skip_processing:
+        print('processing Koppen-Heiger climate data...')
+
+        westUS_climate = \
+            clip_resample_reproject_raster(input_raster=koppen_geiger_raster,
+                                           input_shape=WestUS_shape,
+                                           raster_name='Koppen_Heiger_westUS.tif',
+                                           output_raster_dir=output_dir,
+                                           clip=False, resample=False, clip_and_resample=True,
+                                           targetaligned=True, resample_algorithm='near',
+                                           use_ref_width_height=False, ref_raster=None,
+                                           resolution=model_res)
+
+        # One Hot Encoding
+        climate_arr, raster_file = read_raster_arr_object(westUS_climate)
+
+        # Unique climate classes
+        climate_classes = np.unique(climate_arr).tolist()
+
+        # classification map
+        classification_map = {'arid': [4, 5, 6],
+                              'temperate_dry_summer': [7, 8, 9, 10],
+                              'temperate_no_dry_summer': [14, 15, 16, 21, 25],
+                              'cold': [17, 18, 19, 22, 26, 27]}
+
+        # reclassifying categories and saving them as a new array (single)
+        reclassified_arr = np.full_like(climate_arr, -9999)  # Default to -9999 (or NoData)
+        reclassified_arr = np.where(np.isin(climate_arr, classification_map['arid']), 1, reclassified_arr)
+        reclassified_arr = np.where(np.isin(climate_arr, classification_map['temperate_dry_summer']), 2, reclassified_arr)
+        reclassified_arr = np.where(np.isin(climate_arr, classification_map['temperate_no_dry_summer']), 3, reclassified_arr)
+        reclassified_arr = np.where(np.isin(climate_arr, classification_map['cold']), 4, reclassified_arr)
+
+        output_reclassified_raster = os.path.join(output_dir, 'Koppen_Heiger_westUS_classified.tif')
+        write_array_to_raster(reclassified_arr, raster_file, raster_file.transform, output_reclassified_raster,
+                              dtype='float32')
+
+        # reclassifying categories and saving them separately for each category
+        for category, values in classification_map.items():
+            perCategory_arr = np.where(np.isin(climate_arr, values), 1, -9999)
+
+            output_perCategory_raster = os.path.join(output_dir, f'{category}.tif')
+            write_array_to_raster(perCategory_arr, raster_file, raster_file.transform, output_perCategory_raster,
+                                  dtype='float32')
+    else:
+        pass
+
 def run_all_preprocessing(skip_stateID_raster_creation=False,
                           skip_process_GrowSeason_data=False,
                           skip_ET_processing=False,
@@ -483,7 +539,8 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
                           skip_gridmet_vpd_processing=False,
                           skip_daymet_sunHr_processing=False,
                           skip_HUC12_SW_processing=False,
-                          skip_HUC12_GW_perc_processing=False):
+                          skip_HUC12_GW_perc_processing=False,
+                          skip_koppen_geiger_processing=False):
     """
     Run all preprocessing steps.
 
@@ -503,6 +560,7 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     :param skip_daymet_sunHr_processing: Set to True to skip processing daymet sun hour growing season data.
     :param skip_HUC12_SW_processing: Set to True to skip create SW irrigation dataset.
     :param skip_HUC12_GW_perc_processing: Set to True to skip create GW use % dataset.
+    :param skip_koppen_geiger_processing: Set to False to skip Koppen Geigar climate data processing and One-Hot-Encoding.
 
     :return: None.
     """
@@ -627,3 +685,9 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     create_GW_use_perc_rasters(HUC12_GW_perc_shape='../../Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_with_GW_use_perc.shp',
                                output_dir='../../Data_main/rasters/HUC12_GW_perc', resolution=model_res,
                                ref_raster=WestUS_raster, skip_processing=skip_HUC12_GW_perc_processing)
+
+
+    # Koppen_Geiger climate data processing
+    process_and_OneHotEncode_Koppen_Geiger(koppen_geiger_raster='../../Data_main/rasters/Koppen_geiger/1991_2020/koppen_geiger_0p00833333.tif',
+                                           output_dir='../../Data_main/rasters/Koppen_geiger',
+                                           skip_processing=skip_koppen_geiger_processing)

@@ -13,7 +13,6 @@ import geopandas as gpd
 from rasterio.mask import mask
 from rasterio.merge import merge
 from rasterio.enums import Resampling
-from shapely.geometry import mapping
 
 from Codes.utils.system_ops import make_gdal_sys_call
 from Codes.utils.system_ops import makedirs

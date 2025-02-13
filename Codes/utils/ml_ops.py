@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 from lightgbm import LGBMRegressor
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.inspection import permutation_importance
-from sklearn.metrics import make_scorer, mean_squared_error
+from sklearn.metrics import make_scorer, root_mean_squared_error
 from sklearn.inspection import PartialDependenceDisplay as PDisp
 from sklearn.model_selection import train_test_split, cross_val_score
 
@@ -24,8 +24,9 @@ from os.path import dirname, abspath
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import makedirs
-from Codes.utils.stats_ops import calculate_rmse, calculate_r2
 from Codes.utils.raster_ops import read_raster_arr_object
+from Codes.utils.stats_ops import calculate_rmse, calculate_r2, calculate_mae
+
 
 no_data_value = -9999
 model_res = 0.02000000000000000389  # in deg, 2 km
@@ -50,7 +51,6 @@ def apply_OneHotEncoding(input_df):
     one_hot = OneHotEncoder()
     input_df_enc = one_hot.fit_transform(input_df)
     return input_df_enc
-
 
 
 def create_train_test_dataframe(years_list, yearly_data_path_dict,
@@ -235,6 +235,7 @@ def split_train_val_test_set(input_csv, pred_attr, exclude_columns, output_dir,
 
 
 def train_model(x_train, y_train, params_dict,
+                categorical_columns=None,
                 load_model=False, save_model=False,
                 save_folder=None, model_save_name=None):
     """
@@ -263,6 +264,7 @@ def train_model(x_train, y_train, params_dict,
                                   'num_leaves': 70,
                                   'path_smooth': 0.2,
                                   'subsample': 0.7}
+    :param categorical_columns: List of categorical column names to convert to 'category' dtype. Default set to None.
     :param load_model : Set to True if want to load saved model. Default set to False.
     :param save_model : Set to True if want to save model. Default set to False.
     :param save_folder : Filepath of folder to save model. Default set to None for save_model=False..
@@ -276,12 +278,21 @@ def train_model(x_train, y_train, params_dict,
         print(f'Training model...')
         start_time = timeit.default_timer()
 
+        # provision to include categorical data
+        if categorical_columns is not None:
+            for col in categorical_columns:
+                x_train[col] = x_train[col].astype('category')
+
         # Configuring the regressor with the parameters
         reg_model = LGBMRegressor(tree_learner='serial', random_state=0,
                                   deterministic=True, force_row_wise=True,
                                   n_jobs=-1, **params_dict)
 
-        trained_model = reg_model.fit(x_train, y_train)
+        if categorical_columns is not None:
+            trained_model = reg_model.fit(x_train, y_train)
+        else:
+            trained_model = reg_model.fit(x_train, y_train, categorical_feature=categorical_columns)
+
         y_pred = trained_model.predict(x_train)
 
         print('Train RMSE = {:.3f}'.format(calculate_rmse(Y_pred=y_pred, Y_obsv=y_train)))
@@ -317,8 +328,43 @@ def train_model(x_train, y_train, params_dict,
     return trained_model
 
 
+def test_model(trained_model, x_test, y_test, prediction_csv_path, categorical_columns=None):
+    """
+    Test a trained LightGBM regressor model's performance.
+
+    :param trained_model: trained lightgbm model.
+    :param x_test, y_test: x_test (predictor) and y_test (target) arrays from split_train_test_ratio() function.
+    :param prediction_csv_path: Csv filepath to save the prediction.
+    :param categorical_columns: List of categorical column names to convert to 'category' dtype. Default set to None.
+
+    :return: trained LGBM regression model.
+    """
+    makedirs([os.path.basename(prediction_csv_path)])
+
+    # provision to include categorical data
+    if categorical_columns is not None:
+        for col in categorical_columns:
+            x_test[col] = x_test[col].astype('category')
+
+    # testing model performonce
+    y_pred_test = trained_model.predict(x_test)
+    test_rmse = calculate_rmse(Y_pred=y_pred_test, Y_obsv=y_test)
+    test_r2 = calculate_r2(Y_pred=y_pred_test, Y_obsv=y_test)
+    test_mae = calculate_mae(Y_pred=y_pred_test, Y_obsv=y_test)
+
+    print(f'\nRMSE = {test_rmse:.4f}')
+    print(f'MAE = {test_mae:.4f}')
+    print(f'R2 = {test_r2:.4f}')
+
+    # saving test prediction
+    test_obsv_predict_df = pd.DataFrame({'observed': y_test.values.ravel(),
+                                         'predicted': y_pred_test})
+    test_obsv_predict_df.to_csv(prediction_csv_path, index=False)
+
+
 def cross_val_performance(trained_model_path,
                           x_train_df, y_train_df, k_fold=10,
+                          categorical_columns=None,
                           verbose=True, skip_processing=False):
     """
     Performs k-fold cross-validation on a pre-trained model to evaluate its performance using R2 and RMSE metrics.
@@ -327,6 +373,7 @@ def cross_val_performance(trained_model_path,
     :param x_train_df: The predictor variables (features) dataframe for training the model. Comes from train set.
     :param y_train_df: The target variable dataframe corresponding to the predictors. Comes from train set.
     :param k_fold: Number of folds for k-fold cross-validation. Default is 10.
+    :param categorical_columns: List of categorical column names to convert to 'category' dtype. Default set to None.
     :param verbose: If True, prints detailed R2 and RMSE scores for each fold and their means.
                           If False, prints only the mean R2 and RMSE scores. Default is True.
     :param skip_processing: If True, skips cross-validation.
@@ -335,6 +382,11 @@ def cross_val_performance(trained_model_path,
 
     """
     if not skip_processing:
+        # provision to include categorical data
+        if categorical_columns is not None:
+            for col in categorical_columns:
+                x_train_df[col] = x_train_df[col].astype('category')
+
         # loading trained model
         trained_model = joblib.load(trained_model_path)
 
@@ -343,7 +395,7 @@ def cross_val_performance(trained_model_path,
                                     cv=k_fold, scoring='r2')
 
         # performing k-fold cross-validation on the dataset (score rmse)
-        rmse_scorer = make_scorer(mean_squared_error, greater_is_better=False, squared=False)
+        rmse_scorer = make_scorer(root_mean_squared_error, greater_is_better=False)
         rmse_scores = cross_val_score(trained_model, x_train_df, y_train_df,
                                       cv=k_fold, scoring=rmse_scorer)
         rmse_scores = [-(i) for i in rmse_scores]  # making the rmse values positive

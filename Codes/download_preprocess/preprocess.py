@@ -510,7 +510,7 @@ def process_and_OneHotEncode_Koppen_Geiger(koppen_geiger_raster, output_dir, ski
         reclassified_arr = np.where(np.isin(climate_arr, classification_map['temperate_no_dry_summer']), 3, reclassified_arr)
         reclassified_arr = np.where(np.isin(climate_arr, classification_map['cold']), 4, reclassified_arr)
 
-        output_reclassified_raster = os.path.join(output_dir, 'Koppen_Heiger_westUS_classified.tif')
+        output_reclassified_raster = os.path.join(output_dir, 'reclassified', 'Koppen_Heiger_westUS_classified.tif')
         write_array_to_raster(reclassified_arr, raster_file, raster_file.transform, output_reclassified_raster,
                               dtype='float32')
 
@@ -518,7 +518,7 @@ def process_and_OneHotEncode_Koppen_Geiger(koppen_geiger_raster, output_dir, ski
         for category, values in classification_map.items():
             perCategory_arr = np.where(np.isin(climate_arr, values), 1, -9999)
 
-            output_perCategory_raster = os.path.join(output_dir, f'{category}.tif')
+            output_perCategory_raster = os.path.join(output_dir, 'OneHotEncoded', f'{category}.tif')
             write_array_to_raster(perCategory_arr, raster_file, raster_file.transform, output_perCategory_raster,
                                   dtype='float32')
     else:

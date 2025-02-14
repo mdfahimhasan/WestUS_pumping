@@ -5,6 +5,7 @@
 
 import os
 import sys
+import csv
 import joblib
 import timeit
 import numpy as np
@@ -12,9 +13,13 @@ import pandas as pd
 from glob import glob
 import dask.dataframe as ddf
 import matplotlib.pyplot as plt
+from timeit import default_timer as timer
 
+import skexplain
+import lightgbm as lgb
 from lightgbm import LGBMRegressor
 from sklearn.preprocessing import OneHotEncoder
+from hyperopt import hp, tpe, Trials, fmin, STATUS_OK
 from sklearn.inspection import permutation_importance
 from sklearn.metrics import make_scorer, root_mean_squared_error
 from sklearn.inspection import PartialDependenceDisplay as PDisp
@@ -129,7 +134,7 @@ def create_train_test_dataframe(years_list, yearly_data_path_dict,
 
 def split_train_val_test_set(input_csv, pred_attr, exclude_columns, output_dir,
                              model_version, test_perc=0.3, validation_perc=0,
-                             random_state=0, verbose=True, n_bins=6,
+                             random_state=0, verbose=True, stratify=True,
                              skip_processing=False):
     """
     Split dataset into train, validation, and test data based on a train/test/validation ratio.
@@ -145,20 +150,25 @@ def split_train_val_test_set(input_csv, pred_attr, exclude_columns, output_dir,
     :param random_state : Seed value. Defaults to 0.
     :param verbose : Set to True if want to print which columns are being dropped and which will be included
                      in the model.
-    :param n_bins: Number of quartile-based bins to use it target variable stratifying. Default set to 6.
+    :param stratify: Set to True if want to stratify data based on 'stateID'.
     :param skip_processing: Set to True if want to skip merging IrrMapper and LANID extent data patches.
 
     returns: X_train, X_val, X_test, y_train, y_val, y_test arrays.
     """
-    global x_val, y_val, x
 
     if not skip_processing:
         print('\nSplitting train-test dataframe into train and test dataset...')
 
+        # reading data
         input_df = pd.read_parquet(input_csv)
 
-        # dropping columns that has been specified to not include
+        # stratification column extraction
+        if stratify:   # based on StateID
+            stratify_col = input_df['stateID']
+        else:
+            stratify_col = None
 
+        # dropping columns that has been specified to not include
         if exclude_columns is not None:
             drop_columns = exclude_columns + [pred_attr]
             x = input_df.drop(columns=drop_columns)
@@ -176,16 +186,14 @@ def split_train_val_test_set(input_csv, pred_attr, exclude_columns, output_dir,
             print('Dropping Columns-', exclude_columns, '\n')
             print('Predictors:', x.columns)
 
-        # binning the target variable based on quartile-based bins
-        # useful to stratify the pumping data to ensure proper train-test split
-        y_binned = pd.qcut(y, q=n_bins, labels=False)
-
         # train-test splitting
         x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=test_perc, random_state=random_state,
-                                                            shuffle=True, stratify=y_binned)
+                                                            shuffle=True, stratify=stratify_col)
         if validation_perc > 0:
+            stratify_val = stratify_col.loc[x_train.index] if stratify else None
             x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size=validation_perc,
-                                                              random_state=random_state, shuffle=True)
+                                                              random_state=random_state, shuffle=True,
+                                                              stratify=stratify_val)
 
         # creating dataframe and saving train/test/validation datasets as csv
         makedirs([output_dir])
@@ -234,10 +242,185 @@ def split_train_val_test_set(input_csv, pred_attr, exclude_columns, output_dir,
             return x_train, x_val, x_test, y_train, y_val, y_test
 
 
+def objective_func_bayes(params, train_set, iteration_csv, n_fold):
+    """
+    Objective function for Bayesian optimization using Hyperopt and LightGBM.
+
+    **** Bayesian optimization doesn't directly optimize the objective function. Instead, it builds a probabilistic
+    model (a surrogate) to predict promising regions. In our case its the TPE in bayes_hyperparam_opt() function.
+
+    :param params: Hyperparameter space to use while optimizing.
+    :param train_set: A LGBM dataset. Constructed within the bayes_hyperparam_opt() func using x_train and y_train.
+    :param iteration_csv: Filepath of a csv where hyperparameter iteration step will be stored.
+    :param n_fold: KFold cross validation number. Usually 5 or 10.
+
+    :return : A dictionary after each iteration holding rmse, params, run_time, etc.
+    """
+    global ITERATION
+    ITERATION += 1
+
+    start = timer()
+
+    # converting the train_set (dataframe) to LightGBM Dataset
+    train_set = lgb.Dataset(train_set.iloc[:, :-1], label=train_set.iloc[:, -1])
+
+    # retrieve the boosting type and subsample (if not present set subsample to 1)
+    subsample = params['boosting_type'].get('subsample', 1)
+    params['subsample'] = subsample
+    params['boosting_type'] = params['boosting_type']['boosting_type']
+
+    # inserting a new parameter in the dictionary to handle 'goss'
+    # the new version of LIGHTGBM handles 'goss' as 'boosting_type' = 'gdbt' & 'data_sample_strategy' = 'goss'
+    if params['boosting_type'] == 'goss':
+        params['boosting_type'] = 'gbdt'
+        params['data_sample_strategy'] = 'goss'
+
+    # ensure integer type for integer hyperparameters
+    for parameter_name in ['n_estimators', 'num_leaves', 'min_child_samples', 'max_depth']:
+        params[parameter_name] = int(params[parameter_name])
+
+    # callbacks
+    callbacks = [
+        # lgb.early_stopping(stopping_rounds=50),
+        lgb.log_evaluation(period=0)
+    ]
+
+    # perform n_fold cross validation
+    # ** not using num_boost_round and early stopping as we are providing n_estimators in the param_space **
+    cv_results = lgb.cv(params, train_set,
+                        # num_boost_round=10000,
+                        nfold=n_fold,
+                        stratified=False, metrics='rmse', seed=50,
+                        callbacks=callbacks)
+
+    run_time = timer() - start
+
+    # best score extraction
+    # the try-except block was inserted because of two versions of LIGHTGBM is desktop and server. The server
+    # version used keyword 'valid rmse-mean' while the desktop version was using 'rmse-mean'
+    try:
+        best_rmse = np.min(cv_results['valid rmse-mean'])  # valid rmse-mean stands for mean RMSE value across all the folds for each boosting round
+
+    except:
+        best_rmse = np.min(cv_results['rmse-mean'])
+
+    # result of each iteration will be store in the iteration_csv
+    makedirs([os.path.dirname(iteration_csv)])
+
+    if ITERATION == 1:
+        write_to = open(iteration_csv, 'w')
+        writer = csv.writer(write_to)
+        writer.writerows([['loss', 'params', 'iteration', 'run_time'],
+                          [best_rmse, params, ITERATION, run_time]])
+        write_to.close()
+
+    else:  # when ITERATION > 0, will append result on the existing csv/file
+        write_to = open(iteration_csv, 'a')
+        writer = csv.writer(write_to)
+        writer.writerow([best_rmse, params, ITERATION, run_time])
+
+    # dictionary with information for evaluation
+    return {'loss': best_rmse, 'params': params,
+            'iteration': ITERATION, 'train_time': run_time, 'status': STATUS_OK}
+
+
+def bayes_hyperparam_opt(x_train, y_train, iteration_csv, n_fold=10, max_evals=1000, skip_processing=False):
+    """
+    Hyperparameter optimization using Bayesian optimization method.
+
+    *****
+    good resources for building LGBM model
+
+    https://lightgbm.readthedocs.io/en/latest/pythonapi/lightgbm.LGBMRegressor.html
+    https://lightgbm.readthedocs.io/en/latest/Parameters.html
+    https://neptune.ai/blog/lightgbm-parameters-guide
+
+    Bayesian Hyperparameter Optimization:
+    details at:https://www.geeksforgeeks.org/bayesian-optimization-in-machine-learning/
+
+    coding help from:
+    1. https://github.com/WillKoehrsen/hyperparameter-optimization/blob/master/Bayesian%20Hyperparameter%20Optimization%20of%20Gradient%20Boosting%20Machine.ipynb
+    2. https://www.kaggle.com/code/prashant111/bayesian-optimization-using-hyperopt
+    *****
+
+    :param x_train, y_train : Predictor and target arrays from split_train_test_ratio() function.
+    :param iteration_csv: Filepath of a csv where hyperparameter iteration step will be stored.
+    :param n_fold : Number of folds in K Fold CV. Default set to 10.
+    :param max_evals : Maximum number of evaluations during hyperparameter optimization. Default set to 1000.
+    :param skip_processing: Set to True to skip hyperparameter tuning. Default set to False.
+
+    :return : Best hyperparameters' dictionary.
+    """
+    if not skip_processing:
+        print(f'performing bayesian hyperparameter optimization...')
+
+        # merging x_train and y_train into a single dataset
+        train_set = pd.concat([x_train, y_train], axis=1)
+
+        # creating hyperparameter space for LGBM models
+        param_space = {'boosting_type': hp.choice('boosting_type',
+                                                  [{'boosting_type': 'gbdt',
+                                                    'subsample': hp.uniform('gbdt_subsample', 0.5, 0.8)},
+                                                   {'boosting_type': 'dart',
+                                                    'subsample': hp.uniform('dart_subsample', 0.5, 0.8)},
+                                                   {'boosting_type': 'goss', 'subsample': 1.0}]),
+                       'n_estimators': hp.quniform('n_estimators', 100, 400, 25),
+                       'max_depth': hp.uniform('max_depth', 5, 15),
+                       'learning_rate': hp.loguniform('learning_rate', np.log(0.01), np.log(0.1)),
+                       'colsample_bytree': hp.uniform('colsample_bytree', 0.6, 1.0),
+                       'colsample_bynode': hp.uniform('colsample_bynode', 0.6, 1.0),
+                       'path_smooth': hp.uniform('path_smooth', 0.1, 0.5),
+                       'num_leaves': hp.quniform('num_leaves', 30, 70, 5),
+                       'min_child_samples': hp.quniform('min_child_samples', 20, 50, 5)}
+
+        # optimization algorithm
+        tpe_algorithm = tpe.suggest  # stand for Tree-structured Parzen Estimator. A surrogate (probabilistic) model
+                                     # of the objective function, which predicts which hyperparameters are promising
+                                     # instead of directly testing every hyperparameter. The hyperparameter tuning
+                                     # approach, Sequential model-based optimization (SMBO), will try to closely match the
+                                     # surrogate function to the objective function
+
+        # keeping track of results
+        bayes_trials = Trials()  # The Trials object will hold everything returned from the objective function in the
+                                 # .results attribute. It also holds other information from the search, but we return
+                                 # everything we need from the objective.
+
+        # creating a wrapper function to bring all arguments of objective_func_bayes() under a single argument
+        def objective_wrapper(params):
+            return objective_func_bayes(params, train_set, iteration_csv, n_fold)
+
+        # implementation of Sequential model-based optimization (SMBO)
+        global ITERATION
+        ITERATION = 0
+
+        # run optimization
+        # hyperopt fmin inherently has a acquisition function that decides where to sample next.
+        # It balances exploitation (testing regions known to be good) vs. exploration (trying new regions).
+        fmin(fn=objective_wrapper, space=param_space, algo=tpe_algorithm,
+             max_evals=max_evals, trials=bayes_trials, rstate=np.random.default_rng(50))
+
+        # sorting the trials to get the set of hyperparams with lowest loss
+        bayes_trials_results = sorted(bayes_trials.results[1:],
+                                      key=lambda x: x['loss'],
+                                      reverse=False)  # the indexing in the results is done to remove {'status': 'new'} at 0 index
+        best_hyperparams = bayes_trials_results[0]['params']
+
+        print('\n')
+        print('best hyperparameter set', '\n', best_hyperparams, '\n')
+        print('best RMSE:', bayes_trials.results[1]['loss'])
+
+        return best_hyperparams
+
+    else:
+        pass
+
+
 def train_model(x_train, y_train, params_dict,
                 categorical_columns=None,
                 load_model=False, save_model=False,
-                save_folder=None, model_save_name=None):
+                save_folder=None, model_save_name=None,
+                skip_tune_hyperparameters=False,
+                iteration_csv=None, n_fold=10, max_evals=1000):
     """
     Train a LightGBM regressor model with given hyperparameters.
 
@@ -269,6 +452,10 @@ def train_model(x_train, y_train, params_dict,
     :param save_model : Set to True if want to save model. Default set to False.
     :param save_folder : Filepath of folder to save model. Default set to None for save_model=False..
     :param model_save_name : Model's name to save with. Default set to None for save_model=False.
+    :param skip_tune_hyperparameters: Set to True to skip hyperparameter tuning. Default set to False.
+    :param iteration_csv : Filepath of a csv where hyperparameter iteration step will be stored.
+    :param n_fold : Number of folds in K Fold CV. Default set to 10.
+    :param max_evals : Maximum number of evaluations during hyperparameter optimization. Default set to 1000.
 
     :return: trained LGBM regression model.
     """
@@ -283,15 +470,22 @@ def train_model(x_train, y_train, params_dict,
             for col in categorical_columns:
                 x_train[col] = x_train[col].astype('category')
 
+        # hyperparameter tuning if enables
+        if not skip_tune_hyperparameters:
+            params_dict = bayes_hyperparam_opt(x_train, y_train, iteration_csv,
+                                               n_fold=n_fold, max_evals=max_evals,
+                                               skip_processing=skip_tune_hyperparameters)
+
         # Configuring the regressor with the parameters
         reg_model = LGBMRegressor(tree_learner='serial', random_state=0,
                                   deterministic=True, force_row_wise=True,
                                   n_jobs=-1, **params_dict)
 
         if categorical_columns is not None:
-            trained_model = reg_model.fit(x_train, y_train)
+            trained_model = reg_model.fit(x_train, y_train,
+                                          categorical_feature=categorical_columns)
         else:
-            trained_model = reg_model.fit(x_train, y_train, categorical_feature=categorical_columns)
+            trained_model = reg_model.fit(x_train, y_train)
 
         y_pred = trained_model.predict(x_train)
 
@@ -417,7 +611,7 @@ def cross_val_performance(trained_model_path,
 
 
 def create_pdplots(trained_model, x_train, features_to_include, output_dir, plot_name,
-                   ylabel='Effective Precipitation \n (mm)',
+                   ylabel='Pumping (mm/year)', categorical_columns=None,
                    skip_processing=False):
     """
     Plot partial dependence plot.
@@ -428,7 +622,8 @@ def create_pdplots(trained_model, x_train, features_to_include, output_dir, plot
                                 all input variables will be created.
     :param output_dir: Filepath of output directory to save the PDP plot.
     :param plot_name: str of plot name. Must include '.jpeg' or 'png'.
-    :param ylabel: Ylabel for partial dependence plot. Default set to Effective Precipitation \n (mm)' for monthly model.
+    :param ylabel: Ylabel for partial dependence plot. Default set to 'Pumping (mm/year)'.
+    :param categorical_columns: List of categorical column names to convert to 'category' dtype. Default set to None.
     :param skip_processing: Set to True to skip this process.
 
     :return: None.
@@ -436,9 +631,16 @@ def create_pdplots(trained_model, x_train, features_to_include, output_dir, plot
     if not skip_processing:
         makedirs([output_dir])
 
+        # print(trained_model._Booster.dump_model()['feature_infos']) # prints features info like min-max values
+
         # creating variables for unit degree and degree celcius
         deg_unit = r'$^\circ$'
         deg_cel_unit = r'$^\circ$C'
+
+        # provision to include categorical data
+        if categorical_columns is not None:
+            for col in categorical_columns:
+                x_train[col] = x_train[col].astype('category')
 
         # plotting
         if features_to_include == 'All':  # to plot PDP for all attributes
@@ -447,9 +649,19 @@ def create_pdplots(trained_model, x_train, features_to_include, output_dir, plot
         plt.rcParams['font.size'] = 30
 
         pdisp = PDisp.from_estimator(trained_model, x_train, features=features_to_include,
-                                     percentiles=(0.05, 1), subsample=0.8, grid_resolution=20,
-                                     n_jobs=-1, random_state=0)
+                                     categorical_features=categorical_columns, percentiles=(0.05, 1),
+                                     subsample=0.8, grid_resolution=20, n_jobs=-1, random_state=0)
 
+        # creating a dictionary to rename PDP plot labels
+        feature_dict = {
+            'netGW_Irr': 'Consumptive groundwater use (mm/gs)', 'peff': 'Effective precipitation (mm/gs)',
+            'ret': 'Reference ET (mm/gs)', 'precip': 'Precipitation (mm/gs)', 'tmax': f'Max. temperature ({deg_cel_unit})',
+            'ET': 'ET (mm/gs)', 'irr_crop_frac': 'Fraction of irrigated cropland', 'maxRH': 'Max. relative humidity (%)',
+            'minRH': 'Min. relative humidity (%)', 'shortRad': 'Downward shortwave radiation (W/$m^2$)',
+            'vpd': 'Vapour pressure deficit (kpa)', 'sunHr': 'Daylight duration (hr)',
+            'sw_huc12': 'Surface water irrigation at HUC12 (MG/year)', 'gw_perc_huc12': 'Groundwater use at HUC12 (%)',
+            'climate': 'Climate type'
+        }
 
         # Subplot labels
         subplot_labels = ['(a)', '(b)', '(c)', '(d)', '(e)', '(f)', '(g)', '(h)', '(i)', '(j)', '(k)',
@@ -463,6 +675,9 @@ def create_pdplots(trained_model, x_train, features_to_include, output_dir, plot
         for r in row_num:
             for c in col_num:
                 if pdisp.axes_[r][c] is not None:
+                    # changing axis labels
+                    pdisp.axes_[r][c].set_xlabel(feature_dict[features_to_include[feature_idx]])
+
                     # subplot num
                     pdisp.axes_[r][c].text(0.1, 0.9, subplot_labels[feature_idx], transform=pdisp.axes_[r][c].transAxes,
                                            fontsize=35, va='top', ha='left')
@@ -485,9 +700,78 @@ def create_pdplots(trained_model, x_train, features_to_include, output_dir, plot
         pass
 
 
+def create_aleplots(trained_model, x_train, y_train, features_to_include,
+                    output_dir, plot_name, make_CI=True, skip_processing=False):
+    """
+    Plot Accumulated Local Effects (ALE) plot.
+
+    :param trained_model: Trained model object.
+    :param x_train: x_train dataframe (if the model was trained with a x_train as dataframe) or array.
+    :param y_train: y_train dataframe (if the model was trained with a x_train as dataframe) or array.
+    :param features_to_include: List of features for which ALE plots will be made.
+                                If set to 'All', then PDP plot for all input variables will be created.
+    :param output_dir: Filepath of output directory to save the PDP plot.
+    :param plot_name: str of plot name. Must include '.jpeg' or 'png'.
+    :param make_CI: Set to True if want to include CI in the ALE plot. The confidence intervals are simply the uncertainty
+               in the mean value. This function uses 100 bootstraping to estimate the CIs.
+    :param skip_processing: Set to True to skip this process.
+
+    :return: None.
+    """
+    if not skip_processing:
+        makedirs([output_dir])
+
+        # creating variables for unit degree and degree celcius
+        deg_unit = r'$^\circ$'
+        deg_cel_unit = r'$^\circ$C'
+
+        # plotting
+        if features_to_include == 'All':  # to plot PDP for all attributes
+            features_to_include = list(x_train.columns)
+
+        # creating a dictionary to rename PDP plot labels
+        feature_dict = {
+            'netGW_Irr': 'Consumptive groundwater use (mm/gs)', 'peff': 'Effective precipitation (mm/gs)',
+            'ret': 'Reference ET (mm/gs)', 'precip': 'Precipitation (mm/gs)', 'tmax': f'Max. temperature ({deg_cel_unit})',
+            'ET': 'ET (mm/gs)', 'irr_crop_frac': 'Fraction of irrigated cropland', 'maxRH': 'Max. relative humidity (%)',
+            'minRH': 'Min. relative humidity (%)', 'shortRad': 'Downward shortwave radiation (W/$m^2$)',
+            'vpd': 'Vapour pressure deficit (kpa)', 'sunHr': 'Daylight duration (hr)',
+            'sw_huc12': 'Surface water irrigation at HUC12 (MG/year)', 'gw_perc_huc12': 'Groundwater use at HUC12 (%)',
+            'climate': 'Climate type'
+        }
+
+        plt.rcParams['font.size'] = 8
+
+        # creating explainer object and calculating 1d ale
+        if make_CI:
+            bootstrap = 100
+        else:
+            bootstrap = 1
+
+        explainer = skexplain.ExplainToolkit(('LGBMRegressor', trained_model), X=x_train, y=y_train)
+        ale_1d_ds = explainer.ale(features=features_to_include, n_bootstrap=bootstrap,
+                                  subsample=20000, n_jobs=10, n_bins=20)
+
+        # Create ALE plots
+        fig, axes = explainer.plot_ale(
+            ale=ale_1d_ds,
+            features=features_to_include,  # Important features you want to plot
+            display_feature_names=feature_dict,  # Feature names
+            figsize=(10, 8)
+        )
+
+        fig.tight_layout(rect=[0, 0.05, 1, 0.95])
+        fig.savefig(os.path.join(output_dir, plot_name))
+
+        print('ALE plots generated...')
+
+    else:
+        pass
+
+
 def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_name,
-                                saved_var_list_name,
-                                exclude_columns=None, skip_processing=False):
+                                sorted_var_list_name, categorical_columns=None,
+                                skip_processing=False):
     """
     Plot permutation importance for model predictors.
 
@@ -495,12 +779,10 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
     :param x_test: Filepath of x_test csv or dataframe. In case of dataframe, it has to come directly from the
                     split_train_val_test_set() function.
     :param y_test: Filepath of y_test csv or dataframe.
-    :param exclude_columns: List of predictors to be excluded.
-                            Exclude the same predictors for which model wasn't trained. In case the x_test comes as a
-                            dataframe from the split_train_val_test_set() function, set exclude_columns to None.
     :param output_dir: Output directory filepath to save the plot.
     :param plot_name: Plot name. Must contain 'png', 'jpeg'.
-    :param saved_var_list_name: The name of to use to save the sorted important vars list. Must contain 'pkl'.
+    :param sorted_var_list_name: The name of to use to save the sorted important vars list. Must contain 'pkl'.
+    :param categorical_columns: List of categorical column names to convert to 'category' dtype. Default set to None.
     :param skip_processing: Set to True to skip this process.
 
     :return: List of sorted (most important to less important) important variable names.
@@ -511,7 +793,6 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
         if '.csv' in x_test:
             # Loading x_test and y_test
             x_test_df = pd.read_csv(x_test)
-            x_test_df = x_test_df.drop(columns=exclude_columns)
             x_test_df = reindex_df(x_test_df)
 
             y_test_df = pd.read_csv(y_test)
@@ -519,10 +800,14 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
             x_test_df = x_test
             y_test_df = y_test
 
-        # ensure arrays are writable  (the numpy conversion code block was added after a conda env upgrade threw 'WRITABLE array'
-        #                              error, took chatgpt's help to figure this out. The error meant - permutation_importance() was
-        #                              trying to change the array but could not as it was writable before. This code black makes the
-        #                              arrays writable)
+        # provision to include categorical data
+        if categorical_columns is not None:
+            for col in categorical_columns:
+                x_test_df[col] = x_test_df[col].astype('category')
+
+        # Ensure arrays are writable to prevent errors during permutation importance.
+        # Some NumPy arrays created from Pandas DataFrames are read-only by default.
+        # The permutation_importance() function modifies arrays, so they must be writable.
         x_test_np = x_test_df.to_numpy()
         y_test_np = y_test_df.to_numpy()
 
@@ -540,7 +825,20 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
 
         # sorted important variables
         sorted_imp_vars = importances.columns.tolist()[::-1]
-        print('\n', 'Sorted Important Variables:', sorted_imp_vars, '\n')
+        print('\nSorted Important Variables:', sorted_imp_vars, '\n')
+
+        # renaming input variables
+        feature_name_dict = {
+            'netGW_Irr': 'Consumptive groundwater use', 'peff': 'Effective precipitation',
+            'ret': 'Reference ET', 'precip': 'Precipitation', 'tmax': f'Max. temperature',
+            'ET': 'ET', 'irr_crop_frac': 'Fraction of irrigated croplnad', 'maxRH': 'Max. relative humidity',
+            'minRH': 'Min. relative humidity', 'shortRad': 'Downward shortwave radiation',
+            'vpd': 'Vapour pressure deficit', 'sunHr': 'Daylight duration',
+            'sw_huc12': 'Surface water irrigation at HUC12', 'gw_perc_huc12': 'Groundwater use % at HUC12',
+            'climate': 'Climate type'
+        }
+
+        importances = importances.rename(columns=feature_name_dict)
 
         # plotting
         plt.figure(figsize=(6, 4))
@@ -555,11 +853,11 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
         plt.savefig(os.path.join(output_dir, plot_name), dpi=200)
 
         # saving the list to avoid running the permutation importance plot if not required (saves model running time)
-        joblib.dump(sorted_imp_vars, os.path.join(output_dir, saved_var_list_name))
+        joblib.dump(sorted_imp_vars, os.path.join(output_dir, sorted_var_list_name))
 
         print('Permutation importance plot generated...')
 
     else:
-        sorted_imp_vars = joblib.load(os.path.join(output_dir, saved_var_list_name))
+        sorted_imp_vars = joblib.load(os.path.join(output_dir, sorted_var_list_name))
 
     return sorted_imp_vars

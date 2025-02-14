@@ -360,18 +360,21 @@ def bayes_hyperparam_opt(x_train, y_train, iteration_csv, n_fold=10, max_evals=1
         # creating hyperparameter space for LGBM models
         param_space = {'boosting_type': hp.choice('boosting_type',
                                                   [{'boosting_type': 'gbdt',
-                                                    'subsample': hp.uniform('gbdt_subsample', 0.5, 0.8)},
-                                                   {'boosting_type': 'dart',
-                                                    'subsample': hp.uniform('dart_subsample', 0.5, 0.8)},
-                                                   {'boosting_type': 'goss', 'subsample': 1.0}]),
+                                                    'subsample': hp.uniform('gbdt_subsample', 0.7, 0.9)},
+                                                   # {'boosting_type': 'dart',
+                                                   #  'subsample': hp.uniform('dart_subsample', 0.7, 0.9)},
+                                                   # {'boosting_type': 'goss', 'subsample': 1.0}
+                                                   ]),
                        'n_estimators': hp.quniform('n_estimators', 100, 400, 25),
-                       'max_depth': hp.uniform('max_depth', 5, 15),
+                       'max_depth': hp.uniform('max_depth', 4, 8),
                        'learning_rate': hp.loguniform('learning_rate', np.log(0.01), np.log(0.1)),
                        'colsample_bytree': hp.uniform('colsample_bytree', 0.6, 1.0),
                        'colsample_bynode': hp.uniform('colsample_bynode', 0.6, 1.0),
-                       'path_smooth': hp.uniform('path_smooth', 0.1, 0.5),
-                       'num_leaves': hp.quniform('num_leaves', 30, 70, 5),
-                       'min_child_samples': hp.quniform('min_child_samples', 20, 50, 5)}
+                       'path_smooth': hp.uniform('path_smooth', 0.5, 0.8),
+                       'num_leaves': hp.quniform('num_leaves', 20, 60, 5),
+                       'min_child_samples': hp.quniform('min_child_samples', 25, 60, 5),
+                       'force_col_wise': True           # set to False to choose between colum/row-wise parallelization
+                       }
 
         # optimization algorithm
         tpe_algorithm = tpe.suggest  # stand for Tree-structured Parzen Estimator. A surrogate (probabilistic) model
@@ -646,7 +649,7 @@ def create_pdplots(trained_model, x_train, features_to_include, output_dir, plot
         if features_to_include == 'All':  # to plot PDP for all attributes
             features_to_include = list(x_train.columns)
 
-        plt.rcParams['font.size'] = 30
+        plt.rcParams.update({'font.size': 30})
 
         pdisp = PDisp.from_estimator(trained_model, x_train, features=features_to_include,
                                      categorical_features=categorical_columns, percentiles=(0.05, 1),
@@ -676,23 +679,27 @@ def create_pdplots(trained_model, x_train, features_to_include, output_dir, plot
             for c in col_num:
                 if pdisp.axes_[r][c] is not None:
                     # changing axis labels
-                    pdisp.axes_[r][c].set_xlabel(feature_dict[features_to_include[feature_idx]])
+                    pdisp.axes_[r][c].set_xlabel(feature_dict[features_to_include[feature_idx]], fontsize=30)
 
                     # subplot num
                     pdisp.axes_[r][c].text(0.1, 0.9, subplot_labels[feature_idx], transform=pdisp.axes_[r][c].transAxes,
-                                           fontsize=35, va='top', ha='left')
+                                           fontsize=30, va='top', ha='left')
+
+                    # adjusting size of tick params
+                    pdisp.axes_[r][c].tick_params(axis='both', labelsize=30)
+
 
                     feature_idx += 1
                 else:
                     pass
 
         for row_idx in range(0, pdisp.axes_.shape[0]):
-            pdisp.axes_[row_idx][0].set_ylabel(ylabel)
+            pdisp.axes_[row_idx][0].set_ylabel(ylabel, fontsize=30)
 
         fig = plt.gcf()
         fig.set_size_inches(30, 30)
         fig.tight_layout(rect=[0, 0.05, 1, 0.95])
-        fig.savefig(os.path.join(output_dir, plot_name), dpi=300, bbox_inches='tight')
+        fig.savefig(os.path.join(output_dir, plot_name), dpi=100, bbox_inches='tight')
 
         print('PDP plots generated...')
 
@@ -815,8 +822,9 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
         y_test_np.setflags(write=True)
 
         # generating permutation importance score on test set
+        # using n_job = 1 here to avoid error due to parallelization issue in Linux (nothing wrong with the code)
         result_test = permutation_importance(trained_model, x_test_np, y_test_np,
-                                             n_repeats=30, random_state=0, n_jobs=-1, scoring='r2')
+                                             n_repeats=30, random_state=0, n_jobs=1, scoring='r2')
 
         sorted_importances_idx = result_test.importances_mean.argsort()
         predictor_cols = x_test_df.columns
@@ -850,7 +858,7 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
         ax.tick_params(axis='y', labelsize=8)
 
         plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, plot_name), dpi=200)
+        plt.savefig(os.path.join(output_dir, plot_name), dpi=100)
 
         # saving the list to avoid running the permutation importance plot if not required (saves model running time)
         joblib.dump(sorted_imp_vars, os.path.join(output_dir, sorted_var_list_name))

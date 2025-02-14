@@ -555,10 +555,10 @@ def copy_tiles_parallel(splitted_target_df, input_dir, copy_dir, num_workers):
         pool.starmap(copy_tiles, args)
 
 
-def train_val_test_split(target_data_csv, input_tile_dir, train_dir, val_dir, test_dir,
-                         train_size=0.7, val_size=0.15, test_size=0.15,
-                         random_state=42, num_workers=10,
-                         stratify=True, skip_processing=False):
+def train_val_test_split_tiles(target_data_csv, input_tile_dir, train_dir, val_dir, test_dir,
+                               train_size=0.7, val_size=0.15, test_size=0.15,
+                               random_state=42, num_workers=10,
+                               stratify=True, skip_processing=False):
     """
     Splits the tiles into train, validation, and test datasets, along with their target values.
 

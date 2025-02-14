@@ -69,7 +69,7 @@ def write_array_to_raster(raster_arr, raster_file, transform, output_path, dtype
 
     :return: Output filepath.
     """
-    makedirs([os.path.basename(output_path)])
+    makedirs([os.path.dirname(output_path)])
 
     if dtype is None:
         dtype = raster_arr.dtype

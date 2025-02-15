@@ -498,7 +498,7 @@ class make_training_tiles:
         for file in all_tiles:
             old_no = os.path.basename(file).split('.')[0].split('_')[-1]
             new_no = old_to_new_map[old_no]
-            new_file_name = f'tile_{new_no}.tif'
+            new_file_name = f'tile_{new_no}'
 
             copy_file(input_dir_or_file=file, copy_dir=self.final_tile_output_dir,
                       rename=new_file_name)

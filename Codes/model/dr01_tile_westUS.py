@@ -13,7 +13,7 @@ sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import assign_cpu_nodes
 from utils_tiles import make_multiband_datasets, make_training_tiles, \
-        train_val_test_split, calc_scaling_statistics, standardize_train_val_test
+        train_val_test_split_tiles, calc_scaling_statistics, standardize_train_val_test
 
 
 if __name__ == '__main__':
@@ -101,12 +101,12 @@ if __name__ == '__main__':
 
     use_cpu_nodes = assign_cpu_nodes([skip_split_train_val_test])
 
-    train_val_test_split(target_data_csv=target_csv, input_tile_dir=multiband_tile_dir,
-                         train_dir=train_dir, val_dir=val_dir, test_dir=test_dir,
-                         train_size=0.7, val_size=0.2, test_size=0.1,
-                         random_state=42, num_workers=use_cpu_nodes,
-                         stratify=True,                                # stratified split based on 'stateID'
-                         skip_processing=skip_split_train_val_test)
+    train_val_test_split_tiles(target_data_csv=target_csv, input_tile_dir=multiband_tile_dir,
+                               train_dir=train_dir, val_dir=val_dir, test_dir=test_dir,
+                               train_size=0.7, val_size=0.2, test_size=0.1,
+                               random_state=42, num_workers=use_cpu_nodes,
+                               stratify=True,  # stratified split based on 'stateID'
+                               skip_processing=skip_split_train_val_test)
 
     # ------------------------------------------------------------------------------------------------------------------
     # 4. Calculate standardization statistics

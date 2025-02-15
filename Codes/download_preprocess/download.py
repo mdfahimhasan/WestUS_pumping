@@ -1197,7 +1197,8 @@ def download_drought_indices_water_year(data_name, download_dir, year_list, merg
 
     ee.Initialize(project='ee-fahim', opt_url='https://earthengine-highvolume.googleapis.com')
 
-    makedirs([os.path.join(download_dir, data_name)])
+    download_dir = os.path.join(download_dir, data_name)
+    makedirs([download_dir])
 
     # Extracting dataset information required for downloading from GEE
     data, band, scale_factor, reducer, _, _, \

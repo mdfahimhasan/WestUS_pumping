@@ -63,11 +63,12 @@ def scatter_plot_of_same_vars(Y_pred, Y_obsv, x_label, y_label, plot_name, saved
 
     r2_val = round(calculate_r2(Y_pred, Y_obsv), 4)
     ax.text(0.1, 0.9, s=f'$R^2={r2_val:.3f}$', transform=ax.transAxes)
+    plt.tight_layout()
 
     makedirs([savedir])
 
     fig_loc = os.path.join(savedir, plot_name)
-    fig.savefig(fig_loc, dpi=300)
+    fig.savefig(fig_loc, dpi=200)
 
 
 def density_grid_plot_of_same_vars(Y_pred, Y_obsv, x_label, y_label, plot_name, savedir,

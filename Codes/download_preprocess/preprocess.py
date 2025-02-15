@@ -395,7 +395,8 @@ def create_HUC12_SW_irrigation_rasters(HUC12_SW_shape, output_dir, resolution=mo
 
         # making output directories
         interim_outdir = os.path.join(output_dir, 'interim')
-        makedirs([output_dir, interim_outdir])
+        normalized_dir = os.path.join(output_dir, 'MinMax_normalized')
+        makedirs([output_dir, interim_outdir, normalized_dir])
 
         years = list(range(2000, 2020 + 1))  # years from 2000 to 2020
 
@@ -419,6 +420,16 @@ def create_HUC12_SW_irrigation_rasters(HUC12_SW_shape, output_dir, resolution=mo
 
             output_raster = os.path.join(output_dir, f'HUC12_SW_{year}.tif')
             write_array_to_raster(final_sw_arr, file, file.transform, output_raster)
+
+
+            # min-max normalizing data (to represent relative use of surface water irrigation)
+            min_sw = np.nanmin(final_sw_arr)
+            max_sw = np.nanmax(final_sw_arr)
+
+            normalized_sw_arr = np.where(~np.isnan(final_sw_arr), (final_sw_arr - min_sw) / (max_sw - min_sw), -9999)
+            output_normal_raster = os.path.join(normalized_dir, f'HUC12_SW_{year}.tif')
+            write_array_to_raster(normalized_sw_arr, file, file.transform, output_normal_raster)
+
 
 
 def create_GW_use_perc_rasters(HUC12_GW_perc_shape, output_dir, resolution=model_res,

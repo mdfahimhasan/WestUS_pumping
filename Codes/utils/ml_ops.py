@@ -663,8 +663,9 @@ def create_pdplots(trained_model, x_train, features_to_include, output_dir, plot
             'ET': 'ET (mm/gs)', 'irr_crop_frac': 'Fraction of irrigated cropland', 'maxRH': 'Max. relative humidity (%)',
             'minRH': 'Min. relative humidity (%)', 'shortRad': 'Downward shortwave radiation (W/$m^2$)',
             'vpd': 'Vapour pressure deficit (kpa)', 'sunHr': 'Daylight duration (hr)',
-            'sw_huc12': 'Surface water irrigation at HUC12 (MG/year)', 'gw_perc_huc12': 'Groundwater use at HUC12 (%)',
-            'climate': 'Climate', 'FC': 'Field capacity (%)'
+            'sw_huc12': 'Normalized HUC12 Surface water irrigation', 'gw_perc_huc12': 'Groundwater use at HUC12 (%)',
+            'climate': 'Climate', 'FC': 'Field capacity (%)', 'spi': 'Standardized precipitation index',
+            'spei': 'Standardized precipitation evapotranspiration index', 'eddi': 'Evaporative demand drought index'
         }
 
         # Subplot labels
@@ -843,8 +844,9 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
             'ET': 'ET', 'irr_crop_frac': 'Fraction of irrigated croplnad', 'maxRH': 'Max. relative humidity',
             'minRH': 'Min. relative humidity', 'shortRad': 'Downward shortwave radiation',
             'vpd': 'Vapour pressure deficit', 'sunHr': 'Daylight duration',
-            'sw_huc12': 'Surface water irrigation at HUC12', 'gw_perc_huc12': 'Groundwater use % at HUC12',
-            'climate': 'Climate', 'FC': 'Field capacity'
+            'sw_huc12': 'Normalized HUC12 Surface water irrigation', 'gw_perc_huc12': 'Groundwater use % at HUC12',
+            'climate': 'Climate', 'FC': 'Field capacity', 'spi': 'Standardized precipitation index',
+            'spei': 'Standardized precipitation evapotranspiration index', 'eddi': 'Evaporative demand drought index'
         }
 
         importances = importances.rename(columns=feature_name_dict)

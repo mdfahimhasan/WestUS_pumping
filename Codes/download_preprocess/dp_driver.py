@@ -34,27 +34,19 @@ if __name__ == '__main__':
     gee_grid_shape_for30m_LANID = '../../Data_main/ref_shapes/WestUS_gee_grid_for30m_LANID.shp'
 
     gee_data_list = [
-        # 'Landsat5_NDVI',
-        # 'Landsat8_NDVI',
-        # 'Landsat5_OSAVI',
-        # 'Landsat8_OSAVI',
-        # 'Landsat5_NDMI',
-        # 'Landsat8_NDMI',
-        # 'Landsat5_GCVI',
-        # 'Landsat8_GCVI',
-        'GRIDMET_Precip',
-        'GRIDMET_RET',
-        'GRIDMET_Tmax',
-        'GRIDMET_maxRH',
-        'GRIDMET_minRH',
-        'GRIDMET_windVel',
-        'GRIDMET_shortRad',
-        'GRIDMET_vpd',
-        'DAYMET_sunHr',
-        'MODIS_Day_LST',
-        # 'Field_capacity',
-        # 'Sand_content',
-        # 'Clay_content'
+        # 'GRIDMET_Precip',
+        # 'GRIDMET_RET',
+        # 'GRIDMET_Tmax',
+        # 'GRIDMET_maxRH',
+        # 'GRIDMET_minRH',
+        # 'GRIDMET_windVel',
+        # 'GRIDMET_shortRad',
+        # 'GRIDMET_vpd',
+        # 'DAYMET_sunHr',
+        # 'MODIS_Day_LST',
+        'spi',
+        'spei',
+        'eddi'
     ]
 
     openET_data_list = [
@@ -71,7 +63,7 @@ if __name__ == '__main__':
     months = (1, 12)
 
     # flags
-    skip_download_gee_data = True  ######################################################################################
+    skip_download_gee_data = False  ######################################################################################
     skip_download_OpenET_data = True  ###################################################################################
 
     download_all_gee_data(data_list=gee_data_list, download_dir=data_download_dir,

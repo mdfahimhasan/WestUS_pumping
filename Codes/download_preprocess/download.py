@@ -198,7 +198,10 @@ def get_gee_dict(data_name):
         'Sand_content': 'OpenLandMap/SOL/SOL_SAND-WFRACTION_USDA-3A1A1A_M/v02',
         'Clay_content': 'OpenLandMap/SOL/SOL_CLAY-WFRACTION_USDA-3A1A1A_M/v02',
         'DEM': 'USGS/SRTMGL1_003',
-        'Tree_cover': 'NASA/MEASURES/GFCC/TC/v3'
+        'Tree_cover': 'NASA/MEASURES/GFCC/TC/v3',
+        'spi': 'GRIDMET/DROUGHT',       # Standardized Precipitation Index (precipitation anomalies)
+        'spei': 'GRIDMET/DROUGHT',      # Standardized Precipitation Evapotranspiration Index (temperature-driven drought-water balance)
+        'eddi': 'GRIDMET/DROUGHT'       # Evaporative Drought Demand Index (atmospheric drying demand)
     }
 
     gee_band_dict = {
@@ -231,7 +234,10 @@ def get_gee_dict(data_name):
         'Sand_content': ['b0', 'b10', 'b30', 'b60', 'b100', 'b200'],
         'Clay_content': ['b0', 'b10', 'b30', 'b60', 'b100', 'b200'],
         'DEM': 'elevation',
-        'Tree_cover': 'tree_canopy_cover'
+        'Tree_cover': 'tree_canopy_cover',
+        'spi': 'spi1y',
+        'spei': 'spi1y',
+        'eddi': 'eddi1y'
     }
 
     gee_scale_dict = {
@@ -266,7 +272,10 @@ def get_gee_dict(data_name):
         'Sand_content': 1,
         'Clay_content': 1,
         'DEM': 1,
-        'Tree_cover': 1
+        'Tree_cover': 1,
+        'spi': 1,
+        'spei': 1,
+        'eddi': 1
     }
 
     aggregation_dict = {
@@ -299,7 +308,10 @@ def get_gee_dict(data_name):
         'Sand_content': ee.Reducer.mean(),
         'Clay_content': ee.Reducer.mean(),
         'DEM': None,
-        'Tree_cover': ee.Reducer.mean()
+        'Tree_cover': ee.Reducer.mean(),
+        'spi': ee.Reducer.mean(),
+        'spei': ee.Reducer.mean(),
+        'eddi': ee.Reducer.mean()
     }
 
     # # Note on start date and end date dictionaries
@@ -338,7 +350,10 @@ def get_gee_dict(data_name):
         'Sand_content': None,
         'Clay_content': None,
         'DEM': None,
-        'Tree_cover': datetime(2000, 1, 1)
+        'Tree_cover': datetime(2000, 1, 1),
+        'spi': datetime(1980, 1, 5),
+        'spei': datetime(1980, 1, 5),
+        'eddi': datetime(1980, 1, 5)
     }
 
     month_end_date_dict = {
@@ -371,7 +386,10 @@ def get_gee_dict(data_name):
         'Sand_content': None,
         'Clay_content': None,
         'DEM': None,
-        'Tree_cover': datetime(2015, 1, 1)
+        'Tree_cover': datetime(2015, 1, 1),
+        'spi': datetime(2024, 12, 31),
+        'spei': datetime(2024, 12, 31),
+        'eddi': datetime(2024, 12, 31)
     }
 
     year_start_date_dict = {
@@ -404,7 +422,10 @@ def get_gee_dict(data_name):
         'Sand_content': None,
         'Clay_content': None,
         'DEM': None,
-        'Tree_cover': datetime(2000, 1, 1)
+        'Tree_cover': datetime(2000, 1, 1),
+        'spi': datetime(1980, 1, 5),
+        'spei': datetime(1980, 1, 5),
+        'eddi': datetime(1980, 1, 5)
     }
 
     year_end_date_dict = {
@@ -437,7 +458,10 @@ def get_gee_dict(data_name):
         'Sand_content': None,
         'Clay_content': None,
         'DEM': None,
-        'Tree_cover': datetime(2015, 1, 1)
+        'Tree_cover': datetime(2015, 1, 1),
+        'spi': datetime(2024, 12, 31),
+        'spei': datetime(2024, 12, 31),
+        'eddi': datetime(2024, 12, 31)
     }
 
     return gee_data_dict[data_name], gee_band_dict[data_name], gee_scale_dict[data_name], aggregation_dict[data_name], \
@@ -1148,6 +1172,132 @@ def download_gee_data_yearly(data_name, download_dir, year_list, month_range, me
             pass
 
 
+def download_drought_indices_water_year(data_name, download_dir, year_list, merge_keyword,
+                                        gee_grid_shape='../../Data_main/ref_shapes/WestUS_gee_grid_large.shp',
+                                        refraster_westUS=WestUS_raster, refraster_gee_merge=GEE_merging_refraster_large_grids,
+                                        use_cpu_while_multidownloading=15, westUS_shape=WestUS_shape):
+    """
+    Download drought indices (spi, spei, eddi)  data (at water yearly scale) from GEE.
+
+    :param data_name: Data name. Have to be either of - 'spi', 'spei', 'eddi'.
+    :param download_dir: File path of download directory.
+    :param year_list: List of year_list to download data for.
+    :param merge_keyword: Keyword to use for merging downloaded data. Suggested 'WestUS'/'Conus'.
+    :param gee_grid_shape: File path of gee grids that will be used to download the data.
+    :param refraster_westUS: Reference raster to clip/save data for WestUS extent.
+    :param refraster_gee_merge: Reference raster to use for merging downloaded datasets from GEE. The merged
+                                datasets have to be clipped for Western US ROI.
+    :param use_cpu_while_multidownloading: Number (Int) of CPU cores to use for multi-download by
+                                           multi-processing/multi-threading. Default set to 15.
+    :param westUS_shape: Filepath of West US shapefile.
+
+    :return: None.
+    """
+    global key_word
+
+    ee.Initialize(project='ee-fahim', opt_url='https://earthengine-highvolume.googleapis.com')
+
+    makedirs([os.path.join(download_dir, data_name)])
+
+    # Extracting dataset information required for downloading from GEE
+    data, band, scale_factor, reducer, _, _, \
+       year_start_range, year_end_range = get_gee_dict(data_name)
+
+    # loading grids that will be used to download the data
+    grids = gpd.read_file(gee_grid_shape)
+    grids = grids.sort_values(by='FID', ascending=True)
+    grid_geometry = grids['geometry']
+    grid_no = grids['FID']
+
+    for year in year_list:  # first loop for year_list
+
+        # We are downloading drought indices in the '1y' bands, meaning the index is calculated based on
+        # climate conditions (precipitation and PET) averaged over the previous 12 months.
+        #
+        # To align with the water year, we set the date to the **end of the water year** (~September 30).
+        # But the data isn't available at September 30 each year due to a 5 day cadence. So, we set up a range
+        # of 6 days, search the data within that range. If there is single data found in that range, we download it,
+        # otherwise, we average it and download (if 2 datasets are found).
+        #
+        # Note: The **water year** starts in October of the **previous calendar year** and ends in September
+        # of the **current calendar year**. For example, Water Year 2000 runs from **October 1999 to September 2000**.
+
+        start_date = ee.Date.fromYMD(year, 9, 24)
+        start_date_dt = datetime(year, 9, 24)
+
+        end_date = ee.Date.fromYMD(year, 9, 30)
+        end_date_dt = datetime(year, 9, 30)
+
+        # will collect url and file name in url list and local_file_paths_list
+        data_url_list = []
+        local_file_paths_list = []
+
+        # a condition to check whether start and end date falls in the available data range in GEE
+        # if not the block will not be executed
+        if (start_date_dt >= year_start_range) & (end_date_dt <= year_end_range):
+
+            for grid_sr, geometry in zip(grid_no, grid_geometry):  # second loop for grids
+                roi = geometry.bounds
+                gee_extent = ee.Geometry.Rectangle(roi)
+
+                download_data = ee.ImageCollection(data).select(band).filterDate(start_date, end_date). \
+                    filterBounds(gee_extent).reduce(reducer).multiply(scale_factor).toFloat()
+
+                data_url = download_data.getDownloadURL({'name': data_name,
+                                                         'crs': 'EPSG:4269',  # NAD83
+                                                         'scale': 2200,  # in meter. equal to ~0.02 deg
+                                                         'region': gee_extent,
+                                                         'format': 'GEO_TIFF'})
+
+
+                key_word = data_name
+                local_file_path = os.path.join(download_dir, f'{key_word}_{str(year)}_{str(grid_sr)}.tif')
+
+                # Appending data url and local file path (to save data) to a central list
+                data_url_list.append(data_url)
+                local_file_paths_list.append(local_file_path)
+
+                # The GEE connection gets disconnected sometimes, therefore, we download the data in batches when
+                # there is enough data url gathered for download.
+                if (len(data_url_list) == 120) | (
+                        grid_sr == len(grid_no)):  # downloads data when one of the conditions are met
+                    # Combining url and file paths together to pass in multiprocessing
+                    urls_to_file_paths_compile = []
+                    for j, k in zip(data_url_list, local_file_paths_list):
+                        urls_to_file_paths_compile.append([j, k])
+
+                    # Download data by multi-processing/multi-threading
+                    download_data_from_GEE_by_multiprocess(download_urls_fp_list=urls_to_file_paths_compile,
+                                                           use_cpu=use_cpu_while_multidownloading)
+
+                    # After downloading some data in a batch, we empty the data_utl_list and local_file_paths_list.
+                    # The empty lists will gather some new urls and file paths, and download a new batch of datasets
+                    data_url_list = []
+                    local_file_paths_list = []
+
+            # merging downloaded datasets
+            mosaic_name = f'{key_word}_{year}.tif'
+            mosaic_dir = os.path.join(download_dir, f'{merge_keyword}', 'merged')
+            clip_dir = os.path.join(download_dir, f'{merge_keyword}')
+
+            makedirs([clip_dir, mosaic_dir])
+            merged_arr, merged_raster = mosaic_rasters_from_directory(input_dir=download_dir, output_dir=mosaic_dir,
+                                                                      raster_name=mosaic_name,
+                                                                      ref_raster=refraster_gee_merge,
+                                                                      search_by=f'*{year}*.tif', nodata=no_data_value)
+
+            clip_resample_reproject_raster(input_raster=merged_raster, input_shape=westUS_shape,
+                                           output_raster_dir=clip_dir, clip_and_resample=True,
+                                           use_ref_width_height=False, resolution=model_res,
+                                           ref_raster=refraster_westUS)
+
+            print(f'{data_name} yearly data downloaded and merged')
+
+        else:
+            print(f'Data for year {year} is out of range. Skipping query')
+            pass
+
+
 def download_all_gee_data(data_list, download_dir, year_list, month_range,
                           skip_download=False):
     """
@@ -1164,7 +1314,7 @@ def download_all_gee_data(data_list, download_dir, year_list, month_range,
         'MODIS_LAI', 'GRIDMET_Precip', 'GRIDMET_Tmax', 'GRIDMET_RET', 'GRIDMET_maxRH',
         'GRIDMET_minRH', 'GRIDMET_windVel', 'GRIDMET_shortRad', 'GRIDMET_vpd',
         'DAYMET_sunHr', Field_capacity', 'Bulk_density',
-        'Sand_content', 'Clay_content', 'DEM']
+        'Sand_content', 'Clay_content', 'DEM', 'spi', 'spei', 'eddi']
 
     :param download_dir: File path of main download directory. It will consist directory of individual dataset.
     :param year_list: List of year_list to download data for.
@@ -1208,5 +1358,9 @@ def download_all_gee_data(data_list, download_dir, year_list, month_range,
             elif data_name == 'Tree_cover':
                 download_tree_cover_data(data_name='Tree_cover', download_dir=download_dir,
                                          merge_keyword='WestUS')
+
+            elif data_name in ['spi', 'spei', 'eddi']:
+                download_drought_indices_water_year(data_name=data_name, download_dir=download_dir,
+                                                    year_list=year_list, merge_keyword='WestUS_WaterYear')
     else:
         pass

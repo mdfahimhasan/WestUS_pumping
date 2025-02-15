@@ -6,6 +6,7 @@
 import os
 import sys
 import csv
+import pickle
 import joblib
 import timeit
 import numpy as np
@@ -15,7 +16,7 @@ import dask.dataframe as ddf
 import matplotlib.pyplot as plt
 from timeit import default_timer as timer
 
-import skexplain
+# import skexplain
 import lightgbm as lgb
 from lightgbm import LGBMRegressor
 from sklearn.preprocessing import OneHotEncoder
@@ -29,7 +30,7 @@ from os.path import dirname, abspath
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import makedirs
-from Codes.utils.raster_ops import read_raster_arr_object
+from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster
 from Codes.utils.stats_ops import calculate_rmse, calculate_r2, calculate_mae
 
 
@@ -359,20 +360,21 @@ def bayes_hyperparam_opt(x_train, y_train, iteration_csv, n_fold=10, max_evals=1
 
         # creating hyperparameter space for LGBM models
         param_space = {'boosting_type': hp.choice('boosting_type',
-                                                  [{'boosting_type': 'gbdt',
-                                                    'subsample': hp.uniform('gbdt_subsample', 0.7, 0.9)},
-                                                   # {'boosting_type': 'dart',
-                                                   #  'subsample': hp.uniform('dart_subsample', 0.7, 0.9)},
+                                                  [
+                                                   # {'boosting_type': 'gbdt',
+                                                   #  'subsample': hp.uniform('gbdt_subsample', 0.7, 0.9)},
+                                                   {'boosting_type': 'dart',
+                                                    'subsample': hp.uniform('dart_subsample', 0.5, 0.8)},
                                                    # {'boosting_type': 'goss', 'subsample': 1.0}
                                                    ]),
-                       'n_estimators': hp.quniform('n_estimators', 100, 400, 25),
+                       'n_estimators': hp.quniform('n_estimators', 200, 600, 25),
                        'max_depth': hp.uniform('max_depth', 4, 8),
-                       'learning_rate': hp.loguniform('learning_rate', np.log(0.01), np.log(0.1)),
+                       'learning_rate': hp.loguniform('learning_rate', np.log(0.005), np.log(0.05)),
                        'colsample_bytree': hp.uniform('colsample_bytree', 0.6, 1.0),
                        'colsample_bynode': hp.uniform('colsample_bynode', 0.6, 1.0),
                        'path_smooth': hp.uniform('path_smooth', 0.5, 0.8),
-                       'num_leaves': hp.quniform('num_leaves', 20, 60, 5),
-                       'min_child_samples': hp.quniform('min_child_samples', 25, 60, 5),
+                       'num_leaves': hp.quniform('num_leaves', 15, 50, 5),
+                       'min_child_samples': hp.quniform('min_child_samples', 30, 80, 5),
                        'force_col_wise': True           # set to False to choose between colum/row-wise parallelization
                        }
 
@@ -481,8 +483,7 @@ def train_model(x_train, y_train, params_dict,
 
         # Configuring the regressor with the parameters
         reg_model = LGBMRegressor(tree_learner='serial', random_state=0,
-                                  deterministic=True, force_row_wise=True,
-                                  n_jobs=-1, **params_dict)
+                                  deterministic=True, n_jobs=-1, **params_dict)
 
         if categorical_columns is not None:
             trained_model = reg_model.fit(x_train, y_train,
@@ -663,7 +664,7 @@ def create_pdplots(trained_model, x_train, features_to_include, output_dir, plot
             'minRH': 'Min. relative humidity (%)', 'shortRad': 'Downward shortwave radiation (W/$m^2$)',
             'vpd': 'Vapour pressure deficit (kpa)', 'sunHr': 'Daylight duration (hr)',
             'sw_huc12': 'Surface water irrigation at HUC12 (MG/year)', 'gw_perc_huc12': 'Groundwater use at HUC12 (%)',
-            'climate': 'Climate type'
+            'climate': 'Climate', 'FC': 'Field capacity (%)'
         }
 
         # Subplot labels
@@ -707,73 +708,73 @@ def create_pdplots(trained_model, x_train, features_to_include, output_dir, plot
         pass
 
 
-def create_aleplots(trained_model, x_train, y_train, features_to_include,
-                    output_dir, plot_name, make_CI=True, skip_processing=False):
-    """
-    Plot Accumulated Local Effects (ALE) plot.
-
-    :param trained_model: Trained model object.
-    :param x_train: x_train dataframe (if the model was trained with a x_train as dataframe) or array.
-    :param y_train: y_train dataframe (if the model was trained with a x_train as dataframe) or array.
-    :param features_to_include: List of features for which ALE plots will be made.
-                                If set to 'All', then PDP plot for all input variables will be created.
-    :param output_dir: Filepath of output directory to save the PDP plot.
-    :param plot_name: str of plot name. Must include '.jpeg' or 'png'.
-    :param make_CI: Set to True if want to include CI in the ALE plot. The confidence intervals are simply the uncertainty
-               in the mean value. This function uses 100 bootstraping to estimate the CIs.
-    :param skip_processing: Set to True to skip this process.
-
-    :return: None.
-    """
-    if not skip_processing:
-        makedirs([output_dir])
-
-        # creating variables for unit degree and degree celcius
-        deg_unit = r'$^\circ$'
-        deg_cel_unit = r'$^\circ$C'
-
-        # plotting
-        if features_to_include == 'All':  # to plot PDP for all attributes
-            features_to_include = list(x_train.columns)
-
-        # creating a dictionary to rename PDP plot labels
-        feature_dict = {
-            'netGW_Irr': 'Consumptive groundwater use (mm/gs)', 'peff': 'Effective precipitation (mm/gs)',
-            'ret': 'Reference ET (mm/gs)', 'precip': 'Precipitation (mm/gs)', 'tmax': f'Max. temperature ({deg_cel_unit})',
-            'ET': 'ET (mm/gs)', 'irr_crop_frac': 'Fraction of irrigated cropland', 'maxRH': 'Max. relative humidity (%)',
-            'minRH': 'Min. relative humidity (%)', 'shortRad': 'Downward shortwave radiation (W/$m^2$)',
-            'vpd': 'Vapour pressure deficit (kpa)', 'sunHr': 'Daylight duration (hr)',
-            'sw_huc12': 'Surface water irrigation at HUC12 (MG/year)', 'gw_perc_huc12': 'Groundwater use at HUC12 (%)',
-            'climate': 'Climate type'
-        }
-
-        plt.rcParams['font.size'] = 8
-
-        # creating explainer object and calculating 1d ale
-        if make_CI:
-            bootstrap = 100
-        else:
-            bootstrap = 1
-
-        explainer = skexplain.ExplainToolkit(('LGBMRegressor', trained_model), X=x_train, y=y_train)
-        ale_1d_ds = explainer.ale(features=features_to_include, n_bootstrap=bootstrap,
-                                  subsample=20000, n_jobs=10, n_bins=20)
-
-        # Create ALE plots
-        fig, axes = explainer.plot_ale(
-            ale=ale_1d_ds,
-            features=features_to_include,  # Important features you want to plot
-            display_feature_names=feature_dict,  # Feature names
-            figsize=(10, 8)
-        )
-
-        fig.tight_layout(rect=[0, 0.05, 1, 0.95])
-        fig.savefig(os.path.join(output_dir, plot_name))
-
-        print('ALE plots generated...')
-
-    else:
-        pass
+# def create_aleplots(trained_model, x_train, y_train, features_to_include,
+#                     output_dir, plot_name, make_CI=True, skip_processing=False):
+#     """
+#     Plot Accumulated Local Effects (ALE) plot.
+#
+#     :param trained_model: Trained model object.
+#     :param x_train: x_train dataframe (if the model was trained with a x_train as dataframe) or array.
+#     :param y_train: y_train dataframe (if the model was trained with a x_train as dataframe) or array.
+#     :param features_to_include: List of features for which ALE plots will be made.
+#                                 If set to 'All', then PDP plot for all input variables will be created.
+#     :param output_dir: Filepath of output directory to save the PDP plot.
+#     :param plot_name: str of plot name. Must include '.jpeg' or 'png'.
+#     :param make_CI: Set to True if want to include CI in the ALE plot. The confidence intervals are simply the uncertainty
+#                in the mean value. This function uses 100 bootstraping to estimate the CIs.
+#     :param skip_processing: Set to True to skip this process.
+#
+#     :return: None.
+#     """
+#     if not skip_processing:
+#         makedirs([output_dir])
+#
+#         # creating variables for unit degree and degree celcius
+#         deg_unit = r'$^\circ$'
+#         deg_cel_unit = r'$^\circ$C'
+#
+#         # plotting
+#         if features_to_include == 'All':  # to plot PDP for all attributes
+#             features_to_include = list(x_train.columns)
+#
+#         # creating a dictionary to rename PDP plot labels
+#         feature_dict = {
+#             'netGW_Irr': 'Consumptive groundwater use (mm/gs)', 'peff': 'Effective precipitation (mm/gs)',
+#             'ret': 'Reference ET (mm/gs)', 'precip': 'Precipitation (mm/gs)', 'tmax': f'Max. temperature ({deg_cel_unit})',
+#             'ET': 'ET (mm/gs)', 'irr_crop_frac': 'Fraction of irrigated cropland', 'maxRH': 'Max. relative humidity (%)',
+#             'minRH': 'Min. relative humidity (%)', 'shortRad': 'Downward shortwave radiation (W/$m^2$)',
+#             'vpd': 'Vapour pressure deficit (kpa)', 'sunHr': 'Daylight duration (hr)',
+#             'sw_huc12': 'Surface water irrigation at HUC12 (MG/year)', 'gw_perc_huc12': 'Groundwater use at HUC12 (%)',
+#             'climate': 'Climate type'
+#         }
+#
+#         plt.rcParams['font.size'] = 8
+#
+#         # creating explainer object and calculating 1d ale
+#         if make_CI:
+#             bootstrap = 100
+#         else:
+#             bootstrap = 1
+#
+#         explainer = skexplain.ExplainToolkit(('LGBMRegressor', trained_model), X=x_train, y=y_train)
+#         ale_1d_ds = explainer.ale(features=features_to_include, n_bootstrap=bootstrap,
+#                                   subsample=20000, n_jobs=10, n_bins=20)
+#
+#         # Create ALE plots
+#         fig, axes = explainer.plot_ale(
+#             ale=ale_1d_ds,
+#             features=features_to_include,  # Important features you want to plot
+#             display_feature_names=feature_dict,  # Feature names
+#             figsize=(10, 8)
+#         )
+#
+#         fig.tight_layout(rect=[0, 0.05, 1, 0.95])
+#         fig.savefig(os.path.join(output_dir, plot_name))
+#
+#         print('ALE plots generated...')
+#
+#     else:
+#         pass
 
 
 def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_name,
@@ -843,7 +844,7 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
             'minRH': 'Min. relative humidity', 'shortRad': 'Downward shortwave radiation',
             'vpd': 'Vapour pressure deficit', 'sunHr': 'Daylight duration',
             'sw_huc12': 'Surface water irrigation at HUC12', 'gw_perc_huc12': 'Groundwater use % at HUC12',
-            'climate': 'Climate type'
+            'climate': 'Climate', 'FC': 'Field capacity'
         }
 
         importances = importances.rename(columns=feature_name_dict)
@@ -869,3 +870,129 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
         sorted_imp_vars = joblib.load(os.path.join(output_dir, sorted_var_list_name))
 
     return sorted_imp_vars
+
+
+
+def create_annual_dataframes_for_pumping_prediction(years_list, yearly_data_path_dict,
+                                                    static_data_path_dict, datasets_to_include,
+                                                    output_dir, skip_processing=False):
+    """
+    Create annual dataframes of predictors to generate annual pumping prediction.
+
+    :param years_list: A list of years_list for which data to include in the dataframe.
+    :param yearly_data_path_dict: A dictionary with static variables' names as keys and their paths as values.
+                                  Set to None if there is static dataset.
+    :param static_data_path_dict: A dictionary with yearly variables' names as keys and their paths as values.
+                                  Set to None if there is no yearly dataset.
+    :param datasets_to_include: A list of datasets to include in the dataframe.
+    :param output_dir: Filepath of output directory.
+    :param skip_processing: Set to True to skip this dataframe creation process.
+
+    :return: None.
+    """
+    if not skip_processing:
+        makedirs([output_dir])
+
+        for year in years_list:  # 1st loop controlling years_list
+                print(f'creating dataframe for prediction - year={year}...')
+
+                variable_dict = {}              # empty dict to store data for each variable
+                nan_pos_dict = {}               # empty dict to store data for nan pos. of each variable
+
+                # reading yearly data and storing it in a dictionary
+                for var in yearly_data_path_dict.keys():
+                    if var in datasets_to_include:
+                        yearly_data = glob(os.path.join(yearly_data_path_dict[var], f'*{year}*.tif'))[0]
+                        data_arr = read_raster_arr_object(yearly_data, get_file=False).flatten()
+
+                        data_arr[np.isnan(data_arr)] = 0  # setting nan-position values with 0
+                        variable_dict[var] = list(data_arr)
+
+                # reading static data and storing it in a dictionary
+                if static_data_path_dict is not None:
+                    for var in static_data_path_dict.keys():
+                        if var in datasets_to_include:
+                            static_data = glob(os.path.join(static_data_path_dict[var], '*.tif'))[0]
+                            data_arr = read_raster_arr_object(static_data, get_file=False).flatten()
+
+                            # tracking nan_positions
+                            nan_pos_dict[var] = np.isnan(data_arr)
+
+                            # storing data
+                            data_arr[np.isnan(data_arr)] = 0  # setting nan-position values with 0
+                            variable_dict[var] = list(data_arr)
+
+                # saving the nan position dict as pickle
+                dict_path = os.path.join(output_dir, f'nan_pos_{year}.pkl')
+                pickle.dump(nan_pos_dict, open(dict_path, mode='wb+'))
+
+                # storing collected data into a dataframe
+                predictor_df = pd.DataFrame(variable_dict)
+                predictor_df = predictor_df.dropna()
+
+                # saving input predictor csv
+                monthly_output_csv = os.path.join(output_dir, f'predictors_{year}.csv')
+                predictor_df.to_csv(monthly_output_csv, index=False)
+
+    else:
+        pass
+
+
+def predict_annual_pumping_rasters(trained_model, years_list, exclude_columns,
+                                   predictor_csv_and_nan_pos_dir,
+                                   prediction_name_keyword, output_dir,
+                                   ref_raster=WestUS_raster, skip_processing=False):
+    """
+    Create annual pumping prediction raster.
+
+    :param trained_model: Trained ML model object.
+    :param years_list: A list of years_list for which data to include in the dataframe.
+    :param exclude_columns: List of predictors to exclude from model prediction.
+    :param predictor_csv_and_nan_pos_dir: Filepath of directory holding annual predictor csv and nan
+                                          nan position pkl files.
+    :param prediction_name_keyword: A str that will be added before prediction file name.
+    :param output_dir: Filepath of output directory to store predicted rasters..
+    :param ref_raster: Filepath of ref raster. Default set to WestUS reference raster.
+    :param skip_processing: Set to true to skip this processing step.
+
+    :return: None.
+    """
+    if not skip_processing:
+        makedirs([output_dir])
+
+        # ref raster shape
+        ref_arr, ref_file = read_raster_arr_object(ref_raster)
+        ref_shape = ref_arr.shape
+
+        for year in years_list:
+            print(f'Generating {prediction_name_keyword} prediction raster for year: {year}...')
+
+            # loading input variable dataframe and nan position dict
+            # also filtering out excluded columns
+            predictor_csv = glob(os.path.join(predictor_csv_and_nan_pos_dir, f'*{year}.csv'))[0]
+            nan_pos_dict_path = glob(os.path.join(predictor_csv_and_nan_pos_dir, f'*{year}.pkl'))[0]
+
+            df = pd.read_csv(predictor_csv)
+            df = df.drop(columns=exclude_columns)
+            df = reindex_df(df)
+
+            nan_pos_dict = pickle.load(open(nan_pos_dict_path, mode='rb'))
+
+            # generating prediction raster with trained model
+            pred_arr = trained_model.predict(df)
+            pred_arr = np.array(pred_arr)
+
+            # replacing nan positions with -9999
+            for var_name, nan_pos in nan_pos_dict.items():
+                if var_name not in exclude_columns:
+                    pred_arr[nan_pos] = ref_file.nodata  # ref raster has -9999 as no data
+
+            # reshaping the prediction raster for Western US and saving
+            pred_arr = pred_arr.reshape(ref_shape)
+
+            output_prediction_raster = os.path.join(output_dir, f'{prediction_name_keyword}_{year}.tif')
+            write_array_to_raster(raster_arr=pred_arr, raster_file=ref_file, transform=ref_file.transform,
+                                  output_path=output_prediction_raster)
+    else:
+        pass
+

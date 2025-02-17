@@ -36,7 +36,7 @@ from Codes.utils.stats_ops import calculate_rmse, calculate_r2, calculate_mae
 
 no_data_value = -9999
 model_res = 0.02000000000000000389  # in deg, 2 km
-WestUS_raster = '../../Data_main/reference_rasters/Western_US_refraster_2km.tif'
+WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
 
 
 def reindex_df(df):
@@ -896,7 +896,7 @@ def create_annual_dataframes_for_pumping_prediction(years_list, yearly_data_path
         makedirs([output_dir])
 
         for year in years_list:  # 1st loop controlling years_list
-                print(f'creating dataframe for prediction - year={year}...')
+                print(f'creating dataframe for prediction - year {year}...')
 
                 variable_dict = {}              # empty dict to store data for each variable
                 nan_pos_dict = {}               # empty dict to store data for nan pos. of each variable

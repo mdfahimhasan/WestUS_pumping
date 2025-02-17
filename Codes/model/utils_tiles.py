@@ -830,7 +830,7 @@ def standardize_single_tile(tile, exclude_bands_from_standardizing, mean_dict, s
             dst.set_band_description(idx+1, bands[idx])
 
 
-def standardize_train_val_test(input_tile_dir, mean_dict, std_dict, output_dir,
+def standardize_train_val_test(input_tile_dir, mean_dict, std_dict,  exclude_bands_from_standardizing, output_dir,
                                split_type='train', num_workers=10, skip_processing=False):
     """
     Standardizes multi-band raster tiles and target values for train, validation, or test datasets.
@@ -840,6 +840,7 @@ def standardize_train_val_test(input_tile_dir, mean_dict, std_dict, output_dir,
     :param input_tile_dir: str. Path to the directory containing the input raster tiles and target value csv.
     :param mean_dict: dictionary. A dictionary containing mean values (from train_set) for each band and the target variable.
     :param std_dict: dictionary. A dictionary containing std values (from train_set) for each band and the target variable.
+    :param exclude_bands_from_standardizing: List of band names to exclude from standardizing.
     :param output_dir: str. Path to the directory to save standardized outputs (tiles).
     :param split_type: str. Should be something from ['train', 'val', 'test'].
     :param num_workers: int. Number of parallel processes to use for multiprocessing. Default is 10.
@@ -857,7 +858,7 @@ def standardize_train_val_test(input_tile_dir, mean_dict, std_dict, output_dir,
         all_tiles = glob(os.path.join(input_tile_dir, f'*.tif'))
 
         # standardizing each tile with multiprocessing
-        args = [(tile, mean_dict, std_dict, output_dir) for tile in all_tiles]
+        args = [(tile, exclude_bands_from_standardizing, mean_dict, std_dict, output_dir) for tile in all_tiles]
 
         with Pool(processes=num_workers) as pool:
             pool.starmap(standardize_single_tile, args)

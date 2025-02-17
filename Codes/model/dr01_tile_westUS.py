@@ -146,19 +146,19 @@ if __name__ == '__main__':
 
     use_cpu_nodes = assign_cpu_nodes([skip_standardize_train, skip_standardize_val, skip_standardize_test])
 
-    standardize_train_val_test(input_tile_dir=train_dir,
+    standardize_train_val_test(input_tile_dir=train_dir, exclude_bands_from_standardizing=exclude_standardizing_bands,
                                mean_dict=mean_dict, std_dict=std_dict,
                                split_type='train', output_dir=standardized_train_dir,
                                num_workers=use_cpu_nodes,
                                skip_processing=skip_standardize_train)
 
-    standardize_train_val_test(input_tile_dir=val_dir,
+    standardize_train_val_test(input_tile_dir=val_dir, exclude_bands_from_standardizing=exclude_standardizing_bands,
                                mean_dict=mean_dict, std_dict=std_dict,
                                split_type='val', output_dir=standardized_val_dir,
                                num_workers=use_cpu_nodes,
                                skip_processing=skip_standardize_val)
 
-    standardize_train_val_test(input_tile_dir=test_dir,
+    standardize_train_val_test(input_tile_dir=test_dir, exclude_bands_from_standardizing=exclude_standardizing_bands,
                                mean_dict=mean_dict, std_dict=std_dict,
                                split_type='test', output_dir=standardized_test_dir,
                                num_workers=use_cpu_nodes,

@@ -40,7 +40,6 @@ if __name__ == '__main__':
                      '../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac': 'irr_crop_frac',
                      '../../Data_main/rasters/Irrigated_cropland': 'irr_cropland',
                      '../../Data_main/rasters/maxRH/WestUS_growing_season': 'maxRH',
-                     '../../Data_main/rasters/minRH/WestUS_growing_season': 'minRH',
                      '../../Data_main/rasters/shortRad/WestUS_growing_season': 'shortRad',
                      '../../Data_main/rasters/vpd/WestUS_growing_season': 'vpd',
                      '../../Data_main/rasters/sunHr/WestUS_growing_season': 'sunHr',

@@ -12,7 +12,7 @@ from Codes.model.utils_cnn import main, plot_learning_curve, test, unstandardize
 
 if __name__ == '__main__':
     # model version
-    model_version = 'v6'                                                #####
+    model_version = 'v7'                                                #####
 
     # model switches
     tune_params = False                                 ################################################################
@@ -25,7 +25,7 @@ if __name__ == '__main__':
 
     # default variables (from hyperparameter tuning process)
     batch_size = 128                                                    ##### batch size of DataLoader
-    n_features = 15                                                     ##### number of input channel in a tile
+    n_features = 21                                                     ##### number of input channel in a tile
     n_epochs = 90                                                       #####
     input_size = 7                                                      ##### height/width dim of a tile
     padding = 'same'                                                    #####
@@ -133,14 +133,14 @@ if __name__ == '__main__':
     # 4. Explainable AI plots (using SHAP)
     # ------------------------------------------------------------------------------------------------------------------
     # current input variables' name in the model are as follows, replaces by representative names
-    # ['netGWIrr', 'peff', 'ret', 'precip', 'tmax', 'ET', 'irr_crop_frac', 'irr_cropland',
-    # 'maxRH', 'minRH', 'shortRad', 'vpd', 'sunHr', 'sw_huc12', 'gw_perc_huc12']
+    # ['netGWIrr', 'peff', 'ret', 'precip', 'tmax', 'ET', 'irr_crop_frac',
+    # 'irr_cropland', 'maxRH', 'shortRad', 'vpd', 'sunHr', 'sw_huc12', 'gw_perc_huc12',
+    # 'spi', 'spei', 'eddi', 'arid', 'cold', 'temp_Dry', 'temp_noDry']
     feature_names = ['consumptive groundwater use', 'effective precipitation', 'reference ET', 'precipitation',
                      'maximum temperature', 'ET', 'fraction of irrigated cropland', 'irrigated cropland',
-                     'maximum relative humidity', 'minimum relative humidity', 'downward shortwave radiation',
-                     'vapor pressure deficit', 'daylight duration', 'HUC12 surface water irrigation',
-                     'HUC12 groundwater use %']
-
+                     'maximum relative humidity', 'downward shortwave radiation', 'vapor pressure deficit',
+                     'daylight duration', 'HUC12 surface water irrigation', 'HUC12 groundwater use %',
+                     'SPI', 'SPEI', 'EDDI', 'Arid', 'Cold', 'Temperate dry summer', 'Temperate no dry summer']
 
     plot_shap_values(trained_model, tile_dir=tile_dir_train,
                      target_csv=target_csv_train, batch_size=batch_size,

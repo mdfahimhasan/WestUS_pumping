@@ -17,7 +17,7 @@ from utils_tiles import make_multiband_datasets, make_training_tiles, \
 
 
 if __name__ == '__main__':
-    # flags
+    # flags and vars
     skip_create_multiband_raster = False    #############################################################################
     skip_create_tile = False                #############################################################################
     skip_split_train_val_test = False       #############################################################################
@@ -26,6 +26,11 @@ if __name__ == '__main__':
     skip_standardize_val = False            #############################################################################
     skip_standardize_test = False           #############################################################################
 
+
+    static_keywords = {'stateID', 'arid', 'cold', 'temp_Dry', 'temp_noDry'}   ##########################################
+
+    exclude_standardizing_bands = \
+    ['irr_cropland', 'arid', 'cold', 'temp_Dry', 'temp_noDry']                ##########################################
 
     # ------------------------------------------------------------------------------------------------------------------
     # 1. Multi-band raster creation for model training (includes pumping data in 1st band)
@@ -50,16 +55,14 @@ if __name__ == '__main__':
                      '../../Data_main/rasters/eddi/WestUS_WaterYear': 'eddi',
                      '../../Data_main/rasters/Koppen_geiger/OneHotEncoded/arid': 'arid',
                      '../../Data_main/rasters/Koppen_geiger/OneHotEncoded/cold': 'cold',
-                     '../../Data_main/rasters/Koppen_geiger/OneHotEncoded/temperate_dry_summer': 'temp_dry',
-                     '../../Data_main/rasters/Koppen_geiger/OneHotEncoded/temperate_no_dry_summer': 'temp_no_dry',
+                     '../../Data_main/rasters/Koppen_geiger/OneHotEncoded/temperate_dry_summer': 'temp_Dry',
+                     '../../Data_main/rasters/Koppen_geiger/OneHotEncoded/temperate_no_dry_summer': 'temp_noDry',
                      '../../Data_main/ref_rasters/stateID': 'stateID'}
 
-    static_keywords = {'stateID', 'arid', 'cold', 'temperate_dry_summer', 'temperate_no_dry'}
-    static_vars_dir = [i for i in datasets_dict.keys() if any(k in i for k in static_keywords)]
+    static_vars_dir = [i for i, j in datasets_dict.items() if any(k in j for k in static_keywords)]
     temporal_vars_dir = [i for i in datasets_dict.keys() if i not in static_vars_dir]
 
     multiband_key_list = list(datasets_dict.values())  # 'pumping_mm' and 'stateID' included here
-    print(multiband_key_list)
     westUS_multiband_dir = '../../Data_main/rasters/multibands_westUS/training/westUS'
 
     training_years = (2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
@@ -130,8 +133,6 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
     # 6. Standardize
     # ------------------------------------------------------------------------------------------------------------------
-    exclude_standardizing_bands = \
-    ['irr_cropland', 'arid', 'cold', 'temp_dry', 'temp_no_dry']     ####################################################
 
     train_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/train'
     standardized_train_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/standardized/train'

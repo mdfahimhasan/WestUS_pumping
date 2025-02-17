@@ -93,7 +93,7 @@ def create_multiband_raster(input_files_list, band_key_list, output_file, nodata
     """
     Create a multi-band image from a list of images.
 
-    *** The output files can be arranged with temporal bands (each representing a particular time's dataset)
+    *** The output files can be arranged with temporal all_bands (each representing a particular time's dataset)
         or feature (each band representing a variable)
 
     :param input_files_list: List of image file paths to be included in the multi-band image.
@@ -125,8 +125,8 @@ def create_multiband_raster(input_files_list, band_key_list, output_file, nodata
         for id, (layer, layer_name) in enumerate(zip(input_files_list, band_key_list), start=1):
 
             # # good checks to know if right data is placed under the right band during multiband creation
-            # print(f'{layer=}')
-            # print(f'{layer_name=}')
+            print(f'{layer=}')
+            print(f'{layer_name=}')
 
             # writing each band
             with rio.open(layer) as src:
@@ -193,7 +193,7 @@ class make_training_tiles:
     Processes a multi-band raster image into tiles of training data and associated feature attributes.
 
     **Caution**:
-    The `band_key_list` should only contain the names of the feature bands and exclude the target variable
+    The `band_key_list` should only contain the names of the feature all_bands and exclude the target variable
     and stateID name.
     """
 
@@ -391,7 +391,7 @@ class make_training_tiles:
                         valid_band_idxs = [i + 1 for i in all_band_idxs
                                            if i not in exclude_band_idxs]            # +1 again to convert to 1-based indexing
 
-                        # reading multi-band array for the window and with pumping and stateID bands excluded
+                        # reading multi-band array for the window and with pumping and stateID all_bands excluded
                         tile_arr = tiff.read(valid_band_idxs, window=window)
 
                         # checking if any array in the windowed tiff in entirely null (only no data values)
@@ -456,7 +456,7 @@ class make_training_tiles:
 
     def is_image_null(self, tile_arr):
         """
-        Checks all bands in an image array to see if there is an entirely null value band. A tile (image array) with
+        Checks all all_bands in an image array to see if there is an entirely null value band. A tile (image array) with
         a single data band with all null values will be rejected in the main code using this code.
 
         :param tile_arr: Multi-band image array.
@@ -465,14 +465,14 @@ class make_training_tiles:
         """
         # reading each band separately and checking if an entire band is null or not.
         # If any of the band is entirely null, this function will immediately return True and the tile will be skipped.
-        # Note that, an image where all bands have at least one valid pixel will pass this filter.
+        # Note that, an image where all all_bands have at least one valid pixel will pass this filter.
         for num_band in range(0, tile_arr.shape[0]):
             single_arr = tile_arr[num_band]
 
             if np.all(single_arr == self.nodata_value):
                 return True
 
-        # If no bands are null, return False
+        # If no all_bands are null, return False
         return False
 
     @staticmethod
@@ -640,12 +640,12 @@ def accumulate_band_values_each_tile(tile, bands, nodata):
 
     :return: A dictionary containing per-band statistics (mean, std, min, max).
     """
-    dataset = rio.open(tile).read()  # reading all input bands in a tile
+    dataset = rio.open(tile).read()  # reading all input all_bands in a tile
     band_values = {band: [] for band in bands}
 
     # process for each band in the tile
     for band in bands:
-        # extracting band index from 'bands' list
+        # extracting band index from 'all_bands' list
         # then, extracting corresponding array for that band and flattening
         band_idx = bands.index(band)
         band_arr = dataset[band_idx].flatten()
@@ -768,7 +768,7 @@ def standardize_single_tile(tile, exclude_bands_from_standardizing, mean_dict, s
 
     :return: None.
     """
-    # opening data for each tile, getting bands, crs, and affine transformation
+    # opening data for each tile, getting all_bands, crs, and affine transformation
     file = rio.open(tile)
     data_arr = file.read()
 
@@ -780,12 +780,12 @@ def standardize_single_tile(tile, exclude_bands_from_standardizing, mean_dict, s
 
 
     if file.count != len(bands):  # exiting code in case number of band names and number of array don't match
-        raise ValueError("Number of bands in metadata and number of array don't match")
+        raise ValueError("Number of all_bands in metadata and number of array don't match")
 
     if not np.isnan(file.nodata):  # ensuring no data type as np.nan as this code will set 0 to no data position
         raise ValueError(f"Expected no data value to be NaN, but got {file.nodata}.")
 
-    # initiating a new array (with all zeros) to store standardized bands
+    # initiating a new array (with all zeros) to store standardized all_bands
     standardized_arr = np.zeros_like(data_arr, dtype=np.float32)
 
     # performing standardization for each band
@@ -794,15 +794,15 @@ def standardize_single_tile(tile, exclude_bands_from_standardizing, mean_dict, s
         mean_val = mean_dict[band]
         std_val = std_dict[band]
 
-        # extracting band index from 'bands' list
+        # extracting band index from 'all_bands' list
         band_idx = bands.index(band)
 
-        # standardizing (except specifically listed bands, boolean arrays)
+        # standardizing (except specifically listed all_bands, boolean arrays)
         if band not in exclude_bands_from_standardizing:
             band_arr = data_arr[band_idx]
             band_arr = np.where(~np.isnan(band_arr), (band_arr - mean_val) / std_val, band_arr)
 
-        else:  # for specifically listed bands, use the original array
+        else:  # for specifically listed all_bands, use the original array
             band_arr = data_arr[band_idx]
 
         # saving band in the initiated zero array

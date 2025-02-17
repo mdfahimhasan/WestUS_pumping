@@ -877,6 +877,7 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
 
 def create_annual_dataframes_for_pumping_prediction(years_list, yearly_data_path_dict,
                                                     static_data_path_dict, datasets_to_include,
+                                                    irrigated_cropland_dir,
                                                     output_dir, skip_processing=False):
     """
     Create annual dataframes of predictors to generate annual pumping prediction.
@@ -887,6 +888,7 @@ def create_annual_dataframes_for_pumping_prediction(years_list, yearly_data_path
     :param static_data_path_dict: A dictionary with yearly variables' names as keys and their paths as values.
                                   Set to None if there is no yearly dataset.
     :param datasets_to_include: A list of datasets to include in the dataframe.
+    :param irrigated_cropland_dir: Filepath of directory of irrigated cropland raster.
     :param output_dir: Filepath of output directory.
     :param skip_processing: Set to True to skip this dataframe creation process.
 
@@ -899,7 +901,6 @@ def create_annual_dataframes_for_pumping_prediction(years_list, yearly_data_path
                 print(f'creating dataframe for prediction - year {year}...')
 
                 variable_dict = {}              # empty dict to store data for each variable
-                nan_pos_dict = {}               # empty dict to store data for nan pos. of each variable
 
                 # reading yearly data and storing it in a dictionary
                 for var in yearly_data_path_dict.keys():
@@ -917,16 +918,9 @@ def create_annual_dataframes_for_pumping_prediction(years_list, yearly_data_path
                             static_data = glob(os.path.join(static_data_path_dict[var], '*.tif'))[0]
                             data_arr = read_raster_arr_object(static_data, get_file=False).flatten()
 
-                            # tracking nan_positions
-                            nan_pos_dict[var] = np.isnan(data_arr)
-
                             # storing data
                             data_arr[np.isnan(data_arr)] = 0  # setting nan-position values with 0
                             variable_dict[var] = list(data_arr)
-
-                # saving the nan position dict as pickle
-                dict_path = os.path.join(output_dir, f'nan_pos_{year}.pkl')
-                pickle.dump(nan_pos_dict, open(dict_path, mode='wb+'))
 
                 # storing collected data into a dataframe
                 predictor_df = pd.DataFrame(variable_dict)
@@ -936,6 +930,13 @@ def create_annual_dataframes_for_pumping_prediction(years_list, yearly_data_path
                 monthly_output_csv = os.path.join(output_dir, f'predictors_{year}.csv')
                 predictor_df.to_csv(monthly_output_csv, index=False)
 
+                # creating nan position dictionary based on irrigated cropland data and saving it
+                irrigated_cropland_raster = glob(os.path.join(irrigated_cropland_dir, f'*{year}.tif'))[0]
+                irr_arr = read_raster_arr_object(irrigated_cropland_raster, get_file=False)
+
+                nan_pos_dict = {'irr': np.isnan(irr_arr).flatten()}
+                dict_path = os.path.join(output_dir, f'nan_pos_{year}.pkl')
+                pickle.dump(nan_pos_dict, open(dict_path, mode='wb+'))
     else:
         pass
 
@@ -967,7 +968,7 @@ def predict_annual_pumping_rasters(trained_model, years_list, exclude_columns,
         ref_shape = ref_arr.shape
 
         for year in years_list:
-            print(f'Generating {prediction_name_keyword} prediction raster for year: {year}...')
+            print(f'\nGenerating {prediction_name_keyword} prediction raster for year: {year}...')
 
             # loading input variable dataframe and nan position dict
             # also filtering out excluded columns
@@ -978,16 +979,14 @@ def predict_annual_pumping_rasters(trained_model, years_list, exclude_columns,
             df = df.drop(columns=exclude_columns)
             df = reindex_df(df)
 
-            nan_pos_dict = pickle.load(open(nan_pos_dict_path, mode='rb'))
-
             # generating prediction raster with trained model
             pred_arr = trained_model.predict(df)
             pred_arr = np.array(pred_arr)
 
             # replacing nan positions with -9999
+            nan_pos_dict = pickle.load(open(nan_pos_dict_path, mode='rb'))
             for var_name, nan_pos in nan_pos_dict.items():
-                if var_name not in exclude_columns:
-                    pred_arr[nan_pos] = ref_file.nodata  # ref raster has -9999 as no data
+                pred_arr[nan_pos] = ref_file.nodata  # ref raster has -9999 as no data
 
             # reshaping the prediction raster for Western US and saving
             pred_arr = pred_arr.reshape(ref_shape)

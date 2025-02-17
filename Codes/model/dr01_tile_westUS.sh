@@ -2,7 +2,7 @@
 
 ## running the dr01_tile_westUS.py script on CPU nodes
 
-#SBATCH --partition=smi_all
+#SBATCH --partition=all
 #SBATCH --ntasks=30
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1 #Request 1 GPU

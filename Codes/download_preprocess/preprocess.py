@@ -28,7 +28,7 @@ WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
 def extract_month_from_GrowSeason_data(GS_data_dir, skip_processing=False):
     """
     Extract start and ending growing season months from growing season dataset (provided by Justin Huntington DRI;
-    downloaded from GEE to google drive). The output datasets have 2 bands, containing start and end month info,
+    downloaded from GEE to google drive). The output datasets have 2 all_bands, containing start and end month info,
     respectively.
 
     :param GS_data_dir: Directory path of growing season dataset. The GEE-downloaded datasets are in the
@@ -86,7 +86,7 @@ def extract_month_from_GrowSeason_data(GS_data_dir, skip_processing=False):
             start_months = vectorized_doy_to_date(year, startDOY_arr)
             end_months = vectorized_doy_to_date(year, endDOY_arr)
 
-            # stacking the arrays together (single tif with 2 bands)
+            # stacking the arrays together (single tif with 2 all_bands)
             GS_month_arr = np.stack((start_months, end_months), axis=0)
 
             # saving the array

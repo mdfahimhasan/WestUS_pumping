@@ -205,19 +205,19 @@ def get_gee_dict(data_name):
     }
 
     gee_band_dict = {
-        'Landsat5_NDVI': ['SR_B4', 'SR_B3'],    # bands for NIR and Red, respectively
-        'Landsat8_NDVI': ['SR_B5', 'SR_B4'],    # bands for NIR and Red, respectively
-        'Landsat5_OSAVI': ['SR_B4', 'SR_B3'],   # bands for NIR and Red, respectively
-        'Landsat8_OSAVI': ['SR_B5', 'SR_B4'],   # bands for NIR and Red, respectively
-        'Landsat5_NDMI': ['SR_B4', 'SR_B5'],    # bands for NIR and SWIR1, respectively
-        'Landsat8_NDMI': ['SR_B5', 'SR_B6'],    # bands for NIR and SWIR1, respectively
-        'Landsat5_GCVI': ['SR_B4', 'SR_B2'],    # bands for NIR and Green, respectively
-        'Landsat8_GCVI': ['SR_B4', 'SR_B2'],    # bands for NIR and Green, respectively,
+        'Landsat5_NDVI': ['SR_B4', 'SR_B3'],    # all_bands for NIR and Red, respectively
+        'Landsat8_NDVI': ['SR_B5', 'SR_B4'],    # all_bands for NIR and Red, respectively
+        'Landsat5_OSAVI': ['SR_B4', 'SR_B3'],   # all_bands for NIR and Red, respectively
+        'Landsat8_OSAVI': ['SR_B5', 'SR_B4'],   # all_bands for NIR and Red, respectively
+        'Landsat5_NDMI': ['SR_B4', 'SR_B5'],    # all_bands for NIR and SWIR1, respectively
+        'Landsat8_NDMI': ['SR_B5', 'SR_B6'],    # all_bands for NIR and SWIR1, respectively
+        'Landsat5_GCVI': ['SR_B4', 'SR_B2'],    # all_bands for NIR and Green, respectively
+        'Landsat8_GCVI': ['SR_B4', 'SR_B2'],    # all_bands for NIR and Green, respectively,
         'MODIS_Day_LST': 'LST_Day_1km',
         'MODIS_Terra_NDVI': 'NDVI',
         'MODIS_Terra_EVI': 'EVI',
-        'MODIS_NDMI': ['sur_refl_b02', 'sur_refl_b06'],  # bands for NIR and SWIR, respectively
-        'MODIS_NDVI': ['sur_refl_b02', 'sur_refl_b01'],  # bands for NIR and Red, respectively
+        'MODIS_NDMI': ['sur_refl_b02', 'sur_refl_b06'],  # all_bands for NIR and SWIR, respectively
+        'MODIS_NDVI': ['sur_refl_b02', 'sur_refl_b01'],  # all_bands for NIR and Red, respectively
         'MODIS_LAI': 'Lai_500m',
         'GRIDMET_Precip': 'pr',  # daily total, unit in mm
         'GRIDMET_RET': 'etr',
@@ -593,7 +593,7 @@ def download_soil_datasets(data_name, download_dir, merge_keyword,
     if data_name in ['Field_capacity', 'Bulk_density', 'Sand_content', 'Clay_content']:
         data, all_bands, multiply_scale, reducer, _, _, _, _ = get_gee_dict(data_name)
 
-        # selecting datasets with all bands ['b0', 'b10', 'b30', 'b60', 'b100', 'b200']
+        # selecting datasets with all all_bands ['b0', 'b10', 'b30', 'b60', 'b100', 'b200']
         data_all_bands = ee.Image(data).select(all_bands)
 
         # calculating band average
@@ -1212,7 +1212,7 @@ def download_drought_indices_water_year(data_name, download_dir, year_list, merg
 
     for year in year_list:  # first loop for year_list
 
-        # We are downloading drought indices in the '1y' bands, meaning the index is calculated based on
+        # We are downloading drought indices in the '1y' all_bands, meaning the index is calculated based on
         # climate conditions (precipitation and PET) averaged over the previous 12 months.
         #
         # To align with the water year, we set the date to the **end of the water year** (~September 30).

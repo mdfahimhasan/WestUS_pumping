@@ -479,23 +479,25 @@ def create_GW_use_perc_rasters(HUC12_GW_perc_shape, output_dir, resolution=model
             write_array_to_raster(final_sw_arr, file, file.transform, output_raster)
 
 
-def process_and_OneHotEncode_Koppen_Geiger(koppen_geiger_raster, output_dir, skip_processing=False):
+def process_and_OneHotEncode_Koppen_Geiger(koppen_geiger_raster, output_dir,
+                                           ref_raster=WestUS_raster, skip_processing=False):
     """
-    Process (clip + resample + reclassify + OneHotEncode) Kopen-Heiger climate data.
+    Process (clip + resample + reclassify + OneHotEncode) Kopen-Geiger climate data.
 
-    :param koppen_geiger_raster: Filepath of raw Koppen-Heiger raster data.
+    :param koppen_geiger_raster: Filepath of raw Koppen-Geiger raster data.
     :param output_dir: Filepath of output dir.
+    :param ref_raster: Western US reference raster.
     :param skip_processing: Set to True to skip this process.
 
     :return: None.
     """
     if not skip_processing:
-        print('processing Koppen-Heiger climate data...')
+        print('processing Koppen-Geiger climate data...')
 
         westUS_climate = \
             clip_resample_reproject_raster(input_raster=koppen_geiger_raster,
                                            input_shape=WestUS_shape,
-                                           raster_name='Koppen_Heiger_westUS.tif',
+                                           raster_name='Koppen_Geiger_westUS.tif',
                                            output_raster_dir=output_dir,
                                            clip=False, resample=False, clip_and_resample=True,
                                            targetaligned=True, resample_algorithm='near',
@@ -521,15 +523,19 @@ def process_and_OneHotEncode_Koppen_Geiger(koppen_geiger_raster, output_dir, ski
         reclassified_arr = np.where(np.isin(climate_arr, classification_map['temperate_no_dry_summer']), 3, reclassified_arr)
         reclassified_arr = np.where(np.isin(climate_arr, classification_map['cold']), 4, reclassified_arr)
 
-        output_reclassified_raster = os.path.join(output_dir, 'reclassified', 'Koppen_Heiger_westUS_classified.tif')
+        output_reclassified_raster = os.path.join(output_dir, 'reclassified', 'Koppen_Geiger_westUS_classified.tif')
         write_array_to_raster(reclassified_arr, raster_file, raster_file.transform, output_reclassified_raster,
                               dtype='float32')
 
+        # reference raster
+        ref_arr = read_raster_arr_object(ref_raster, get_file=False)
+
         # reclassifying categories and saving them separately for each category
         for category, values in classification_map.items():
-            perCategory_arr = np.where(np.isin(climate_arr, values), 1, -9999)
+            perCategory_arr = np.where(np.isin(climate_arr, values), 1, 0)
+            perCategory_arr[np.isnan(ref_arr)] = -9999           # setting -9999 outside of western Us
 
-            output_perCategory_raster = os.path.join(output_dir, 'OneHotEncoded', f'{category}.tif')
+            output_perCategory_raster = os.path.join(output_dir, f'OneHotEncoded/{category}', f'{category}.tif')
             write_array_to_raster(perCategory_arr, raster_file, raster_file.transform, output_perCategory_raster,
                                   dtype='float32')
     else:
@@ -700,6 +706,7 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
 
 
     # Koppen_Geiger climate data processing
-    process_and_OneHotEncode_Koppen_Geiger(koppen_geiger_raster='../../Data_main/rasters/Koppen_geiger/1991_2020/koppen_geiger_0p00833333.tif',
-                                           output_dir='../../Data_main/rasters/Koppen_geiger',
-                                           skip_processing=skip_koppen_geiger_processing)
+    process_and_OneHotEncode_Koppen_Geiger(
+        koppen_geiger_raster='../../Data_main/rasters/Koppen_geiger/1991_2020/koppen_geiger_0p00833333.tif',
+        output_dir='../../Data_main/rasters/Koppen_geiger',
+        skip_processing=skip_koppen_geiger_processing)

@@ -997,4 +997,3 @@ def predict_annual_pumping_rasters(trained_model, years_list, exclude_columns,
                                   output_path=output_prediction_raster)
     else:
         pass
-

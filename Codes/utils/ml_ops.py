@@ -537,7 +537,7 @@ def test_model(trained_model, x_test, y_test, prediction_csv_path, categorical_c
 
     :return: trained LGBM regression model.
     """
-    makedirs([os.path.basename(prediction_csv_path)])
+    makedirs([os.path.dirname(prediction_csv_path)])
 
     # provision to include categorical data
     if categorical_columns is not None:

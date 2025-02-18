@@ -160,7 +160,7 @@ def mask_raster_by_shape(input_raster, input_shape, output_dir,
                 dtype=raster_arr.dtype,
                 count=raster_file.count,
                 crs=raster_file.crs,
-                transform=raster_file.transform,
+                transform=mask_transform,
                 nodata=nodata
         ) as dst:
             dst.write(masked_arr)

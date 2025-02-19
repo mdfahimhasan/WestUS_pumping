@@ -92,6 +92,7 @@ if __name__ == '__main__':
     use_cpu_nodes = assign_cpu_nodes([skip_create_tile])
 
     make_training_tiles(tiff_path_list=multiband_rasters, band_key_list=tile_band_list,
+                        train_band_name='pumping_mm',           ##########
                         interim_tile_output_dir=interim_multiband_tile_dir,
                         interim_target_data_output_csv=interim_target_csv,
                         final_tile_output_dir=final_multiband_tile_dir,

@@ -590,6 +590,10 @@ def train_val_test_split_tiles(target_data_csv, input_tile_dir, train_dir, val_d
     if not skip_processing:
         print(f'making train-validation-test ({train_size * 100}-{val_size * 100}-{test_size * 100} %) splits....\n')
 
+        # removing existing output directories and making new ones
+        for dir_path in [train_dir, val_dir, test_dir]:
+            if os.path.exists(dir_path):
+                shutil.rmtree(dir_path)
         makedirs([train_dir, val_dir, test_dir])
 
         # loading the target data CSV
@@ -823,7 +827,7 @@ def standardize_single_tile(tile, exclude_bands_from_standardizing, mean_dict, s
             dtype=np.float32,
             crs=file_crs,
             transform=file_transform,
-            nodata=0
+            nodata=-9999
     ) as dst:
         for idx, band_arr in enumerate(standardized_arr):
             dst.write(band_arr, idx+1)
@@ -851,7 +855,10 @@ def standardize_train_val_test(input_tile_dir, mean_dict, std_dict,  exclude_ban
     if not skip_processing:
         print(f"standardizing '{split_type}' tiles... \n")
 
-        # creating new directory for standardized datasets
+        # removing and creating new directory for standardized datasets
+        if os.path.exists(output_dir):
+            shutil.rmtree(output_dir)
+
         makedirs([output_dir])
 
         # collecting all tiles in the training data directory

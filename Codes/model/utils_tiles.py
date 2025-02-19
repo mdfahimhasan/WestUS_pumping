@@ -205,7 +205,7 @@ class make_training_tiles:
         """
         :param tiff_path_list (list): List of paths to the multi-band raster TIFF file to process.
         :param band_key_list (list): List of keys or descriptions for each band.
-        :param train_band_name (str): name of the training band. 'pumping_mm' or 'netGW_Irr'.
+        :param train_band_name (str): name of the training band. 'pumping_mm' or 'netGWIrr'.
         :param interim_tile_output_dir (str): Interim directory where the processed tiles will be saved.
         :param final_tile_output_dir (str): Final directory where the processed tiles will be saved.
         :param interim_target_data_output_csv (str): Filepath to save the interim target training data as CSV.
@@ -342,7 +342,7 @@ class make_training_tiles:
                     - tiff_path: Path to the raster file so the worker can open and read it independently.
                     - band_key_list: List of band names or keys for saving tiles. It has been modified with 'year' name
                     - start_tile_no: The initial tile number for this chunk, assigned from `cumulative_tile_no`.
-                    - train_band_name: name of the training band. 'pumping_mm' or 'netGW_Irr'.
+                    - train_band_name: name of the training band. 'pumping_mm' or 'netGWIrr'.
                     - target_data_list: Shared multiprocessing list for storing target data.
                     - config: Contains additional settings like tile_size, nodata_value, and interim_tile_output_dir.
 
@@ -357,11 +357,11 @@ class make_training_tiles:
         with rio.open(tiff_path) as tiff:
             tile_radius = config['tile_size'] // 2
 
-            # reading training band (pumping/netGW_Irr) and stateID array
+            # reading training band (pumping/netGWIrr) and stateID array
             bands = tiff.descriptions  # list of band names
 
             train_band_idx = bands.index(train_band_name) + 1   # +1 due to rasterio-based indexing
-            training_band = tiff.read(train_band_idx)        # reading training data (pumping_mm/netGW_Irr)
+            training_band = tiff.read(train_band_idx)        # reading training data (pumping_mm/netGWIrr)
 
             stateID_idx = bands.index('stateID') + 1           # +1 due to rasterio-based indexing
             stateID_band = tiff.read(stateID_idx)              # reading stateID band
@@ -389,7 +389,7 @@ class make_training_tiles:
                         window = Window(col_off=col - tile_radius, row_off=row - tile_radius,
                                         width=self.tile_size, height=self.tile_size)
 
-                        # keeping only the arrays except the train data (pumping_mm/netGW_Irr) and stateID band
+                        # keeping only the arrays except the train data (pumping_mm/netGWIrr) and stateID band
                         all_band_idxs = list(range(len(bands)))                      # 0-based indices
                         exclude_band_idxs = [train_band_idx - 1, stateID_idx - 1]  # -1 as the indices were 1-based
                         valid_band_idxs = [i + 1 for i in all_band_idxs

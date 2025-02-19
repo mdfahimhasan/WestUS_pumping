@@ -385,6 +385,10 @@ class make_training_tiles:
                         if center_train_value == self.nodata_value:
                             continue
 
+                        # skipping tile with zero in the center pixel of the tile
+                        if center_train_value == 0:
+                            continue
+
                         # creating a window around the central pixel and reading the data
                         window = Window(col_off=col - tile_radius, row_off=row - tile_radius,
                                         width=self.tile_size, height=self.tile_size)

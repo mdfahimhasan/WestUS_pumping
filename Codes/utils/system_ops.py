@@ -119,7 +119,7 @@ def assign_cpu_nodes(flags):
         if os_name == 'Windows':  # Windows
             use_cpu_nodes = 10    # capped at 10 as Windows is local PC
         elif os_name == 'Linux':  # Linux
-            use_cpu_nodes = 30    # capped at 30 as Linux is HPC
+            use_cpu_nodes = 60    # capped at 60 as Linux is HPC
         else:
             raise ValueError(f'Unsupported OS: {os_name}. Must be Windows or Linux.')
 

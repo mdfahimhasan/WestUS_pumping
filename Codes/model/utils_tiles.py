@@ -20,12 +20,15 @@ to improve  efficiency, accuracy, and readability of the script, considering the
 
 import os
 import shutil
+import platform
+import subprocess
 import numpy as np
 import pandas as pd
 from glob import glob
 import rasterio as rio
 from rasterio.windows import Window
 from multiprocessing import Pool, Manager
+from multiprocessing.pool import ThreadPool
 from sklearn.model_selection import train_test_split
 
 from Codes.utils.system_ops import makedirs, copy_file, clean_and_make_directory
@@ -196,17 +199,16 @@ class make_training_tiles:
     """
 
     def __init__(self, tiff_path_list, band_key_list, train_band_name,
-                 interim_tile_output_dir, interim_target_data_output_csv,
-                 final_tile_output_dir, final_target_data_output_csv,
-                 tile_size=7, nodata_value=-9999, nodata_threshold=50, start_tile_no=1,
+                 tile_output_dir, target_data_output_csv, mode,
+                 tile_size=7, nodata_value=-9999, nodata_threshold=50,
                  num_workers=20, skip_processing=False):
         """
         :param tiff_path_list (list): List of paths to the multi-band raster TIFF file to process.
         :param band_key_list (list): List of keys or descriptions for each band.
         :param train_band_name (str): name of the training band. 'pumping_mm' or 'netGWIrr'.
-        :param interim_tile_output_dir (str): Interim directory where the processed tiles will be saved.
-        :param final_tile_output_dir (str): Final directory where the processed tiles will be saved.
-        :param interim_target_data_output_csv (str): Filepath to save the interim target training data as CSV.
+        :param tile_output_dir (str): Directory where the processed tiles will be saved.
+        :param target_data_output_csv (str): Filepath to save the target training data as CSV.
+        :param mode (str): Either 'pretrain' or finetune'.
         :param tile_size (int): Size of the square tile (e.g., 7x7). Must be odd to ensure a center pixel.
         :param nodata_value (int/float): NoData value in the raster (default: -9999).
         :param nodata_threshold (int): Maximum percentage of NoData values allowed in a tile (default: 50).
@@ -214,14 +216,14 @@ class make_training_tiles:
         :param num_workers: int. Number of parallel processes to use for multiprocessing. Default is 20.
         :param skip_processing (bool): If True, skips processing and initializes the class without performing operations.
         """
-        self.interim_tile_output_dir = interim_tile_output_dir
-        self.interim_target_data_output_csv = interim_target_data_output_csv
-        self.final_tile_output_dir = final_tile_output_dir
-        self.final_target_data_output_csv = final_target_data_output_csv
+
+        self.tile_output_dir = tile_output_dir
+        self.target_data_output_csv = target_data_output_csv
+        self.mode = mode
         self.tile_size = tile_size
         self.nodata_value = nodata_value
         self.nodata_threshold = nodata_threshold
-        self.tile_no = start_tile_no
+        self.start_tile_no = 1              # initiating start_tile_no as 1, will be updated after every tiff processing
         self.num_workers = num_workers
         self.train_band_name = train_band_name
 
@@ -229,18 +231,14 @@ class make_training_tiles:
         # implementing the tiling using multi-processing (multiprocess has been used to fasten processing speed)
         if not skip_processing:
             # removing old output files and making a new folder
-            if os.path.exists(self.final_tile_output_dir):
-                shutil.rmtree(self.final_tile_output_dir)
+            if os.path.exists(self.tile_output_dir):
+                shutil.rmtree(self.tile_output_dir)
 
-            makedirs([self.interim_tile_output_dir])
+            makedirs([self.tile_output_dir])
 
             for tiff_path in tiff_path_list:
-                cumulative_tile_no = self.process_tiles(tiff_path, band_key_list)
-                self.tile_no = cumulative_tile_no  # updating the self.tile_no after each multi-band raster iteration
-
-            # final process to serialize tile_no (multiprocess sets tile_no based on total central pixel
-            # processed in each chunk, resulting in large value of tile_no that need to be serialized)
-            self._final_update_tile_no()
+                last_tile_no = self.process_tiles(tiff_path, band_key_list)
+                self.start_tile_no = last_tile_no + 1  # updating the self.start_tile_no after each multi-band raster iteration
 
     def process_tiles(self, tiff_path, band_key_list):
         """
@@ -254,8 +252,8 @@ class make_training_tiles:
         :param band_key_list: list. List of keys or descriptions for each band in the raster, excluding the target band.
 
         :return: None
-            Saves the output tiles as multi-band GeoTIFF files in the specified directory (`interim_tile_output_dir`)
-            and the target data (tile numbers and center pixel values) as a CSV file (`interim_target_data_output_csv`).
+            Saves the output tiles as multi-band GeoTIFF files in the output directory
+            and the target data (tile numbers and center pixel values) as a CSV file.
 
         **Details**:
         - The raster is divided into row chunks of 100 rows each (adjusted for tile size to avoid edge cases).
@@ -270,66 +268,62 @@ class make_training_tiles:
         year = os.path.basename(tiff_path).split('.')[0].split('_')[-1]
         band_key_list_mod = [(i + '_' + year) for i in band_key_list]
 
-        print(f'\ncreating multi-band tiles for {year}...')
+        print(f'\nCreating multi-band tiles for {year}...')
 
         # opening a multi-band image file. The tile-ing operation will be done inside the opened image file.
         with rio.open(tiff_path) as tiff:
             tiff_height = tiff.height
             tile_radius = self.tile_size // 2
             row_chunks = [range(start, min(start + 100, tiff_height - tile_radius))
-                          for start in range(tile_radius, tiff_height - tile_radius, 100)]  # Chunk size of 100 rows
+                          for start in range(tile_radius, tiff_height - tile_radius, 100)]    # Chunk size of 100 rows
 
-            print(f'processing multi-band raster in {len(row_chunks)} chunks \n')
+            print(f'Processing raster in {len(row_chunks)} chunks...')
 
-            # Manager() is used to create a shared list (`target_data_list`) for storing target data across worker processes.
+            # Manager() is used to create a shared list (`target_data_list`) for storing target data across worker
+            # processes. Also, creating a shared counter for tile numbers.
+            # Lock() ensures only one process modifies tile_counter.value at a time.
             manager = Manager()
-            target_data_list = manager.list()  # shared list of target data
+            target_data_list = manager.list()
+            tile_counter = manager.Value('i', self.start_tile_no)
+            lock = manager.Lock()
 
-            # assigning a unique starting tile number for each chunk using `cumulative_tile_no`.
-            # This ensures unique tile IDs across different chunks and raster files.
-            cumulative_tile_no = self.tile_no
-
-            # # # # # # # # # # # # # # # preparing the input arguments for each worker process: # # # # # # # # # # # #
+            # preparing the input arguments for each worker process
             config = {
                 'tile_size': self.tile_size,
                 'nodata_value': self.nodata_value,
-                'interim_tile_output_dir': self.interim_tile_output_dir,
+                'tile_output_dir': self.tile_output_dir,
                 'nodata_threshold': self.nodata_threshold
             }
 
-            # initiating an empty list to store pool inputs
-            pool_input =[]
+            pool_input = [(chunk, tiff_path, band_key_list_mod, self.train_band_name, target_data_list, config,
+                           tile_counter, lock) for chunk in row_chunks]
 
             # processing data with multiprocessing
-            for chunk_idx, chunk in enumerate(row_chunks):
-
-                # assigning the starting tile number for the current chunk
-                start_tile_no = cumulative_tile_no
-                cumulative_tile_no += len(chunk) * (tiff.width - 2 * tile_radius)  # approximate number of tile in this chunk
-
-                print(f'Chunk {chunk_idx} starts with tile_no {start_tile_no}')  # debugging
-                pool_input.append((chunk, tiff_path, band_key_list_mod, start_tile_no,
-                                   self.train_band_name, target_data_list, config))
-
-
-            # # # # # # creating a multiprocessing pool with a specified number of worker processes  # # # # # # # # # #
-            # This will control resource usage during parallel raster chunk processing.
             with Pool(processes=self.num_workers) as pool:
-                pool.map(self._process_chunk_worker, pool_input)
+                results = pool.map(self._process_chunk_worker, pool_input)
 
-            # saving the training data to a CSV file
+            # getting the maximum tile number from the results, ignoring None values
+            last_tile_no = max([res for res in results if res is not None], default=self.start_tile_no)
+
+            # converting target data list to a dataframe
             # ensure DataFrame has column names even if empty
             if len(target_data_list) > 0:
                 target_df = pd.DataFrame(list(target_data_list))  # converting Manager.list() to python list >> DataFrame
             else:
-                target_df = pd.DataFrame(columns=['tile_no', 'stateID', 'target_value'])  # Ensure correct column names
+                target_df = pd.DataFrame(columns=['tile_no', 'stateID', 'target_value'])  # ensuring correct column names
 
-            target_df.to_csv(self.interim_target_data_output_csv, mode='a',
-                             header=not os.path.exists(self.interim_target_data_output_csv),
-                             index=False)
+            if self.mode == 'pretrain':
+                # replacing samples (very few) with stateID 3 - Nebraska and 1 -  Oklahoma. They belong to kansas
+                # but came in Nebraska and Oklahoma during stateID raster creation (along state border)
+                # otherwise train_val_test split function throws error
+                target_df.loc[target_df['stateID'] == 3, 'stateID'] = 12
+                target_df.loc[target_df['stateID'] == 1, 'stateID'] = 12
 
-            # returning the updated 'cumulative_tile_no' which will be used to update the 'self.tile_no' in __init__()
-            return cumulative_tile_no
+            # saving the training data to a CSV file
+            target_df.to_csv(self.target_data_output_csv, index=False)
+
+            return last_tile_no
+
 
     def _process_chunk_worker(self, args):
         """
@@ -342,15 +336,19 @@ class make_training_tiles:
                     - start_tile_no: The initial tile number for this chunk, assigned from `cumulative_tile_no`.
                     - train_band_name: name of the training band. 'pumping_mm' or 'netGWIrr'.
                     - target_data_list: Shared multiprocessing list for storing target data.
-                    - config: Contains additional settings like tile_size, nodata_value, and interim_tile_output_dir.
+                    - config: Contains additional settings like tile_size, nodata_value, and tile_output_dir.
+                    - tile_counter: A shared **multiprocessing.Value** that ensures each tile gets a unique number
+                                   across all processes. It starts from `start_tile_no` and increments sequentially.
+                    - lock: A **multiprocessing.Lock()** to prevent race conditions when updating `tile_counter`.
+                            Ensures only one process updates the counter at a time.
 
         :return: None.
                  Results (e.g., tile numbers and target data) are saved in shared objects (tile_no, target_data_list)
                           and do not need to be returned.
         """
-        chunk, tiff_path, band_key_list, start_tile_no, train_band_name, target_data_list, config = args
+        chunk, tiff_path, band_key_list, train_band_name, target_data_list, config, tile_counter, lock = args
 
-        current_tile_no = start_tile_no  # initializing the local tile number for this chunk
+        last_tile_no = None  # Initialize last_tile_no to prevent UnboundLocalError
 
         with rio.open(tiff_path) as tiff:
             tile_radius = config['tile_size'] // 2
@@ -358,11 +356,11 @@ class make_training_tiles:
             # reading training band (pumping/netGWIrr) and stateID array
             bands = tiff.descriptions  # list of band names
 
-            train_band_idx = bands.index(train_band_name) + 1   # +1 due to rasterio-based indexing
-            training_band = tiff.read(train_band_idx)        # reading training data (pumping_mm/netGWIrr)
+            train_band_idx = bands.index(train_band_name) + 1  # +1 due to rasterio-based indexing
+            training_band = tiff.read(train_band_idx)  # reading training data (pumping_mm/netGWIrr)
 
-            stateID_idx = bands.index('stateID') + 1           # +1 due to rasterio-based indexing
-            stateID_band = tiff.read(stateID_idx)              # reading stateID band
+            stateID_idx = bands.index('stateID') + 1  # +1 due to rasterio-based indexing
+            stateID_band = tiff.read(stateID_idx)  # reading stateID band
 
             # The first loop iterates across chunk (each chunk has 100 rows by default) and
             # the second loop across the width (columns) of the raster.
@@ -389,13 +387,13 @@ class make_training_tiles:
 
                         # creating a window around the central pixel and reading the data
                         window = Window(col_off=col - tile_radius, row_off=row - tile_radius,
-                                        width=self.tile_size, height=self.tile_size)
+                                        width=config['tile_size'], height=config['tile_size'])
 
                         # keeping only the arrays except the train data (pumping_mm/netGWIrr) and stateID band
-                        all_band_idxs = list(range(len(bands)))                      # 0-based indices
+                        all_band_idxs = list(range(len(bands)))  # 0-based indices
                         exclude_band_idxs = [train_band_idx - 1, stateID_idx - 1]  # -1 as the indices were 1-based
                         valid_band_idxs = [i + 1 for i in all_band_idxs
-                                           if i not in exclude_band_idxs]            # +1 again to convert to 1-based indexing
+                                           if i not in exclude_band_idxs]  # +1 again to convert to 1-based indexing
 
                         # reading multi-band array for the window with train data and stateID bands excluded
                         tile_arr = tiff.read(valid_band_idxs, window=window)
@@ -409,6 +407,14 @@ class make_training_tiles:
                         if any(perc > self.nodata_threshold for perc in nodata_percentage):
                             continue
 
+                        # assigning a sequential tile number using shared counter
+                        with lock:
+                            tile_no = tile_counter.value
+                            tile_counter.value += 1      # incrementing counter
+
+                        # Keeping track of the last tile number used
+                        last_tile_no = tile_no
+
                         # replacing NoData values with np.nan
                         tile_arr[tile_arr == self.nodata_value] = np.nan
 
@@ -416,8 +422,8 @@ class make_training_tiles:
                         crs = tiff.crs
                         window_transform = tiff.window_transform(window)
 
-                        tile_name = f'tile_{current_tile_no}.tif'
-                        output_file = os.path.join(config['interim_tile_output_dir'], tile_name)
+                        tile_name = f'tile_{tile_no}.tif'
+                        output_file = os.path.join(config['tile_output_dir'], tile_name)
 
                         try:
                             self.save_tile(output_file, tile_arr, crs, window_transform, band_key_list)
@@ -427,14 +433,34 @@ class make_training_tiles:
                             continue
 
                         # append target (training) data to target_data_list, along with tile_no and stateID
-                        target_data_list.append({'tile_no': current_tile_no, 'stateID': stateID_val,
+                        target_data_list.append({'tile_no': tile_no, 'stateID': stateID_val,
                                                  'target_value': center_train_value})
-                        current_tile_no += 1
 
                     except Exception as e:
                         # Log and skip problematic tiles
-                        print(f'Skipping tile at row {row}, col {col} due to read error: {e}')
+                        print(f"Skipping tile due to error: {e}")
                         continue
+
+        return last_tile_no
+
+    @staticmethod
+    def save_tile(output_file, tile_arr, crs, transform, band_key_list):
+        with rio.open(
+                output_file,
+                'w',
+                driver='GTiff',
+                height=tile_arr.shape[1],
+                width=tile_arr.shape[2],
+                dtype=tile_arr.dtype,
+                count=tile_arr.shape[0],
+                crs=crs,
+                transform=transform,
+                nodata=np.nan
+        ) as dst:
+            for band_id in range(tile_arr.shape[0]):
+                dst.write(tile_arr[band_id], band_id + 1)
+                dst.set_band_description(band_id + 1, band_key_list[band_id])
+
 
     def calculate_nodata_percentage(self, tile_arr):
         """
@@ -481,94 +507,65 @@ class make_training_tiles:
         # If no all_bands are null, return False
         return False
 
-    @staticmethod
-    def save_tile(output_file, tile_arr, crs, transform, band_key_list):
-        with rio.open(
-                output_file,
-                'w',
-                driver='GTiff',
-                height=tile_arr.shape[1],
-                width=tile_arr.shape[2],
-                dtype=tile_arr.dtype,
-                count=tile_arr.shape[0],
-                crs=crs,
-                transform=transform,
-                nodata=np.nan
-        ) as dst:
-            for band_id in range(tile_arr.shape[0]):
-                dst.write(tile_arr[band_id], band_id + 1)
-                dst.set_band_description(band_id + 1, band_key_list[band_id])
 
-    def _final_update_tile_no(self):
-        print('\nfinalizing tile_no for tiled rasters and target data...')
-        all_tiles = glob(os.path.join(self.interim_tile_output_dir, '*tif'))
-        old_tile_no = [os.path.basename(i).split('.')[0].split('_')[-1] for i in all_tiles]
-
-        # generating new sequential tile numbers
-        new_tile_no = list(range(1, len(old_tile_no) + 1))
-
-        # creating a dictionary where old_tile_no is key and new_tile_no is value
-        old_to_new_map = dict(zip(old_tile_no, new_tile_no))
-
-        # copying all tile to the final directory after changing their names
-        for file in all_tiles:
-            old_no = os.path.basename(file).split('.')[0].split('_')[-1]
-            new_no = old_to_new_map[old_no]
-            new_file_name = f'tile_{new_no}'
-
-            copy_file(input_dir_or_file=file, copy_dir=self.final_tile_output_dir,
-                      rename=new_file_name)
-
-        # replacing old tile no in target data csv with new tile no
-        target_df = pd.read_csv(self.interim_target_data_output_csv)
-        target_df['tile_no'] = target_df['tile_no'].astype(str).map(old_to_new_map)
-
-        # replacing samples (very few) with stateID 3 - Nebraska and 1 -  Oklahoma. They belong to kansas
-        # but came in Nebraska and Oklahoma during stateID raster creation (along state border)
-        target_df.loc[target_df['stateID'] == 3, 'stateID'] = 12
-        target_df.loc[target_df['stateID'] == 1, 'stateID'] = 12
-
-        # save final csv
-        target_df.to_csv(self.final_target_data_output_csv, index=False)
-
-
-def copy_tiles(row, input_dir, copy_dir):
+def copy_tiles_batch(batch, input_dir, copy_dir):
     """
-   Copies a tile based on the tile number from the source to the destination directory.
+    Copies a batch of tiles using rsync (Linux/macOS) or robocopy (Windows).
+    Code taken from ChatGPT.
 
-   :param row: A row from the DataFrame containing 'tile_no'.
-   :param input_dir: Path of the directory containing input tiles.
-   :param copy_dir: Destination directory to copy the tiles.
+    :param batch: List of 'tile_no' values to copy.
+    :param input_dir: Source directory containing input tiles.
+    :param copy_dir: Destination directory for copied tiles.
 
-   :return: None.
-   """
-    tile_no = int(row['tile_no'])
-    matching_tiles = glob(os.path.join(input_dir, f'*_{tile_no}.*tif'))
-    if len(matching_tiles) != 1:
-        print(f'Skipping tile_no {tile_no}: found multiple matches.')
+    :return: None.
+    """
+    # Generate a list of all matching file paths
+    matching_files = []
 
-    tile_path = matching_tiles[0]
-    shutil.copy(tile_path, os.path.join(copy_dir, os.path.basename(tile_path)))
+    for tile_no in batch:
+        found_files = glob(os.path.join(input_dir, f'*_{tile_no}.*tif'))
+        if found_files:
+            matching_files.extend(found_files)
+
+    if not matching_files:
+        print(f"Skipping batch: No matching files found.")
+
+    else:
+        # Detect OS and use appropriate method
+        if platform.system() == 'Windows':
+            for file in matching_files:
+                subprocess.run(['robocopy', input_dir, copy_dir, os.path.basename(file),
+                                '/NFL', '/NDL', '/NJH', '/NJS', '/NC', '/NS', '/NP'],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:  # for linux
+            subprocess.run(['rsync', '-a', '--progress'] + matching_files + [copy_dir], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 # multiprocessing helper function for copying files
-def copy_tiles_parallel(splitted_target_df, input_dir, copy_dir, num_workers):
+def copy_tiles_parallel(splitted_target_df, input_dir, copy_dir, num_workers, batch_size=60):
     """
     Copy tiles to train, validation, and test data directory using multiprocessing.
 
     :param splitted_target_df: Train/validation/test dataframe.
     :param input_dir: Path of directory of all tiled data.
     :param copy_dir: Path to copy the tiles.
-    :param num_workers: int. Number of parallel processes to use for multiprocessing. Default is 10.
+    :param num_workers: int. Number of parallel processes to use for multiprocessing.
+    :param batch_size: Number of tiles each worker should process in one go. Default is 60.
 
     :return: None.
     """
+    # extracting tile_no column from dataframe
+    tile_list = splitted_target_df['tile_no'].tolist()
+
+    # splitting tiles into batches
+    tile_batches = [tile_list[i: i+batch_size] for i in range(0, len(tile_list), batch_size)]
+
     # preparing iterable of argument tuples for starmap
-    args = [(row, input_dir, copy_dir) for _, row in splitted_target_df.iterrows()]
+    args = [(batch, input_dir, copy_dir) for batch in tile_batches]
 
     # implementing copying using multiprocessing
-    with Pool(processes=num_workers) as pool:
-        pool.starmap(copy_tiles, args)
+    with ThreadPool(processes=num_workers) as pool:
+        pool.starmap(copy_tiles_batch, args)
 
 
 def train_val_test_split_tiles(target_data_csv, input_tile_dir, train_dir, val_dir, test_dir,

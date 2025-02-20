@@ -676,94 +676,137 @@ def accumulate_band_values_each_tile(tile, bands, nodata):
     return band_values
 
 
-def calc_scaling_statistics(train_dir, output_dir, num_workers=10, skip_processing=False):
-    """
-    Calculates the mean, standard deviation, min, and max for each band across all tiles in the training directory.
+def load_statistics_from_csv(output_dir):
+    """Loads mean, std, min, max statistics from CSV files into dictionaries."""
+    mean_csv = pd.read_csv(os.path.join(output_dir, 'mean.csv'))
+    std_csv = pd.read_csv(os.path.join(output_dir, 'std.csv'))
 
-    :param train_dir: str. Path to the directory containing training tiles.
-    :param output_dir: str. Path to the directory to save calculated statistics.
+    return (
+        dict(zip(mean_csv['variable'], mean_csv['value'])),
+        dict(zip(std_csv['variable'], std_csv['value']))
+    )
+
+
+def save_statistics_to_csv(statistics_dicts, output_dir):
+    """Saves multiple statistics dictionaries to CSV."""
+    for dict_name, dictionary in zip(['mean', 'std'], statistics_dicts):
+        df = pd.DataFrame(dictionary.items(), columns=['variable', 'value'])
+        df.to_csv(os.path.join(output_dir, f'{dict_name}.csv'), index=False)
+
+
+def calc_scaling_statistics(train_dir, pretrain_output_dir, finetune_output_dir=None,
+                            num_workers=10, mode='pretrain', skip_processing=False):
+    """
+    Calculates the mean and standard deviation for each band across all tiles in the training directory.
+
+    :param train_dir: str. Path to the directory containing training tiles. Have to be respective train_dir for
+                     'pretrain' or 'finetune' mode.
+    :param pretrain_output_dir: str. Path to the directory to save calculated statistics during pretrain mode (with netGW).
+    :param finetune_output_dir: str. Path to the directory to save calculated statistics during finetune mode (with pumping).
+                                Default set to None.
     :param num_workers: int. Number of parallel processes to use for multiprocessing. Default is 10.
+    :param mode: Either 'pretrain' or 'finetune'. If mode is 'pretrain' calculates the statistics of all bands including
+                 target variable. If mode is 'finetune', loads the statistics files from the 'pretrain' outdir,
+                 calculates new target value statistics and adds them to the statistics file, and
+                 saves and returns the statistics files.
     :param skip_processing: Set to True to skip processing. Default is False.
 
-    :return: Four dictionaries: mean_csv, std_csv, min_dict, and max_dict.
+    :return: Four dictionaries: mean_csv, std_csv.
     """
     if not skip_processing:  # calculating the statistics
-        print('calculating statistics for data scaling...')
+        if mode not in ['pretrain', 'finetune']:
+            raise ValueError("mode must be either 'pretrain' or 'finetune'")
 
-        clean_and_make_directory(output_dir)
+        if mode == 'pretrain':
+            print('calculating statistics for data scaling...')
 
-        # collecting all tiles in the training data directory
-        all_tiles = glob(os.path.join(train_dir, f'*.tif'))
+            clean_and_make_directory(pretrain_output_dir)
 
-        # getting band descriptions and no data info
-        bands = rio.open(all_tiles[0]).descriptions
-        bands = [band[0: band.rfind('_')] for band in bands]   # band.rfind('_') finds the index of the last '_' that separates the year attribute
-        print(f'Band Descriptions: {bands} \n')
+            # collecting all tiles in the training data directory
+            all_tiles = glob(os.path.join(train_dir, f'*.tif'))
 
-        nodata = rio.open(all_tiles[0]).nodata
+            # getting band descriptions and no data info
+            bands = rio.open(all_tiles[0]).descriptions
+            bands = [band[0: band.rfind('_')] for band in bands]   # band.rfind('_') finds the index of the last '_' that separates the year attribute
+            print(f'Band Descriptions: {bands} \n')
 
-        # Collecting individual band arrays separately in a dictionary
-        # which will be used to calculate band statistics.
-        # Using multiprocessing to parallelly process large number of tiles
-        args = [(tile, bands, nodata) for tile in all_tiles]
+            nodata = rio.open(all_tiles[0]).nodata
 
-        with Pool(processes=num_workers) as pool:
-            result_dict = pool.starmap(accumulate_band_values_each_tile, args)
+            # Collecting individual band arrays separately in a dictionary
+            # which will be used to calculate band statistics.
+            # Using multiprocessing to parallelly process large number of tiles
+            args = [(tile, bands, nodata) for tile in all_tiles]
 
-        # iterating overs results from multiprocessing
-        aggregated_values = {band: [] for band in bands}
-        for tiles_values in result_dict:
-            # Each tile_values is a dictionary containing band names as keys
-            # and the corresponding valid pixel values from that tile as a list.
-            # Here, multiple dictionary are the results of multiprocessing, which
-            # need to be merged across all tiles for each band.
+            with Pool(processes=num_workers) as pool:
+                result_dict = pool.starmap(accumulate_band_values_each_tile, args)
 
-            for band in bands:
-                # Extending the aggregated list for the current band with values from this tile.
-                # This ensures that all pixel values for each band, from all tiles, are merged
-                # into a single list in the aggregated_values dictionary.
-                # Without this second loop, we would only process the values from the last tile
-                # in the results, which would result in incomplete statistics.
-                aggregated_values[band].extend(tiles_values[band])
+            # iterating overs results from multiprocessing
+            aggregated_values = {band: [] for band in bands}
+            for tiles_values in result_dict:
+                # Each tile_values is a dictionary containing band names as keys
+                # and the corresponding valid pixel values from that tile as a list.
+                # Here, multiple dictionary are the results of multiprocessing, which
+                # need to be merged across all tiles for each band.
 
-        # calculating statistics
-        mean_dict = {band: np.nanmean(aggregated_values[band]) for band in bands}
-        std_dict = {band: np.nanstd(aggregated_values[band]) for band in bands}
-        min_dict = {band: np.nanmin(aggregated_values[band]) for band in bands}
-        max_dict = {band: np.nanmax(aggregated_values[band]) for band in bands}
+                for band in bands:
+                    # Extending the aggregated list for the current band with values from this tile.
+                    # This ensures that all pixel values for each band, from all tiles, are merged
+                    # into a single list in the aggregated_values dictionary.
+                    # Without this second loop, we would only process the values from the last tile
+                    # in the results, which would result in incomplete statistics.
+                    aggregated_values[band].extend(tiles_values[band])
 
-        # processing target statistics
-        target_df = pd.read_csv(os.path.join(train_dir, 'y_train.csv'))
-        target_df.dropna(inplace=True)
-        target_val = np.array(target_df['target_value'].tolist())
+            # calculating statistics
+            mean_dict = {band: np.nanmean(aggregated_values[band]) for band in bands}
+            std_dict = {band: np.nanstd(aggregated_values[band]) for band in bands}
 
-        mean_dict['target'] = np.nanmean(target_val)
-        std_dict['target'] = np.nanstd(target_val)
-        min_dict['target'] = np.nanmin(target_val)
-        max_dict['target'] = np.nanmax(target_val)
+            # calculating  target statistics (pretrain mode)
+            target_df = pd.read_csv(os.path.join(train_dir, 'y_train.csv'))
+            target_df.dropna(inplace=True)
+            target_val = np.array(target_df['target_value'].tolist())
 
-        # saving dictionaries as pickle
-        for dict_name, dictionary in zip(
-                ['mean', 'std', 'min', 'max'], [mean_dict, std_dict, min_dict, max_dict]
-        ):
-            df = pd.DataFrame(dictionary.items(), columns=['variable', 'value'])
-            csv_path = os.path.join(output_dir, f'{dict_name}.csv')
-            df.to_csv(csv_path, index=False)
+            mean_dict['target'] = np.nanmean(target_val)
+            std_dict['target'] = np.nanstd(target_val)
 
-        return mean_dict, std_dict, min_dict, max_dict
+            # saving dictionaries as csv
+            save_statistics_to_csv(statistics_dicts=[mean_dict, std_dict], output_dir=pretrain_output_dir)
+
+            return mean_dict, std_dict
+
+        elif mode == 'finetune':
+            print('calculating statistics for data scaling...')
+
+            clean_and_make_directory(finetune_output_dir)
+
+            # loading statistics dir from pretrain phase
+            mean_dict, std_dict = load_statistics_from_csv(pretrain_output_dir)
+
+            # calculating target statistics (finetune mode)
+            target_df = pd.read_csv(os.path.join(train_dir, 'y_train.csv'))
+            target_df.dropna(inplace=True)
+            target_val = np.array(target_df['target_value'].tolist())
+
+            mean_dict['target'] = np.nanmean(target_val)
+            std_dict['target'] = np.nanstd(target_val)
+
+            # saving dictionaries as pickle
+            save_statistics_to_csv(statistics_dicts=[mean_dict, std_dict], output_dir=finetune_output_dir)
+
+            return mean_dict, std_dict
 
     else:  # loading the saved statistics
-        mean_csv = pd.read_csv(os.path.join(output_dir, 'mean.csv'))
-        std_csv = pd.read_csv(os.path.join(output_dir, 'std.csv'))
-        min_csv = pd.read_csv(os.path.join(output_dir, 'min.csv'))
-        max_csv = pd.read_csv(os.path.join(output_dir, 'max.csv'))
+        if mode not in ['pretrain', 'finetune']:
+            raise ValueError("mode must be either 'pretrain' or 'finetune'")
 
-        mean_dict = dict(zip(mean_csv['variable'], mean_csv['value']))
-        std_dict = dict(zip(std_csv['variable'], std_csv['value']))
-        min_dict = dict(zip(min_csv['variable'], min_csv['value']))
-        max_dict =dict(zip(max_csv['variable'], max_csv['value']))
+        if mode == 'pretrain':
+            mean_dict, std_dict = load_statistics_from_csv(pretrain_output_dir)
 
-        return mean_dict, std_dict, min_dict, max_dict
+            return mean_dict, std_dict
+
+        elif mode == 'finetune':
+            mean_dict, std_dict = load_statistics_from_csv(finetune_output_dir)
+
+            return mean_dict, std_dict
 
 
 def standardize_single_tile(tile, exclude_bands_from_standardizing, mean_dict, std_dict, output_dir):

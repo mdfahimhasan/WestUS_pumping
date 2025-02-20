@@ -126,8 +126,11 @@ if __name__ == '__main__':
 
     use_cpu_nodes = assign_cpu_nodes([skip_calc_stats])
 
-    mean_dict, std_dict, _, _ = \
-        calc_scaling_statistics(train_dir=train_dir, output_dir=statistics_dir,
+    mean_dict, std_dict= \
+        calc_scaling_statistics(train_dir=train_dir,
+                                mode='pretrain',        # here the model is not TL, however set to 'pretrain'
+                                pretrain_output_dir=statistics_dir,
+                                finetune_output_dir=None,
                                 num_workers=use_cpu_nodes,
                                 skip_processing=skip_calc_stats)
 

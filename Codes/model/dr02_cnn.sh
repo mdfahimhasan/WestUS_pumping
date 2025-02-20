@@ -3,7 +3,7 @@
 ## running the dr02_cnn.py script on CPU nodes
 
 #SBATCH --partition=smi_all
-#SBATCH --ntasks=43
+#SBATCH --ntasks=30
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1 #Request 1 GPU
 #SBATCH --time=1-0

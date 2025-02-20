@@ -16,10 +16,10 @@ if __name__ == '__main__':
 
     # model switches
     tune_params = False                                 ################################################################
-    n_trials_for_tuning = 200                           ################################################################
+    n_trials_for_tuning = 300                           ################################################################
     implement_earlyStopping = True                     #################################################################
     plot_hyperparam_importance = True                  #################################################################
-    skip_unstandardizing_training = True               #################################################################
+    skip_unstandardizing_training = False               #################################################################
     skip_unstandardizing_testing = False                #################################################################
     skip_plot_SHAP_plot = False                         #################################################################
 
@@ -36,12 +36,12 @@ if __name__ == '__main__':
 
     # default model architecture
     default_params = {
-        'filters': [64, 64],                                            ##### convolutional layers
+        'filters': [32],                                            ##### convolutional layers
         'kernel_size': [5, 5],                                          ##### kernel size for each Conv layer
         'fc_units': [256, 32],                                          ##### fully connected layer
-        'lr': 0.0003011646825680101,                                    ##### learning rate
-        'weight_decay': 6.86933341560855e-05,                           ##### weight decay
-        'dropout': 0.5                                                  ##### dropout rate
+        'lr': 0.00036681611030918307,                                    ##### learning rate
+        'weight_decay': 0.00022169734142878322,                           ##### weight decay
+        'dropout': 0.30000000000000004                                                 ##### dropout rate
     }
 
     # directories

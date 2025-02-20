@@ -46,7 +46,7 @@ class DataLoaderCreator:
     A dataloader class to batchify tiles of input features and a single target value per tile for the model.
     """
 
-    def __init__(self, tile_dir, target_csv, batch_size=64, data_type='train', verbose=False):
+    def __init__(self, tile_dir, target_csv, bands_to_exclude=None, batch_size=64, data_type='train', verbose=False):
         """
         Initialize the DataLoader to batch the data.
 
@@ -54,15 +54,26 @@ class DataLoaderCreator:
         :param target_csv (csv): Target csv. Must have a tile_no and value columns.
                                  The tile_no column represents the corresponding tile no and value
                                  represents the value to train/validate/test on.
+        :param bands_to_exclude (list): List of bands to exclude during training. Default set to None.
         :param batch_size (int): Batch size for the DataLoader.
         :param data_type (str): Type of data (train/validation/test) passed to the DataLoader class.
         :param verbose (bool): Set to True if want to print before and after batching tensor size. 
         """
+
+        self.idx_bands_to_include = None
+
         if data_type in ['train', 'validation', 'test']:
             print(f'Initializing DataLoader to batch the {data_type} data...\n')
         else:
             raise ValueError(f"Invalid data_type: {data_type}. Must be 'train', 'validation', or 'test'.")
 
+
+        # reading a single tile initially and selecting the bands to read
+        if bands_to_exclude is not None:
+            single_tile = glob(os.path.join(tile_dir, '*.tif'))[0]
+            tile_file = rio.open(single_tile)
+            all_bands = tile_file.descriptions
+            self.idx_bands_to_include = [i + 1 for i, band in enumerate(all_bands) if band not in bands_to_exclude]  # +1 for rasterio-based indexing
 
         # reading target and input datasets:
         # we have to make sure that target values and tiles are matching (tiles have corresponding target values).
@@ -77,7 +88,11 @@ class DataLoaderCreator:
         tile_dict = {os.path.basename(tile).split('_')[-1].replace('.tif', ''): tile for tile in tiles}
         tiles_sorted = [tile_dict[str(tile_no)] for tile_no in tile_no_list if str(tile_no) in tile_dict]
 
-        features_arrs = [rio.open(tt).read() for tt in tiles_sorted]  # storing multi-band features as array
+        if bands_to_exclude is not None:  # read bands considering the exclusion list
+            features_arrs = [rio.open(tt).read(self.idx_bands_to_include) for tt in tiles_sorted]  # storing multi-band features as array
+
+        else:   # read all bands
+            features_arrs = [rio.open(tt).read() for tt in tiles_sorted]  # storing multi-band features as array
 
         # creating numpy arrays for features, target, and tile_no
         features_np = np.stack(features_arrs)  # dimensions are - num of image * num features * height * width
@@ -691,12 +706,22 @@ def run_default_model(train_loader, val_loader,
     else:
         best_val_loss = early_stopping.best_loss
 
-    # saving model information and losses
-    model_info['hyperparameters'] = {
+    # saving model state_dict, hyperparamters and architecture information and losses
+    model_info['state_dict'] = model.state_dict()
+
+    model_info['params'] = {
         'lr': lr,
+        'n_features': n_features,
+        'input_size': input_size,
         'filters': filters,
         'kernel_size': kernel_size,
-        'fc_units': fc_units
+        'fc_units': fc_units,
+        'stride': stride,
+        'padding': padding,
+        'pooling': pooling,
+        'activation_func': activation_func,
+        'dropout_rate': dropout_rate,
+        'weight_decay': weight_decay
     }
     model_info['train_losses'] = train_losses
     model_info['val_losses'] = val_losses
@@ -749,8 +774,8 @@ def run_and_tune_model(trial, train_loader, val_loader,
     kernel_size = [trial.suggest_int(f'kernel_size_layer_{i}', 3, 5, step=2) for i in range(num_layers)]
 
     # sample fully connected layer configuration
-    num_fc_layers = trial.suggest_int('num_fc_layers', 1, 4)  # number of fully connected layers can be flexible from 1-3
-    fc_units = [trial.suggest_int(f'fc_units_layer_{i}', 32, 256, step=32) for i in range(num_fc_layers)]
+    num_fc_layers = trial.suggest_int('num_fc_layers', 4, 8)  # number of fully connected layers can be flexible
+    fc_units = [trial.suggest_int(f'fc_units_layer_{i}', 64, 512, step=64) for i in range(num_fc_layers)]
     dropout_rate = trial.suggest_float('dropout', 0.1, 0.5, step=0.1)
 
     # training the model with the sampled parameters
@@ -912,9 +937,8 @@ def main(tile_dir_train, target_csv_train,
                                          start_EarlyStop_count_from_epoch=start_EarlyStop_count_from_epoch,
                                          verbose=True)
 
-        # save the best model's information and the best model
-        with open(model_info_save_path, 'wb') as f:
-            pickle.dump(best_model_info, f)
+        # save the best model's state_dict + information and the best model
+        torch.save(best_model_info, model_info_save_path)
 
         torch.save(trained_model, model_save_path)
         print(f'\nFinal model saved at {model_save_path}')
@@ -1034,7 +1058,7 @@ def unstandardize_save_and_test(model, tile_dir, target_csv, mean_csv, std_csv,
         model_output_df['unstandardized_pred'] = (model_output_df['standardized_pred'] * target_std) \
                                                  + target_mean
 
-        # loading dataframe with actual (actual pumping values) values of target
+        # loading dataframe with actual values of target
         original_df = pd.read_csv(target_csv)
 
         # merging the two dataframes
@@ -1161,6 +1185,151 @@ def plot_shap_values(trained_model, tile_dir, target_csv, batch_size,
 
     else:
         pass
+
+
+def load_and_prep_for_FineTuning(model_info_path, training_last_fcLayers=2, device='cuda'):
+    """
+    Loads model state dict into a new instance of the model. Freezes some layers and keeps others open for fine tuning.
+
+    :param model_info_path: Filepath of model info (consisting of state_dict and params).
+    :param training_last_fcLayers: Number of last fully connected layers to keep open for fine tuning.
+    :param device: Device to load the model. Defaults too 'cuda'.
+
+    :return: The model with loaded weights.
+    """
+    # load model state_dict and params
+    model_info = torch.load(model_info_path)
+
+    # extracting hyperparams and architecture
+    params = model_info['params']
+
+    # initializing the model with the saved params
+    pretrained_model = CNNRegression(
+        n_features=params['n_features'],
+        input_size=params['input_size'],
+        filters=params['filters'],
+        kernels=params['kernel_size'],
+        stride=params['stride'],
+        activation_func=params['activation_func'],
+        padding=params['padding'],
+        pooling=params['pooling'],
+        fc_layers=params['fc_units'],
+        dropout_rate=params['dropout_rate']
+    )
+
+    # loading the trained weights
+    pretrained_model.load_state_dict(torch.load(model_info_path['state_dict'],
+                                                map_location=torch.device(device)))
+    # setting model to eval() mode initially
+    pretrained_model.eval()
+
+    # freezing convolutional layers (so they are not updated)
+    for param in pretrained_model.conv_layers.parameters():
+        param.requires_grad = False
+
+    # allowing some FC layers to be trainable
+    for param in pretrained_model.fc_layers[-training_last_fcLayers:].parameters():
+        param.requires_grad = True
+
+    # to 'cuda'
+    pretrained_model.to(device)
+
+    return pretrained_model
+
+
+def fine_tune_model(model_info_path, train_DataLoader, val_DataLoader,
+                    model_info_save_path, model_save_path,
+                    n_epochs=100, lr=0.0001, weight_decay=1e-4,
+                    implement_earlyStopping=False, start_EarlyStop_count_from_epoch=40, verbose=True):
+    # loading the pretrained model with the trained state_dict and params and
+    # preparing the pretrained model for fine tuning (freezing some layers and keeping some open for training)
+    # # model still in eval() mode to maintain dropout status before stating to fine-tune
+    pretrained_model = load_and_prep_for_FineTuning(model_info_path, training_last_fcLayers=2)
+
+    # configuring optimizer
+    # Only configures optimizer for trainable params
+    optimizer = torch.optim.Adam(
+        filter(lambda p: p.requires_grad, pretrained_model.parameters()),
+        lr=lr,
+        weight_decay=weight_decay
+    )
+
+    # initialize EarlyStopping
+    early_stopping = EarlyStopping(patience=20)
+
+    # empty dictionary to store model parameters and losses
+    model_info = {}
+
+    # empty lists to track losses
+    train_losses = []
+    val_losses = []
+    last_epoch = None  # Track the last trained epoch
+
+    for epoch in range(n_epochs):
+
+        epoch = epoch + 1  # making epoch starting from 1
+
+        # training and validation for one epoch
+        train_loss, train_rmse, train_r2 = train(pretrained_model, train_DataLoader, optimizer)
+        val_loss, val_rmse, val_r2 = validate(pretrained_model, val_DataLoader)
+
+        # storing losses
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
+
+        # storing the last trained epoch
+        last_epoch = epoch
+
+        # printing progress
+        if verbose and epoch % 10 == 0:
+            print(f'Train Epoch: {epoch} | Loss: {train_loss:.3f} | RMSE: {train_rmse:.3f} | R²: {train_r2:.3f}')
+            print(f'Val   Epoch: {epoch} | Loss: {val_loss:.3f}   | RMSE: {val_rmse:.3f}   | R²: {val_r2:.3f}')
+            print('---------------------------------------------------------------------')
+
+        # checking for early stopping
+        if epoch >= start_EarlyStop_count_from_epoch and implement_earlyStopping:
+            early_stopping(val_loss, pretrained_model)
+            if early_stopping.early_stop:
+                print(f'Early stopping triggered at epoch {epoch + 1}')
+                break
+
+    # printing final performance (last trained epoch)
+    print(f'Final Train Epoch: {last_epoch} | Loss: {train_loss:.3f} | RMSE: {train_rmse:.3f} | R²: {train_r2:.3f}')
+    print(f'Final Val   Epoch: {last_epoch} | Loss: {val_loss:.3f}   | RMSE: {val_rmse:.3f}   | R²: {val_r2:.3f}')
+    print('---------------------------------------------------------------------')
+
+    # handling val_loss when early stopping is disabled
+    if not implement_earlyStopping:
+        best_val_loss = min(val_losses)
+
+    else:
+        best_val_loss = early_stopping.best_loss
+
+    # saving model state_dict, hyperparamters and architecture information and losses
+    model_info['state_dict'] = pretrained_model.state_dict()
+
+    model_info['params'] = {
+        'n_epochs': n_epochs,
+        'lr': lr,
+        'weight_decay': weight_decay,
+        'best_epoch': last_epoch
+    }
+
+    model_info['train_losses'] = train_losses
+    model_info['val_losses'] = val_losses
+    model_info['val_loss'] = best_val_loss
+
+    torch.save(model_info, model_info_save_path)
+    torch.save(pretrained_model, model_save_path)
+
+    return pretrained_model, model_info
+
+
+
+
+
+
+
 
 
 

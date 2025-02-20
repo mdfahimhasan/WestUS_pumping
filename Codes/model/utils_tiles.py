@@ -694,21 +694,22 @@ def save_statistics_to_csv(statistics_dicts, output_dir):
         df.to_csv(os.path.join(output_dir, f'{dict_name}.csv'), index=False)
 
 
-def calc_scaling_statistics(train_dir, pretrain_output_dir, finetune_output_dir=None,
-                            num_workers=10, mode='pretrain', skip_processing=False):
+def calc_scaling_statistics(train_dir, mode, pretrain_output_dir, finetune_output_dir=None,
+                            num_workers=10, skip_processing=False):
     """
     Calculates the mean and standard deviation for each band across all tiles in the training directory.
 
     :param train_dir: str. Path to the directory containing training tiles. Have to be respective train_dir for
                      'pretrain' or 'finetune' mode.
-    :param pretrain_output_dir: str. Path to the directory to save calculated statistics during pretrain mode (with netGW).
-    :param finetune_output_dir: str. Path to the directory to save calculated statistics during finetune mode (with pumping).
-                                Default set to None.
-    :param num_workers: int. Number of parallel processes to use for multiprocessing. Default is 10.
     :param mode: Either 'pretrain' or 'finetune'. If mode is 'pretrain' calculates the statistics of all bands including
                  target variable. If mode is 'finetune', loads the statistics files from the 'pretrain' outdir,
                  calculates new target value statistics and adds them to the statistics file, and
                  saves and returns the statistics files.
+    :param pretrain_output_dir: str. Path to the directory to save calculated statistics during pretrain mode (with netGW).
+    :param finetune_output_dir: str. Path to the directory to save calculated statistics during finetune mode (with pumping).
+                                Default set to None.
+    :param num_workers: int. Number of parallel processes to use for multiprocessing. Default is 10.
+
     :param skip_processing: Set to True to skip processing. Default is False.
 
     :return: Four dictionaries: mean_csv, std_csv.

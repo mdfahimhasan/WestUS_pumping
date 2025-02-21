@@ -8,7 +8,7 @@ from os.path import dirname, abspath
 
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
-from Codes.model.utils_cnn import main, plot_learning_curve, test, unstandardize_save_and_test, plot_shap_values
+from Codes.models.utils_cnn import main, plot_learning_curve, test, unstandardize_save_and_test, plot_shap_values
 
 if __name__ == '__main__':
     # model version

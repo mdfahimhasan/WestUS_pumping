@@ -18,13 +18,13 @@ from utils_tiles import make_multiband_datasets, make_training_tiles, \
 
 if __name__ == '__main__':
     # flags and vars
-    skip_create_multiband_raster = False    #############################################################################
-    skip_create_tile = False                #############################################################################
-    skip_split_train_val_test = False       #############################################################################
-    skip_calc_stats = False                 #############################################################################
-    skip_standardize_train = False          #############################################################################
-    skip_standardize_val = False            #############################################################################
-    skip_standardize_test = False           #############################################################################
+    skip_create_multiband_raster = True    #############################################################################
+    skip_create_tile = True                #############################################################################
+    skip_split_train_val_test = True       #############################################################################
+    skip_calc_stats = False                #############################################################################
+    skip_standardize_train = True          #############################################################################
+    skip_standardize_val = True            #############################################################################
+    skip_standardize_test = True           #############################################################################
 
 
     static_keywords = {'stateID', 'arid', 'cold', 'temp_Dry', 'temp_noDry'}   ##########################################
@@ -65,8 +65,10 @@ if __name__ == '__main__':
     multiband_key_list = list(datasets_dict.values())  # 'pumping_mm' and 'stateID' included here
     westUS_multiband_dir = '../../Data_main/rasters/multibands_westUS/training/westUS'
 
-    training_years = (2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
-                      2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019)
+    training_years = (2000, 2001, 2002, 2003, 2004
+                      # , 2005, 2006, 2007, 2008, 2009, 2010, 2011,
+                      # 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019
+                      )
 
     # multi-band raster creation
     make_multiband_datasets(list_of_temporal_var_dirs=temporal_vars_dir,
@@ -81,41 +83,33 @@ if __name__ == '__main__':
     # 2. Multi-band tile creation for model training (includes pumping data in 1st band)
     # ------------------------------------------------------------------------------------------------------------------
     multiband_rasters = glob(os.path.join(westUS_multiband_dir, '*.tif'))
-    interim_multiband_tile_dir = '../../Data_main/rasters/multibands_westUS/training/tiles/interim'
-    interim_target_csv = '../../Data_main/rasters/multibands_westUS/training/tiles/interim/target.csv'
-    final_multiband_tile_dir = '../../Data_main/rasters/multibands_westUS/training/tiles'
-    final_target_csv = '../../Data_main/rasters/multibands_westUS/training/tiles/target.csv'
+    multiband_tile_dir = '../../Data_main/rasters/multibands_westUS/training/tiles'
+    target_csv = '../../Data_main/rasters/multibands_westUS/training/tiles/target.csv'
 
     tile_band_list = [i for i in list(datasets_dict.values())
                       if i not in ['pumping_mm', 'stateID']]  # making sure to not include 'pumping_mm' and 'stateID' here
 
     use_cpu_nodes = assign_cpu_nodes([skip_create_tile])
 
-    make_training_tiles(tiff_path_list=multiband_rasters, band_key_list=tile_band_list,
+    make_training_tiles(tiff_path_list=multiband_rasters,
+                        band_key_list=tile_band_list,
+                        mode='pretrain',
                         train_band_name='pumping_mm',           ##########
-                        interim_tile_output_dir=interim_multiband_tile_dir,
-                        interim_target_data_output_csv=interim_target_csv,
-                        final_tile_output_dir=final_multiband_tile_dir,
-                        final_target_data_output_csv=final_target_csv,
-                        start_tile_no=1,
+                        tile_output_dir=multiband_tile_dir,
+                        target_data_output_csv=target_csv,
                         num_workers=use_cpu_nodes,
                         skip_processing=skip_create_tile)
 
     # ------------------------------------------------------------------------------------------------------------------
     # 3. Train-validation-test split
     # ------------------------------------------------------------------------------------------------------------------
-    multiband_tile_dir = final_multiband_tile_dir
-    target_csv = final_target_csv
     train_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/train'
     val_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/val'
     test_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/test'
 
-    use_cpu_nodes = assign_cpu_nodes([skip_split_train_val_test])
-
     train_val_test_split_tiles(target_data_csv=target_csv, input_tile_dir=multiband_tile_dir,
                                train_dir=train_dir, val_dir=val_dir, test_dir=test_dir,
-                               train_size=0.7, val_size=0.2, test_size=0.1,
-                               random_state=42, num_workers=use_cpu_nodes,
+                               train_size=0.7, val_size=0.15, test_size=0.15, random_state=42,
                                stratify=True,  # stratified split based on 'stateID'
                                skip_processing=skip_split_train_val_test)
 
@@ -126,8 +120,8 @@ if __name__ == '__main__':
 
     use_cpu_nodes = assign_cpu_nodes([skip_calc_stats])
 
-    mean_dict, std_dict= \
-        calc_scaling_statistics(train_dir=train_dir,
+    mean_dict, std_dict = \
+        calc_scaling_statistics(train_csv=os.path.join(train_dir, 'train.csv'),
                                 mode='pretrain',        # here the model is not TL, however set to 'pretrain'
                                 pretrain_output_dir=statistics_dir,
                                 finetune_output_dir=None,

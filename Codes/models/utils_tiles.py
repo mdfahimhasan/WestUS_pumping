@@ -31,7 +31,7 @@ from multiprocessing import Pool, Manager
 from multiprocessing.pool import ThreadPool
 from sklearn.model_selection import train_test_split
 
-from Codes.utils.system_ops import makedirs, copy_file, clean_and_make_directory
+from Codes.utils.system_ops import makedirs, clean_and_make_directory
 from Codes.utils.raster_ops import read_raster_arr_object
 
 no_data_value = -9999
@@ -45,6 +45,7 @@ def org_vars(list_of_temporal_var_dirs, years_list, list_of_static_var_dirs=None
     :param list_of_temporal_var_dirs: List of main directory files of the temporal variables.
     :param years_list: A list of years for which variables/datasets are available.
     :param list_of_static_var_dirs: List of main directory files of the static variables. Default set to None.
+    :param month_range: Range of months for which data has to be processed.
 
     :return: A list that consists of multiple nested lists. Each nested list contains the file paths of all variables
              of a particular year and month.
@@ -160,8 +161,6 @@ def make_multiband_datasets(list_of_temporal_var_dirs, list_of_static_var_dirs,
 
         makedirs([output_dir])
 
-        global output_file_path
-
         # arranging the variables (their paths) in an order so that all input variables of a year/month will be in a
         # nested list inside the main output list
         data_paths_lists = org_vars(list_of_temporal_var_dirs=list_of_temporal_var_dirs,
@@ -237,10 +236,14 @@ class make_training_tiles:
             makedirs([self.tile_output_dir])
 
             for tiff_path in tiff_path_list:
-                last_tile_no = self.process_tiles(tiff_path, band_key_list)
+                last_tile_no, output_list = self._process_tiles(tiff_path, band_key_list)
                 self.start_tile_no = last_tile_no + 1  # updating the self.start_tile_no after each multi-band raster iteration
 
-    def process_tiles(self, tiff_path, band_key_list):
+                # saving the output list for each tiff processes.
+                # In each iteration, the output list gets appended after the previous one
+                self._save_target_data(target_data_list=output_list)
+
+    def _process_tiles(self, tiff_path, band_key_list):
         """
         Processes a multi-band raster image into tiles of training data and associated feature attributes.
 
@@ -305,24 +308,7 @@ class make_training_tiles:
             # getting the maximum tile number from the results, ignoring None values
             last_tile_no = max([res for res in results if res is not None], default=self.start_tile_no)
 
-            # converting target data list to a dataframe
-            # ensure DataFrame has column names even if empty
-            if len(target_data_list) > 0:
-                target_df = pd.DataFrame(list(target_data_list))  # converting Manager.list() to python list >> DataFrame
-            else:
-                target_df = pd.DataFrame(columns=['tile_no', 'stateID', 'target_value'])  # ensuring correct column names
-
-            if self.mode == 'pretrain':
-                # replacing samples (very few) with stateID 3 - Nebraska and 1 -  Oklahoma. They belong to kansas
-                # but came in Nebraska and Oklahoma during stateID raster creation (along state border)
-                # otherwise train_val_test split function throws error
-                target_df.loc[target_df['stateID'] == 3, 'stateID'] = 12
-                target_df.loc[target_df['stateID'] == 1, 'stateID'] = 12
-
-            # saving the training data to a CSV file
-            target_df.to_csv(self.target_data_output_csv, index=False)
-
-            return last_tile_no
+            return last_tile_no, target_data_list
 
 
     def _process_chunk_worker(self, args):
@@ -399,11 +385,11 @@ class make_training_tiles:
                         tile_arr = tiff.read(valid_band_idxs, window=window)
 
                         # checking if any array in the windowed tiff in entirely null (only no data values)
-                        if self.is_image_null(tile_arr):
+                        if self._is_image_null(tile_arr):
                             continue
 
                         # checking if the tile has too many NoData values
-                        nodata_percentage = self.calculate_nodata_percentage(tile_arr)
+                        nodata_percentage = self._calculate_nodata_percentage(tile_arr)
                         if any(perc > self.nodata_threshold for perc in nodata_percentage):
                             continue
 
@@ -426,7 +412,7 @@ class make_training_tiles:
                         output_file = os.path.join(config['tile_output_dir'], tile_name)
 
                         try:
-                            self.save_tile(output_file, tile_arr, crs, window_transform, band_key_list)
+                            self._save_tile(output_file, tile_arr, crs, window_transform, band_key_list)
 
                         except Exception as e:
                             print(f'Skipping tile {tile_name} due to save error: {e}')
@@ -444,7 +430,7 @@ class make_training_tiles:
         return last_tile_no
 
     @staticmethod
-    def save_tile(output_file, tile_arr, crs, transform, band_key_list):
+    def _save_tile(output_file, tile_arr, crs, transform, band_key_list):
         with rio.open(
                 output_file,
                 'w',
@@ -461,8 +447,7 @@ class make_training_tiles:
                 dst.write(tile_arr[band_id], band_id + 1)
                 dst.set_band_description(band_id + 1, band_key_list[band_id])
 
-
-    def calculate_nodata_percentage(self, tile_arr):
+    def _calculate_nodata_percentage(self, tile_arr):
         """
         Calculates the percentage of NoData pixels in each band of the tile and returns a list.
 
@@ -486,7 +471,7 @@ class make_training_tiles:
         return perc_counts_all_bands
 
 
-    def is_image_null(self, tile_arr):
+    def _is_image_null(self, tile_arr):
         """
         Checks all all_bands in an image array to see if there is an entirely null value band. A tile (image array) with
         a single data band with all null values will be rejected in the main code using this code.
@@ -506,6 +491,32 @@ class make_training_tiles:
 
         # If no all_bands are null, return False
         return False
+
+    def _save_target_data(self, target_data_list):
+        """
+        Saves target_data_list as a csv holding tile_no and taget value.
+
+        :param target_data_list: A list of dictionary holding 'tile_no', 'stateID', and 'target_value' and their values
+                                as key, value pairs. Generated from the __process_chunk_worker() function.
+        :return:
+        """
+        # converting target data list to a dataframe
+        # ensure DataFrame has column names even if empty
+        if len(target_data_list) > 0:
+            target_df = pd.DataFrame(list(target_data_list))  # converting Manager.list() to python list >> DataFrame
+        else:
+            target_df = pd.DataFrame(columns=['tile_no', 'stateID', 'target_value'])  # ensuring correct column names
+
+        if self.mode == 'pretrain':
+            # replacing samples (very few) with stateID 3 - Nebraska and 1 -  Oklahoma. They belong to kansas
+            # but came in Nebraska and Oklahoma during stateID raster creation (along state border)
+            # otherwise train_val_test split function throws error
+            target_df.loc[target_df['stateID'] == 3, 'stateID'] = 12
+            target_df.loc[target_df['stateID'] == 1, 'stateID'] = 12
+
+        # saving the dataframe
+        target_df.to_csv(self.target_data_output_csv,  mode='a',
+                         header=not os.path.exists(self.target_data_output_csv), index=False)
 
 
 def copy_tiles_batch(batch, input_dir, copy_dir):
@@ -568,10 +579,29 @@ def copy_tiles_parallel(splitted_target_df, input_dir, copy_dir, num_workers, ba
         pool.starmap(copy_tiles_batch, args)
 
 
+def create_train_val_test_tile_dir_path(df, input_tile_dir):
+    """
+    Maps tile_no to file paths using a dictionary lookup and adds the tile paths to the dataframe
+
+    :param df: Input dataframe. Must have 'tile_no' as column.
+    :param input_tile_dir: Filepath of directory holding all the tiles.
+
+    :return: A modified dataframe with tile paths in columns.
+    """
+
+    # making a dictionary for all tiles in the input tile dir. The key has tile no and the item has tile path
+    tile_dict = {int(f.split('_')[-1].replace('.tif', '')): os.path.join(input_tile_dir, f)
+                    for f in os.listdir(input_tile_dir) if f.endswith('tif')}
+
+    # mapping tile_no to file path
+    df['tile_paths'] = df['tile_no'].astype(int).apply(lambda x: tile_dict[x])
+
+    return df
+
+
 def train_val_test_split_tiles(target_data_csv, input_tile_dir, train_dir, val_dir, test_dir,
                                train_size=0.7, val_size=0.15, test_size=0.15,
-                               random_state=42, num_workers=30,
-                               stratify=True, skip_processing=False):
+                               random_state=42, stratify=True, skip_processing=False):
     """
     Splits the tiles into train, validation, and test datasets, along with their target values.
 
@@ -584,7 +614,6 @@ def train_val_test_split_tiles(target_data_csv, input_tile_dir, train_dir, val_d
     :param val_size: float. Proportion of the dataset to include in the validation split. Default is 0.15.
     :param test_size: float. Proportion of the dataset to include in the test split. Default is 0.15.
     :param random_state: int. Random seed for reproducibility. Default is 42.
-    :param num_workers: int. Number of parallel processes to use for multiprocessing. Default is 30.
     :param stratify: Whether to staritify based on 'stateID'. Default set to True to do stratified split.
     :param skip_processing: Set to True to skip processing. Default is False.
 
@@ -593,11 +622,10 @@ def train_val_test_split_tiles(target_data_csv, input_tile_dir, train_dir, val_d
     if not skip_processing:
         print(f'making train-validation-test ({train_size * 100}-{val_size * 100}-{test_size * 100} %) splits....\n')
 
-        # removing existing output directories and making new ones
-        for dir_path in [train_dir, val_dir, test_dir]:
-            if os.path.exists(dir_path):
-                shutil.rmtree(dir_path)
-        makedirs([train_dir, val_dir, test_dir])
+        # cleaning existing data from the directories
+        clean_and_make_directory(train_dir)
+        clean_and_make_directory(val_dir)
+        clean_and_make_directory(test_dir)
 
         # loading the target data CSV
         target_df = pd.read_csv(target_data_csv)
@@ -613,25 +641,30 @@ def train_val_test_split_tiles(target_data_csv, input_tile_dir, train_dir, val_d
             val_data, test_data = train_test_split(temp_data, test_size=test_size / (val_size + test_size),
                                                    random_state=random_state)
 
-        # cleaning existing data from the directories
-        clean_and_make_directory(train_dir)
-        clean_and_make_directory(val_dir)
-        clean_and_make_directory(test_dir)
 
-        # storing splitted train, val, and test target values as csv
+
+        # Storing splitted train, val, and test target values and associated tile path in a csv.
+        # In this approach we are not copying the train-val-test tiles to the respective directory directly
+        # to save computational time.
         train_data_df = pd.DataFrame(train_data)
-        train_data_df.to_csv(os.path.join(train_dir, 'y_train.csv'), index=False)
+        train_data_df = create_train_val_test_tile_dir_path(train_data_df, input_tile_dir)
 
         val_data_df = pd.DataFrame(val_data)
-        val_data_df.to_csv(os.path.join(val_dir, 'y_val.csv'), index=False)
+        val_data_df = create_train_val_test_tile_dir_path(val_data_df, input_tile_dir)
 
         test_data_df = pd.DataFrame(test_data)
-        test_data_df.to_csv(os.path.join(test_dir, 'y_test.csv'), index=False)
+        test_data_df = create_train_val_test_tile_dir_path(test_data_df, input_tile_dir)
 
-        # copying tiles to respective train, val, and test directories
-        copy_tiles_parallel(train_data, input_tile_dir, train_dir, num_workers)
-        copy_tiles_parallel(val_data, input_tile_dir, val_dir, num_workers)
-        copy_tiles_parallel(test_data, input_tile_dir, test_dir, num_workers)
+        train_data_df.to_csv(os.path.join(train_dir, 'train.csv'), index=False)
+        val_data_df.to_csv(os.path.join(val_dir, 'val.csv'), index=False)
+        test_data_df.to_csv(os.path.join(test_dir, 'test.csv'), index=False)
+
+        # # This was the parallel batch copying option to copy train-val-test tiles into respective directories
+        # # not using it now
+        # # copying tiles to respective train, val, and test directories
+        # copy_tiles_parallel(train_data, input_tile_dir, train_dir, num_workers)
+        # copy_tiles_parallel(val_data, input_tile_dir, val_dir, num_workers)
+        # copy_tiles_parallel(test_data, input_tile_dir, test_dir, num_workers)
 
     else:
         pass
@@ -689,13 +722,13 @@ def save_statistics_to_csv(statistics_dicts, output_dir):
         df.to_csv(os.path.join(output_dir, f'{dict_name}.csv'), index=False)
 
 
-def calc_scaling_statistics(train_dir, mode, pretrain_output_dir, finetune_output_dir=None,
+def calc_scaling_statistics(train_csv, mode, pretrain_output_dir, finetune_output_dir=None,
                             num_workers=3, skip_processing=False):
     """
     Calculates the mean and standard deviation for each band across all tiles in the training directory.
 
-    :param train_dir: str. Path to the directory containing training tiles. Have to be respective train_dir for
-                     'pretrain' or 'finetune' mode.
+    :param train_csv: filepath str. Filepath to the csv containing training tile_no, target_value, and filepath.
+                      Have to be respective train_csv for 'pretrain' or 'finetune' mode.
     :param mode: Either 'pretrain' or 'finetune'. If mode is 'pretrain' calculates the statistics of all bands including
                  target variable. If mode is 'finetune', loads the statistics files from the 'pretrain' outdir,
                  calculates new target value statistics and adds them to the statistics file, and
@@ -718,8 +751,9 @@ def calc_scaling_statistics(train_dir, mode, pretrain_output_dir, finetune_outpu
 
             clean_and_make_directory(pretrain_output_dir)
 
-            # collecting all tiles in the training data directory
-            all_tiles = glob(os.path.join(train_dir, f'*.tif'))
+            # collecting all training tiles from the train_csv
+            train_df = pd.read_csv(train_csv)
+            all_tiles = train_df['tile_paths'].tolist()
 
             # getting band descriptions and no data info
             bands = rio.open(all_tiles[0]).descriptions
@@ -757,10 +791,10 @@ def calc_scaling_statistics(train_dir, mode, pretrain_output_dir, finetune_outpu
             std_dict = {band: np.nanstd(aggregated_values[band]) for band in bands}
 
             # calculating  target statistics (pretrain mode)
-            target_df = pd.read_csv(os.path.join(train_dir, 'y_train.csv'))
-            target_df.dropna(inplace=True)
-            target_val = np.array(target_df['target_value'].tolist())
+            target_val = np.array(train_df['target_value'].tolist())
 
+            # the statistics will be saved in separate directory than pretrain mode, so same key 'target'
+            # for 'pretrain' and 'finetune' mode won't affect
             mean_dict['target'] = np.nanmean(target_val)
             std_dict['target'] = np.nanstd(target_val)
 
@@ -778,10 +812,11 @@ def calc_scaling_statistics(train_dir, mode, pretrain_output_dir, finetune_outpu
             mean_dict, std_dict = load_statistics_from_csv(pretrain_output_dir)
 
             # calculating target statistics (finetune mode)
-            target_df = pd.read_csv(os.path.join(train_dir, 'y_train.csv'))
-            target_df.dropna(inplace=True)
-            target_val = np.array(target_df['target_value'].tolist())
+            train_df = pd.read_csv(train_csv)
+            target_val = np.array(train_df['target_value'].tolist())
 
+            # the statistics will be saved in separate directory than pretrain mode, so same key 'target'
+            # for 'pretrain' and 'finetune' mode won't affect
             mean_dict['target'] = np.nanmean(target_val)
             std_dict['target'] = np.nanstd(target_val)
 

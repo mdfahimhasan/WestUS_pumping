@@ -381,7 +381,7 @@ class make_training_tiles:
                         valid_band_idxs = [i + 1 for i in all_band_idxs
                                            if i not in exclude_band_idxs]  # +1 again to convert to 1-based indexing
 
-                        # reading multi-band array for the window with train data and stateID bands excluded
+                        # reading multi-band array for the window with train data and stateID valid_bands excluded
                         tile_arr = tiff.read(valid_band_idxs, window=window)
 
                         # checking if any array in the windowed tiff in entirely null (only no data values)
@@ -670,24 +670,26 @@ def train_val_test_split_tiles(target_data_csv, input_tile_dir, train_dir, val_d
         pass
 
 
-def accumulate_band_values_each_tile(tile, bands, nodata):
+def accumulate_band_values_each_tile(tile, valid_idxs, valid_bands, nodata):
     """
     Collects valid band values to calculate per-band statistics using multiprocessing.
 
+    :param valid_idxs: List of band indices that corresponds to valid_bands. Only these bands will be
+                       opened and processed. Follows rasterio-based indexing 1-based.
     :param tile: Path to the tile file.
-    :param bands: List of band descriptions.
+    :param valid_bands: List of band descriptions.
     :param nodata: NoData value for the tile.
 
     :return: A dictionary containing per-band statistics (mean, std, min, max).
     """
-    dataset = rio.open(tile).read()  # reading all input all_bands in a tile
-    band_values = {band: [] for band in bands}
+    dataset = rio.open(tile).read(valid_idxs)  # reading all input all_bands in a tile
+    band_values = {band: [] for band in valid_bands}
 
     # process for each band in the tile
-    for band in bands:
+    for band in valid_bands:
         # extracting band index from 'all_bands' list
         # then, extracting corresponding array for that band and flattening
-        band_idx = bands.index(band)
+        band_idx = valid_bands.index(band)
         band_arr = dataset[band_idx].flatten()
 
         # better NaN or nodata handling
@@ -722,17 +724,19 @@ def save_statistics_to_csv(statistics_dicts, output_dir):
         df.to_csv(os.path.join(output_dir, f'{dict_name}.csv'), index=False)
 
 
-def calc_scaling_statistics(train_csv, mode, pretrain_output_dir, finetune_output_dir=None,
+def calc_scaling_statistics(train_csv, mode, exclude_bands,
+                            pretrain_output_dir, finetune_output_dir=None,
                             num_workers=3, skip_processing=False):
     """
     Calculates the mean and standard deviation for each band across all tiles in the training directory.
 
     :param train_csv: filepath str. Filepath to the csv containing training tile_no, target_value, and filepath.
                       Have to be respective train_csv for 'pretrain' or 'finetune' mode.
-    :param mode: Either 'pretrain' or 'finetune'. If mode is 'pretrain' calculates the statistics of all bands including
+    :param mode: Either 'pretrain' or 'finetune'. If mode is 'pretrain' calculates the statistics of all valid_bands including
                  target variable. If mode is 'finetune', loads the statistics files from the 'pretrain' outdir,
                  calculates new target value statistics and adds them to the statistics file, and
                  saves and returns the statistics files.
+    :param exclude_bands: List of valid_bands to exclude from processing. Don't need standardization of these valid_bands.
     :param pretrain_output_dir: str. Path to the directory to save calculated statistics during pretrain mode (with netGW).
     :param finetune_output_dir: str. Path to the directory to save calculated statistics during finetune mode (with pumping).
                                 Default set to None.
@@ -758,27 +762,32 @@ def calc_scaling_statistics(train_csv, mode, pretrain_output_dir, finetune_outpu
             # getting band descriptions and no data info
             bands = rio.open(all_tiles[0]).descriptions
             bands = [band[0: band.rfind('_')] for band in bands]   # band.rfind('_') finds the index of the last '_' that separates the year attribute
-            print(f'Band Descriptions: {bands} \n')
+
+            # keeping only the arrays except the train data (pumping_mm/netGWIrr) and stateID band
+            valid_band_idxs = [i+1 for i, j in enumerate(bands) if j not in exclude_bands]  # +1 for rasterio-based indexingas the indices were 1-based
+            valid_bands = [band for band in bands if band not in exclude_bands]
+
+            print(f'Band processed for statistics: {valid_bands} \n')
 
             nodata = rio.open(all_tiles[0]).nodata
 
             # Collecting individual band arrays separately in a dictionary
             # which will be used to calculate band statistics.
             # Using multiprocessing to parallelly process large number of tiles
-            args = [(tile, bands, nodata) for tile in all_tiles]
+            args = [(tile, valid_band_idxs, valid_bands, nodata) for tile in all_tiles]
 
             with Pool(processes=num_workers) as pool:
                 result_dict = pool.starmap(accumulate_band_values_each_tile, args)
 
             # iterating overs results from multiprocessing
-            aggregated_values = {band: [] for band in bands}
+            aggregated_values = {band: [] for band in valid_bands}
             for tiles_values in result_dict:
                 # Each tile_values is a dictionary containing band names as keys
                 # and the corresponding valid pixel values from that tile as a list.
                 # Here, multiple dictionary are the results of multiprocessing, which
                 # need to be merged across all tiles for each band.
 
-                for band in bands:
+                for band in valid_bands:
                     # Extending the aggregated list for the current band with values from this tile.
                     # This ensures that all pixel values for each band, from all tiles, are merged
                     # into a single list in the aggregated_values dictionary.
@@ -787,8 +796,8 @@ def calc_scaling_statistics(train_csv, mode, pretrain_output_dir, finetune_outpu
                     aggregated_values[band].extend(tiles_values[band])
 
             # calculating statistics
-            mean_dict = {band: np.nanmean(aggregated_values[band]) for band in bands}
-            std_dict = {band: np.nanstd(aggregated_values[band]) for band in bands}
+            mean_dict = {band: np.nanmean(aggregated_values[band]) for band in valid_bands}
+            std_dict = {band: np.nanstd(aggregated_values[band]) for band in valid_bands}
 
             # calculating  target statistics (pretrain mode)
             target_val = np.array(train_df['target_value'].tolist())

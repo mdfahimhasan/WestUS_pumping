@@ -122,6 +122,7 @@ if __name__ == '__main__':
 
     mean_dict, std_dict = \
         calc_scaling_statistics(train_csv=os.path.join(train_dir, 'train.csv'),
+                                exclude_bands=exclude_standardizing_bands,
                                 mode='pretrain',        # here the model is not TL, however set to 'pretrain'
                                 pretrain_output_dir=statistics_dir,
                                 finetune_output_dir=None,

@@ -747,6 +747,8 @@ def calc_scaling_statistics(train_csv, mode, exclude_bands,
     :return: Four dictionaries: mean_csv, std_csv.
     """
     if not skip_processing:  # calculating the statistics
+
+        # confirming exact keywords for mode name
         if mode not in ['pretrain', 'finetune']:
             raise ValueError("mode must be either 'pretrain' or 'finetune'")
 

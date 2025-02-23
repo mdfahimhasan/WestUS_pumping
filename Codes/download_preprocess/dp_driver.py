@@ -88,6 +88,7 @@ if __name__ == '__main__':
     # flags
     skip_stateID_raster_creation = True         ############################ this won't run on linux
     skip_process_GS_data = True                 ########################################################################
+    skip_process_netGW = False                   ########################################################################
     skip_ET_processing = True                   ########################################################################
     skip_prism_precip_processing = True         ########################################################################
     skip_prism_tmax_processing = True           ########################################################################
@@ -106,6 +107,7 @@ if __name__ == '__main__':
 
     run_all_preprocessing(skip_stateID_raster_creation=skip_stateID_raster_creation,
                           skip_process_GrowSeason_data=skip_process_GS_data,
+                          skip_process_netGW=skip_process_netGW,
                           skip_ET_processing=skip_ET_processing,
                           skip_prism_precip_processing=skip_prism_precip_processing,
                           skip_prism_tmax_processing=skip_prism_tmax_processing,

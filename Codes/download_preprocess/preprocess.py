@@ -507,9 +507,6 @@ def process_and_OneHotEncode_Koppen_Geiger(koppen_geiger_raster, output_dir,
         # One Hot Encoding
         climate_arr, raster_file = read_raster_arr_object(westUS_climate)
 
-        # Unique climate classes
-        climate_classes = np.unique(climate_arr).tolist()
-
         # classification map
         classification_map = {'arid': [4, 5, 6],
                               'temperate_dry_summer': [7, 8, 9, 10],
@@ -542,8 +539,39 @@ def process_and_OneHotEncode_Koppen_Geiger(koppen_geiger_raster, output_dir,
         pass
 
 
+def process_netGWIrr_data(netGW_dir, output_dir, skip_processing=False):
+    """
+    Process consumptive groundwater irrigation dataset (replace 0 value with -9999/nodata).
+
+    :param netGW_dir: Directory of consumptive groundwater irrigation dataset.
+    :param output_dir: Output directory filepath.
+    :param skip_processing: Set to True to skip this step.
+
+    :return: None.
+    """
+    if not skip_processing:
+        print('processing netGW data...')
+
+        makedirs([output_dir])
+
+        netGW_data = glob(os.path.join(netGW_dir, '*.tif'))
+
+        for data in netGW_data:
+            arr, file = read_raster_arr_object(data)
+
+            # setting zero values as -9999 (nodata)
+            arr[arr == 0] = -9999
+
+            # saving data
+            write_array_to_raster(arr, file, file.transform,
+                                  output_path=os.path.join(output_dir, os.path.basename(data)))
+    else:
+        pass
+
+
 def run_all_preprocessing(skip_stateID_raster_creation=False,
                           skip_process_GrowSeason_data=False,
+                          skip_process_netGW=False,
                           skip_ET_processing=False,
                           skip_prism_precip_processing=False,
                           skip_prism_tmax_processing=False,
@@ -562,8 +590,10 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     """
     Run all preprocessing steps.
 
+
     :param skip_stateID_raster_creation: Set to True to skip stateID raster creation.
     :param skip_process_GrowSeason_data: Set to True to skip processing growing season data.
+    :param skip_process_netGW: Set to True to skip consumptive groundwater irrigation dataset processing.
     :param skip_ET_processing: Set to True to skip processing grwing season ET data.
     :param skip_prism_precip_processing: Set True if want to skip prism precipitation data preprocessing.
     :param skip_prism_tmax_processing: Set True if want to skip prism temperature data preprocessing.
@@ -590,6 +620,11 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     # process growing season data
     extract_month_from_GrowSeason_data(GS_data_dir='../../Data_main/rasters/Growing_season',
                                        skip_processing=skip_process_GrowSeason_data)
+
+    # process netGW (consumptive groundwater irrigation) data
+    process_netGWIrr_data(netGW_dir='../../Data_main/rasters/NetGW_irrigation/original',
+                          output_dir='../../Data_main/rasters/NetGW_irrigation/WesternUS',
+                          skip_processing=skip_process_netGW)
 
     # OpenET ensemble processing
     dynamic_gs_sum_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,

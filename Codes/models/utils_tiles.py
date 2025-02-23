@@ -199,7 +199,7 @@ class make_training_tiles:
 
     def __init__(self, tiff_path_list, band_key_list, train_band_name,
                  tile_output_dir, target_data_output_csv, mode,
-                 tile_size=7, nodata_value=-9999, nodata_threshold=50,
+                 tile_size=7, nodata_value=-9999, nodata_threshold=80,
                  num_workers=20, skip_processing=False):
         """
         :param tiff_path_list (list): List of paths to the multi-band raster TIFF file to process.
@@ -210,7 +210,7 @@ class make_training_tiles:
         :param mode (str): Either 'pretrain' or finetune'.
         :param tile_size (int): Size of the square tile (e.g., 7x7). Must be odd to ensure a center pixel.
         :param nodata_value (int/float): NoData value in the raster (default: -9999).
-        :param nodata_threshold (int): Maximum percentage of NoData values allowed in a tile (default: 50).
+        :param nodata_threshold (int): Maximum percentage of NoData values allowed in a tile (default: 80).
         :param start_tile_no (int): Initial value for the tile number. Default set to 1.
         :param num_workers: int. Number of parallel processes to use for multiprocessing. Default is 20.
         :param skip_processing (bool): If True, skips processing and initializes the class without performing operations.

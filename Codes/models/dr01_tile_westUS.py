@@ -18,13 +18,13 @@ from utils_tiles import make_multiband_datasets, make_training_tiles, \
 
 if __name__ == '__main__':
     # flags and vars
-    skip_create_multiband_raster = True    #############################################################################
-    skip_create_tile = True                #############################################################################
-    skip_split_train_val_test = True       #############################################################################
+    skip_create_multiband_raster = False    #############################################################################
+    skip_create_tile = False                #############################################################################
+    skip_split_train_val_test = False       #############################################################################
     skip_calc_stats = False                #############################################################################
-    skip_standardize_train = True          #############################################################################
-    skip_standardize_val = True            #############################################################################
-    skip_standardize_test = True           #############################################################################
+    skip_standardize_train = False          #############################################################################
+    skip_standardize_val = False            #############################################################################
+    skip_standardize_test = False           #############################################################################
 
 
     static_keywords = {'stateID', 'arid', 'cold', 'temp_Dry', 'temp_noDry'}   ##########################################
@@ -65,10 +65,8 @@ if __name__ == '__main__':
     multiband_key_list = list(datasets_dict.values())  # 'pumping_mm' and 'stateID' included here
     westUS_multiband_dir = '../../Data_main/rasters/multibands_westUS/training/westUS'
 
-    training_years = (2000, 2001, 2002, 2003, 2004
-                      # , 2005, 2006, 2007, 2008, 2009, 2010, 2011,
-                      # 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019
-                      )
+    training_years = (2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
+                      2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019)
 
     # multi-band raster creation
     make_multiband_datasets(list_of_temporal_var_dirs=temporal_vars_dir,
@@ -133,31 +131,31 @@ if __name__ == '__main__':
     # 6. Standardize
     # ------------------------------------------------------------------------------------------------------------------
 
-    train_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/train'
+    train_csv = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/train/train.csv'
     standardized_train_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/standardized/train'
 
-    val_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/val'
+    val_csv = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/val/val.csv'
     standardized_val_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/standardized/val'
 
-    test_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/test'
+    test_csv = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/test/test.csv'
     standardized_test_dir = r'../../Data_main/rasters/multibands_westUS/train_val_test_splits/standardized/test'
 
 
     use_cpu_nodes = assign_cpu_nodes([skip_standardize_train, skip_standardize_val, skip_standardize_test])
 
-    standardize_train_val_test(input_tile_dir=train_dir, exclude_bands_from_standardizing=exclude_standardizing_bands,
+    standardize_train_val_test(split_csv=train_csv, exclude_bands_from_standardizing=exclude_standardizing_bands,
                                mean_dict=mean_dict, std_dict=std_dict,
                                split_type='train', output_dir=standardized_train_dir,
                                num_workers=use_cpu_nodes,
                                skip_processing=skip_standardize_train)
 
-    standardize_train_val_test(input_tile_dir=val_dir, exclude_bands_from_standardizing=exclude_standardizing_bands,
+    standardize_train_val_test(split_csv=val_csv, exclude_bands_from_standardizing=exclude_standardizing_bands,
                                mean_dict=mean_dict, std_dict=std_dict,
                                split_type='val', output_dir=standardized_val_dir,
                                num_workers=use_cpu_nodes,
                                skip_processing=skip_standardize_val)
 
-    standardize_train_val_test(input_tile_dir=test_dir, exclude_bands_from_standardizing=exclude_standardizing_bands,
+    standardize_train_val_test(split_csv=test_csv, exclude_bands_from_standardizing=exclude_standardizing_bands,
                                mean_dict=mean_dict, std_dict=std_dict,
                                split_type='test', output_dir=standardized_test_dir,
                                num_workers=use_cpu_nodes,

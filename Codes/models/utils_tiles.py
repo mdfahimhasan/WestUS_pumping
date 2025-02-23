@@ -905,7 +905,9 @@ def standardize_single_tile(tile, exclude_bands_from_standardizing, mean_dict, s
         # saving band in the initiated zero array
         standardized_arr[band_idx] = band_arr
 
-    # setting all no data (np.nan) values to zero
+    # The tiles have no data pixels which are being set to zero here to not pass nan in the CNN model.
+    # We are also maintaining a high nodata percentage threshold to not allow too many nodata pixels
+    # in each band of a tile (refer to make_training_tiles class) setting all no data (np.nan) values to zero
     standardized_arr[np.isnan(standardized_arr)] = 0
 
     # saving standardized tile as a new array

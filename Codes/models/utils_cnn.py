@@ -54,7 +54,7 @@ class DataLoaderCreator:
         :param target_csv (csv): Target csv. Must have a tile_no and value columns.
                                  The tile_no column represents the corresponding tile no and value
                                  represents the value to train/validate/test on.
-        :param bands_to_exclude (list): List of bands to exclude during training. Default set to None.
+        :param bands_to_exclude (list): List of valid_bands to exclude during training. Default set to None.
         :param batch_size (int): Batch size for the DataLoader.
         :param data_type (str): Type of data (train/validation/test) passed to the DataLoader class.
         :param verbose (bool): Set to True if want to print before and after batching tensor size. 
@@ -68,7 +68,7 @@ class DataLoaderCreator:
             raise ValueError(f"Invalid data_type: {data_type}. Must be 'train', 'validation', or 'test'.")
 
 
-        # reading a single tile initially and selecting the bands to read
+        # reading a single tile initially and selecting the valid_bands to read
         if bands_to_exclude is not None:
             single_tile = glob(os.path.join(tile_dir, '*.tif'))[0]
             tile_file = rio.open(single_tile)
@@ -88,10 +88,10 @@ class DataLoaderCreator:
         tile_dict = {os.path.basename(tile).split('_')[-1].replace('.tif', ''): tile for tile in tiles}
         tiles_sorted = [tile_dict[str(tile_no)] for tile_no in tile_no_list if str(tile_no) in tile_dict]
 
-        if bands_to_exclude is not None:  # read bands considering the exclusion list
+        if bands_to_exclude is not None:  # read valid_bands considering the exclusion list
             features_arrs = [rio.open(tt).read(self.idx_bands_to_include) for tt in tiles_sorted]  # storing multi-band features as array
 
-        else:   # read all bands
+        else:   # read all valid_bands
             features_arrs = [rio.open(tt).read() for tt in tiles_sorted]  # storing multi-band features as array
 
         # creating numpy arrays for features, target, and tile_no
@@ -835,7 +835,8 @@ def save_param_importance_plot(study, save_path):
 
 
 def main(tile_dir_train, target_csv_train,
-         tile_dir_val, target_csv_val, batch_size,
+         tile_dir_val, target_csv_val,
+         bands_to_exclude, batch_size,
          n_features, input_size, n_epochs,
          model_save_path, model_info_save_path,
          padding='same', pooling='maxpool',
@@ -858,6 +859,7 @@ def main(tile_dir_train, target_csv_train,
     :param target_csv_train: CSV file with training set target values.
     :param tile_dir_val: Directory containing validation set input tiles.
     :param target_csv_val: CSV file with validation set target values.
+    :param bands_to_exclude: List of bands to exclude from model training. Can be set to None to run with all bands.
     :param batch_size: int. Batch size of DataLoader.
     :param n_features: int. Number of input channels in the image.
     :param input_size : int. Height/width of the square input image (e.g., 64 for 64x64).
@@ -888,10 +890,12 @@ def main(tile_dir_train, target_csv_train,
 
     # creating train and validation DataLoaders
     train_loader = DataLoaderCreator(tile_dir_train, target_csv_train,
+                                     bands_to_exclude=bands_to_exclude,
                                      batch_size=batch_size,
                                      data_type='train').get_dataloader()
 
     val_loader = DataLoaderCreator(tile_dir_val, target_csv_val,
+                                   bands_to_exclude=bands_to_exclude,
                                    batch_size=batch_size,
                                    data_type='validation').get_dataloader()
 

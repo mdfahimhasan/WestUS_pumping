@@ -774,8 +774,17 @@ def run_and_tune_model(trial, train_loader, val_loader,
     kernel_size = [trial.suggest_int(f'kernel_size_layer_{i}', 3, 5, step=2) for i in range(num_layers)]
 
     # sample fully connected layer configuration
-    num_fc_layers = trial.suggest_int('num_fc_layers', 4, 8)  # number of fully connected layers can be flexible
-    fc_units = [trial.suggest_int(f'fc_units_layer_{i}', 64, 512, step=64) for i in range(num_fc_layers)]
+    # ensure each subsequent layer has fewer units than the previous layer
+
+    num_fc_layers = trial.suggest_int('num_fc_layers', 2, 4)  # flexible number of fully connected layers
+
+    fc_units = []       # initialize an empty list to store units per layer
+    fc_units.append(trial.suggest_int('fc_units_layer_0', 256, 512, step=64))  # largest layer
+
+    for i in range(1, num_fc_layers):
+        fc_units.append(trial.suggest_int(f'fc_units_layer_{i}', 64, fc_units[i - 1], step=64))
+
+    # dropout
     dropout_rate = trial.suggest_float('dropout', 0.1, 0.5, step=0.1)
 
     # training the model with the sampled parameters

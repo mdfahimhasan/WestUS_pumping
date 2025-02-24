@@ -644,12 +644,15 @@ def train_val_test_split_tiles(target_data_csv, input_tile_dir, train_dir, val_d
         # to save computational time.
         train_data_df = pd.DataFrame(train_data)
         train_data_df = create_train_val_test_tile_dir_path(train_data_df, input_tile_dir)
+        train_data_df.dropna(inplace=True)
 
         val_data_df = pd.DataFrame(val_data)
         val_data_df = create_train_val_test_tile_dir_path(val_data_df, input_tile_dir)
+        val_data_df.dropna(inplace=True)
 
         test_data_df = pd.DataFrame(test_data)
         test_data_df = create_train_val_test_tile_dir_path(test_data_df, input_tile_dir)
+        test_data_df.dropna(inplace=True)
 
         train_data_df.to_csv(os.path.join(train_dir, 'train.csv'), index=False)
         val_data_df.to_csv(os.path.join(val_dir, 'val.csv'), index=False)

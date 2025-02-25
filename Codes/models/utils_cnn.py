@@ -46,7 +46,8 @@ class DataLoaderCreator:
     A dataloader class to batchify tiles of input features and a single target value per tile for the model.
     """
 
-    def __init__(self, tile_dir, target_csv, bands_to_exclude=None, batch_size=64, data_type='train', verbose=False):
+    def __init__(self, tile_dir, target_csv, sample_perc_tiles='all',
+                 bands_to_exclude=None, batch_size=64, data_type='train', verbose=False):
         """
         Initialize the DataLoader to batch the data.
 
@@ -54,6 +55,8 @@ class DataLoaderCreator:
         :param target_csv (csv): Target csv. Must have a tile_no and value columns.
                                  The tile_no column represents the corresponding tile no and value
                                  represents the value to train/validate/test on.
+        :param sample_perc_tiles (str or int): Percentage of data sample (tiles) to use for model training.
+                                               Default set to 'all' to use all tiles.
         :param bands_to_exclude (list): List of valid_bands to exclude during training. Default set to None.
         :param batch_size (int): Batch size for the DataLoader.
         :param data_type (str): Type of data (train/validation/test) passed to the DataLoader class.
@@ -67,6 +70,8 @@ class DataLoaderCreator:
         else:
             raise ValueError(f"Invalid data_type: {data_type}. Must be 'train', 'validation', or 'test'.")
 
+        if sample_perc_tiles != 'all' and not isinstance(sample_perc_tiles, int):
+            raise ValueError(" 'sample_perc_tiles' must be 'all' or an interger between 1 and 100 ")
 
         # reading a single tile initially and selecting the valid_bands to read
         if bands_to_exclude is not None:
@@ -81,8 +86,11 @@ class DataLoaderCreator:
         # then, sorting tiles to match the order of tile_no_list from the target CSV.
         # finally, reading the sorted tiles as arrays
         target_df = pd.read_csv(target_csv)
-        target_values = target_df['standardized_value'].tolist()
-        tile_no_list = target_df['tile_no'].tolist()
+        sampled_df = target_df if sample_perc_tiles == 'all' else target_df.sample(frac=sample_perc_tiles / 100,
+                                                                                   random_state=43, ignore_index=True)
+
+        target_values = sampled_df['standardized_value'].tolist()
+        tile_no_list = sampled_df['tile_no'].tolist()
 
         tiles = glob(os.path.join(tile_dir, '*.tif'))
         tile_dict = {os.path.basename(tile).split('_')[-1].replace('.tif', ''): tile for tile in tiles}
@@ -779,13 +787,15 @@ def run_and_tune_model(trial, train_loader, val_loader,
     num_fc_layers = trial.suggest_int('num_fc_layers', 2, 4)  # flexible number of fully connected layers
 
     fc_units = []       # initialize an empty list to store units per layer
-    fc_units.append(trial.suggest_int('fc_units_layer_0', 256, 512, step=64))  # largest layer
+    # fc_units.append(trial.suggest_int('fc_units_layer_0', 256, 512, step=64))  # largest layer
+    fc_units.append(trial.suggest_int('fc_units_layer_0', 128, 256, step=64))  # largest layer
 
     for i in range(1, num_fc_layers):
-        fc_units.append(trial.suggest_int(f'fc_units_layer_{i}', 64, fc_units[i - 1], step=64))
+        # fc_units.append(trial.suggest_int(f'fc_units_layer_{i}', 64, fc_units[i - 1], step=64))
+        fc_units.append(trial.suggest_int(f'fc_units_layer_{i}', 64, (fc_units[i - 1] - 32), step=32))
 
     # dropout
-    dropout_rate = trial.suggest_float('dropout', 0.1, 0.5, step=0.1)
+    dropout_rate = trial.suggest_float('dropout', 0.1, 0.3, step=0.1)
 
     # training the model with the sampled parameters
     _, model_info = run_default_model(train_loader, val_loader,
@@ -845,7 +855,7 @@ def save_param_importance_plot(study, save_path):
 
 def main(tile_dir_train, target_csv_train,
          tile_dir_val, target_csv_val,
-         bands_to_exclude, batch_size,
+         sample_perc_tiles, bands_to_exclude, batch_size,
          n_features, input_size, n_epochs,
          model_save_path, model_info_save_path,
          padding='same', pooling='maxpool',
@@ -868,6 +878,8 @@ def main(tile_dir_train, target_csv_train,
     :param target_csv_train: CSV file with training set target values.
     :param tile_dir_val: Directory containing validation set input tiles.
     :param target_csv_val: CSV file with validation set target values.
+    :param sample_perc_tiles : Percentage of data sample (tiles) to use for model training.
+                               Must be 'all' or an integer between 1 to 100. Default set to 'all' to use all tiles.
     :param bands_to_exclude: List of bands to exclude from model training. Can be set to None to run with all bands.
     :param batch_size: int. Batch size of DataLoader.
     :param n_features: int. Number of input channels in the image.
@@ -899,11 +911,13 @@ def main(tile_dir_train, target_csv_train,
 
     # creating train and validation DataLoaders
     train_loader = DataLoaderCreator(tile_dir_train, target_csv_train,
+                                     sample_perc_tiles=sample_perc_tiles,
                                      bands_to_exclude=bands_to_exclude,
                                      batch_size=batch_size,
                                      data_type='train').get_dataloader()
 
     val_loader = DataLoaderCreator(tile_dir_val, target_csv_val,
+                                   sample_perc_tiles=sample_perc_tiles,
                                    bands_to_exclude=bands_to_exclude,
                                    batch_size=batch_size,
                                    data_type='validation').get_dataloader()

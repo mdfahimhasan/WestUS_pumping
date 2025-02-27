@@ -543,7 +543,7 @@ def validate(model, val_loader, verbose=False):
     return avg_loss, rmse, r2
 
 
-def test(model, tile_dir, target_csv, batch_size, data_type='test'):
+def test(model, tile_dir, target_csv, sample_perc_tiles, bands_to_exclude, batch_size, data_type='test'):
     """
     Evaluates the model on the test dataset. However, it can be employed for train and validation
     dataset as well.
@@ -551,6 +551,9 @@ def test(model, tile_dir, target_csv, batch_size, data_type='test'):
     :param model: The trained model.
     :param tile_dir: Directory containing input data tiles. Can be from the tran/validation/test set.
     :param target_csv: CSV file with validation targets. Can be from the tran/validation/test set.
+    :param sample_perc_tiles : Percentage of data sample (tiles) to use for model training.
+                               Must be 'all' or an integer between 1 to 100. Default set to 'all' to use all tiles.
+    :param bands_to_exclude: List of bands to exclude from model training. Can be set to None to run with all bands.
     :param batch_size: int. Batch size used in the DataLoader.
     :param data_type (str): Type of data passed to the DataLoader class.
 
@@ -558,6 +561,8 @@ def test(model, tile_dir, target_csv, batch_size, data_type='test'):
     """
     # DataLoader
     DataLoader = DataLoaderCreator(tile_dir, target_csv,
+                                   sample_perc_tiles=sample_perc_tiles,
+                                   bands_to_exclude=bands_to_exclude,
                                    batch_size=batch_size,
                                    data_type=data_type).get_dataloader()
 
@@ -773,17 +778,19 @@ def run_and_tune_model(trial, train_loader, val_loader,
     print(f'\nStarting trial number {trial.number}...\n')
 
     # sample hyperparameters
-    lr = trial.suggest_float('lr', 1e-5, 1e-2, log=True)
-    weight_decay = trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)
+    lr = trial.suggest_float('lr', 1e-4, 5e-3, log=True)
+    weight_decay = trial.suggest_float('weight_decay', 1e-5, 1e-3, log=True)
 
     # sample convolutional architecture
     num_layers = 2      # keeping number of convolutional layers fixed at 2 due to our specific input size
-    filters = [trial.suggest_int(f'filters_layer_{i}', 32, 64, step=16) for i in range(num_layers)]
+    filters = [trial.suggest_int(f'filters_layer_{i}', 64, 128, step=16) for i in range(num_layers)]
     kernel_size = [trial.suggest_int(f'kernel_size_layer_{i}', 3, 5, step=2) for i in range(num_layers)]
+
+    # dropout
+    dropout_rate = trial.suggest_float('dropout', 0.1, 0.5, step=0.1)
 
     # sample fully connected layer configuration
     # ensure each subsequent layer has fewer units than the previous layer
-
     num_fc_layers = trial.suggest_int('num_fc_layers', 2, 4)  # flexible number of fully connected layers
 
     fc_units = []       # initialize an empty list to store units per layer
@@ -792,10 +799,12 @@ def run_and_tune_model(trial, train_loader, val_loader,
 
     for i in range(1, num_fc_layers):
         # fc_units.append(trial.suggest_int(f'fc_units_layer_{i}', 64, fc_units[i - 1], step=64))
-        fc_units.append(trial.suggest_int(f'fc_units_layer_{i}', 64, (fc_units[i - 1] - 32), step=32))
+        if fc_units[i - 1] > 64:
+            high_val = max(64, fc_units[i - 1] -32)
+            fc_units.append(trial.suggest_int(f'fc_units_layer_{i}', 64, high_val, step=32))
+        else:
+            break       # stopping adding layers when further reduction is not possible
 
-    # dropout
-    dropout_rate = trial.suggest_float('dropout', 0.1, 0.3, step=0.1)
 
     # training the model with the sampled parameters
     _, model_info = run_default_model(train_loader, val_loader,
@@ -1028,9 +1037,9 @@ def main(tile_dir_train, target_csv_train,
         return trained_model, model_info
 
 
-def unstandardize_save_and_test(model, tile_dir, target_csv, mean_csv, std_csv,
-                                output_csv, batch_size, data_type='test',
-                                skip_processing=False):
+def unstandardize_save_and_test(model, tile_dir, target_csv, sample_perc_tiles,
+                                bands_to_exclude, batch_size, mean_csv, std_csv,
+                                output_csv, data_type='test', skip_processing=False):
     """
     Unstandardizes the trained model's prediction, saves the results in a csv, and does performance testing on the
     unstandardized data.
@@ -1038,6 +1047,9 @@ def unstandardize_save_and_test(model, tile_dir, target_csv, mean_csv, std_csv,
     :param model: The trained model object.
     :param tile_dir: Directory containing train/test/validation set input tiles.
     :param target_csv: CSV file with train/test/validation set target values.
+    :param sample_perc_tiles : Percentage of data sample (tiles) to use for model training.
+                               Must be 'all' or an integer between 1 to 100. Default set to 'all' to use all tiles.
+    :param bands_to_exclude: List of bands to exclude from model training. Can be set to None to run with all bands.
     :param mean_csv: Filepath of csv with mean values of features and target data. Used in unstandardizing.
     :param std_csv: Filepath of csv with standard deviation values of features and target data. Used in unstandardizing.
     :param output_csv: Filepath of output csv that will hold the unstandardized results.
@@ -1051,6 +1063,8 @@ def unstandardize_save_and_test(model, tile_dir, target_csv, mean_csv, std_csv,
     if not skip_processing:
         # DataLoader
         DataLoader = DataLoaderCreator(tile_dir, target_csv,
+                                       sample_perc_tiles=sample_perc_tiles,
+                                       bands_to_exclude=bands_to_exclude,
                                        batch_size=batch_size,
                                        data_type=data_type).get_dataloader()
 
@@ -1132,9 +1146,9 @@ def plot_learning_curve(train_loss, val_loss, plot_save_path):
     print(f'\nLoss plot saved...')
 
 
-def plot_shap_values(trained_model, tile_dir, target_csv, batch_size,
-                     plot_save_path, feature_names, data_type='test',
-                     skip_processing=False):
+def plot_shap_values(trained_model, tile_dir, target_csv, sample_perc_tiles,
+                     bands_to_exclude, batch_size, plot_save_path,
+                     feature_names, data_type='test', skip_processing=False):
     """
     Plot input variables importance plot based on SHAP values.
 
@@ -1146,6 +1160,9 @@ def plot_shap_values(trained_model, tile_dir, target_csv, batch_size,
     :param trained_model: Trained model object.
     :param tile_dir: Directory containing train/test/validation set input tiles.
     :param target_csv: CSV file with train/test/validation set target values.
+    :param sample_perc_tiles : Percentage of data sample (tiles) to use for model training.
+                               Must be 'all' or an integer between 1 to 100. Default set to 'all' to use all tiles.
+    :param bands_to_exclude: List of bands to exclude from model training. Can be set to None to run with all bands.
     :param batch_size: Batch size used in the DataLoader.
     :param plot_save_path: Filepath to save the plot.
     :param feature_names: List of representative feature names.
@@ -1162,6 +1179,8 @@ def plot_shap_values(trained_model, tile_dir, target_csv, batch_size,
         print('\n___________________________________________________________________________')
         print(f'\nplotting SHAP feature importance...')
         dataloader = DataLoaderCreator(tile_dir, target_csv,
+                                       sample_perc_tiles=sample_perc_tiles,
+                                       bands_to_exclude=bands_to_exclude,
                                        batch_size=batch_size,
                                        data_type=data_type).get_dataloader()
 

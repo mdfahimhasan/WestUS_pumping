@@ -569,7 +569,48 @@ def process_netGWIrr_data(netGW_dir, output_dir, skip_processing=False):
         pass
 
 
+def create_pixelID_raster(WestUS_refraster, output_dir, skip_processing=False):
+    """
+    Create pixelID raster. Each valid pixel has a unique pixelID value.
+
+    :param WestUS_refraster: Western US reference raster.
+    :param output_dir: Directory path to save the output raster.
+    :param skip_processing: Set to True to skip processing.
+
+    :return: None.
+    """
+    if not skip_processing:
+        print('process PixelID raster')
+
+        makedirs([output_dir])
+
+        # the reference raster has zero in valid pixel and -9999 in invalid pixels
+        # the valid pixel values are going to be replaced by an unique pixel id
+        ref_arr, ref_file = read_raster_arr_object(WestUS_refraster)
+
+        # converting into a binary array with valid values as 1
+        binary_arr = np.where(ref_arr == 0, 1, 0).flatten()
+
+        # valid pixel count
+        valid_count = np.count_nonzero(binary_arr)
+        pixelID = np.arange(1, valid_count+1, 1)
+
+        # determining valid pixel positions with boolean
+        mask_arr = binary_arr.astype(bool).flatten()
+
+        # replacing valid positions with pixelID
+        binary_arr[mask_arr] = pixelID
+        binary_arr[binary_arr == 0] = -9999
+        pixelID_arr = binary_arr.reshape(ref_file.shape)
+
+        # saving the array
+        output_path = os.path.join(output_dir, 'pixelID.tif')
+        write_array_to_raster(pixelID_arr, ref_file, ref_file.transform,
+                              output_path)
+
+
 def run_all_preprocessing(skip_stateID_raster_creation=False,
+                          skip_pixelID_raster_creation=False,
                           skip_process_GrowSeason_data=False,
                           skip_process_netGW=False,
                           skip_ET_processing=False,
@@ -590,8 +631,8 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     """
     Run all preprocessing steps.
 
-
     :param skip_stateID_raster_creation: Set to True to skip stateID raster creation.
+    :param skip_pixelID_raster_creation: Set to True to skip pixelID raster creation.
     :param skip_process_GrowSeason_data: Set to True to skip processing growing season data.
     :param skip_process_netGW: Set to True to skip consumptive groundwater irrigation dataset processing.
     :param skip_ET_processing: Set to True to skip processing grwing season ET data.
@@ -616,6 +657,11 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     create_stateID_raster(westUS_shp='../../Data_main/ref_shapes/WestUS_states.shp',
                           output_dir='../../Data_main/ref_rasters/stateID',
                           skip_processing=skip_stateID_raster_creation)
+
+    # create PixelID raster
+    create_pixelID_raster(WestUS_refraster=WestUS_raster,
+                          output_dir='../../Data_main/ref_rasters/pixelID',
+                          skip_processing=skip_pixelID_raster_creation)
 
     # process growing season data
     extract_month_from_GrowSeason_data(GS_data_dir='../../Data_main/rasters/Growing_season',
@@ -745,3 +791,4 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
         koppen_geiger_raster='../../Data_main/rasters/Koppen_geiger/1991_2020/koppen_geiger_0p00833333.tif',
         output_dir='../../Data_main/rasters/Koppen_geiger',
         skip_processing=skip_koppen_geiger_processing)
+

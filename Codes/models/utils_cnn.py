@@ -9,7 +9,7 @@ This script was developed by the author based on his knowledge and experience on
 Some assistance and insights have been taken from  ChatGPT, an AI model by OpenAI, to improve  efficiency, accuracy,
 and readability of the script, considering the complex nature of this script.
 """
-
+import copy
 import os
 import sys
 import shap
@@ -252,7 +252,6 @@ class CNNRegression(nn.Module):
                                                         padding, pooling_stride=2)
 
         # # # Fully connected layers
-        # CNN steps: conv -> activation -> pooling
         if fc_layers is None:
             fc_layers = [128]  # default FC structure if fc_layers=None
 
@@ -549,8 +548,8 @@ def test(model, tile_dir, target_csv, sample_perc_tiles, bands_to_exclude, batch
     dataset as well.
 
     :param model: The trained model.
-    :param tile_dir: Directory containing input data tiles. Can be from the tran/validation/test set.
-    :param target_csv: CSV file with validation targets. Can be from the tran/validation/test set.
+    :param tile_dir: Directory containing input data tiles.
+    :param target_csv: CSV file with test targets.
     :param sample_perc_tiles : Percentage of data sample (tiles) to use for model training.
                                Must be 'all' or an integer between 1 to 100. Default set to 'all' to use all tiles.
     :param bands_to_exclude: List of bands to exclude from model training. Can be set to None to run with all bands.
@@ -787,24 +786,24 @@ def run_and_tune_model(trial, train_loader, val_loader,
     kernel_size = [trial.suggest_int(f'kernel_size_layer_{i}', 3, 5, step=2) for i in range(num_layers)]
 
     # dropout
-    dropout_rate = trial.suggest_float('dropout', 0.1, 0.5, step=0.1)
+    dropout_rate = trial.suggest_float('dropout', 0.1, 0.5, step=0.05)
 
     # sample fully connected layer configuration
     # ensure each subsequent layer has fewer units than the previous layer
     num_fc_layers = trial.suggest_int('num_fc_layers', 2, 4)  # flexible number of fully connected layers
 
     fc_units = []       # initialize an empty list to store units per layer
-    # fc_units.append(trial.suggest_int('fc_units_layer_0', 256, 512, step=64))  # largest layer
-    fc_units.append(trial.suggest_int('fc_units_layer_0', 128, 256, step=64))  # largest layer
+    fc_units.append(trial.suggest_int('fc_units_layer_0', 128, 256, step=32))  # largest layer
 
     for i in range(1, num_fc_layers):
-        # fc_units.append(trial.suggest_int(f'fc_units_layer_{i}', 64, fc_units[i - 1], step=64))
-        if fc_units[i - 1] > 64:
-            high_val = max(64, fc_units[i - 1] -32)
-            fc_units.append(trial.suggest_int(f'fc_units_layer_{i}', 64, high_val, step=32))
-        else:
-            break       # stopping adding layers when further reduction is not possible
+        high_val = max(64, fc_units[i - 1] - 32)  # Always compute the next layer
+        fc_units.append(trial.suggest_int(f'fc_units_layer_{i}', 32, high_val, step=32))
 
+    # fc_units.append(trial.suggest_int('fc_units_layer_0', 128, 256, step=64))  # largest layer
+    #
+    # for i in range(1, num_fc_layers):
+    #     high_val = max(64, fc_units[i - 1] - 32)  # Ensure decrease
+    #     fc_units.append(trial.suggest_int(f'fc_units_layer_{i}', 64, high_val, step=32))
 
     # training the model with the sampled parameters
     _, model_info = run_default_model(train_loader, val_loader,
@@ -1264,38 +1263,43 @@ def load_and_prep_for_FineTuning(model_info_path, training_last_fcLayers=2, devi
     )
 
     # loading the trained weights
-    pretrained_model.load_state_dict(torch.load(model_info_path['state_dict'],
+    pretrained_model.load_state_dict(torch.load(model_info['state_dict'],
                                                 map_location=torch.device(device)))
+    finetuned_model = copy.deepcopy(pretrained_model)       # creating a separate copy of the pretrained model
+
     # setting model to eval() mode initially
-    pretrained_model.eval()
+    finetuned_model.eval()
 
     # freezing convolutional layers (so they are not updated)
-    for param in pretrained_model.conv_layers.parameters():
+    for param in finetuned_model.conv_layers.parameters():
         param.requires_grad = False
 
     # allowing some FC layers to be trainable
-    for param in pretrained_model.fc_layers[-training_last_fcLayers:].parameters():
+    for param in finetuned_model.fc_layers[-training_last_fcLayers:].parameters():
         param.requires_grad = True
 
     # to 'cuda'
-    pretrained_model.to(device)
+    finetuned_model.to(device)
 
-    return pretrained_model
+    return finetuned_model
 
 
-def fine_tune_model(model_info_path, train_DataLoader, val_DataLoader,
-                    model_info_save_path, model_save_path,
-                    n_epochs=100, lr=0.0001, weight_decay=1e-4,
+def fine_tune_model(pretrained_model_info_path, train_DataLoader, val_DataLoader,
+                    finetuned_model_info_save_path, finetuned_model_save_path,
+                    n_epochs=100, lr=1e-4, weight_decay=1e-5,
                     implement_earlyStopping=False, start_EarlyStop_count_from_epoch=40, verbose=True):
+
+    makedirs([os.path.dirname(finetuned_model_info_save_path)])
+
     # loading the pretrained model with the trained state_dict and params and
     # preparing the pretrained model for fine tuning (freezing some layers and keeping some open for training)
     # # model still in eval() mode to maintain dropout status before stating to fine-tune
-    pretrained_model = load_and_prep_for_FineTuning(model_info_path, training_last_fcLayers=2)
+    finetuned_model = load_and_prep_for_FineTuning(pretrained_model_info_path, training_last_fcLayers=2)
 
     # configuring optimizer
     # Only configures optimizer for trainable params
     optimizer = torch.optim.Adam(
-        filter(lambda p: p.requires_grad, pretrained_model.parameters()),
+        filter(lambda p: p.requires_grad, finetuned_model.parameters()),
         lr=lr,
         weight_decay=weight_decay
     )
@@ -1316,8 +1320,8 @@ def fine_tune_model(model_info_path, train_DataLoader, val_DataLoader,
         epoch = epoch + 1  # making epoch starting from 1
 
         # training and validation for one epoch
-        train_loss, train_rmse, train_r2 = train(pretrained_model, train_DataLoader, optimizer)
-        val_loss, val_rmse, val_r2 = validate(pretrained_model, val_DataLoader)
+        train_loss, train_rmse, train_r2 = train(finetuned_model, train_DataLoader, optimizer)
+        val_loss, val_rmse, val_r2 = validate(finetuned_model, val_DataLoader)
 
         # storing losses
         train_losses.append(train_loss)
@@ -1334,7 +1338,7 @@ def fine_tune_model(model_info_path, train_DataLoader, val_DataLoader,
 
         # checking for early stopping
         if epoch >= start_EarlyStop_count_from_epoch and implement_earlyStopping:
-            early_stopping(val_loss, pretrained_model)
+            early_stopping(val_loss, finetuned_model)
             if early_stopping.early_stop:
                 print(f'Early stopping triggered at epoch {epoch + 1}')
                 break
@@ -1352,7 +1356,7 @@ def fine_tune_model(model_info_path, train_DataLoader, val_DataLoader,
         best_val_loss = early_stopping.best_loss
 
     # saving model state_dict, hyperparamters and architecture information and losses
-    model_info['state_dict'] = pretrained_model.state_dict()
+    model_info['state_dict'] = finetuned_model.state_dict()
 
     model_info['params'] = {
         'n_epochs': n_epochs,
@@ -1365,10 +1369,10 @@ def fine_tune_model(model_info_path, train_DataLoader, val_DataLoader,
     model_info['val_losses'] = val_losses
     model_info['val_loss'] = best_val_loss
 
-    torch.save(model_info, model_info_save_path)
-    torch.save(pretrained_model, model_save_path)
+    torch.save(model_info, finetuned_model_info_save_path)
+    torch.save(finetuned_model, finetuned_model_save_path)
 
-    return pretrained_model, model_info
+    return finetuned_model, model_info
 
 
 

@@ -339,7 +339,7 @@ class make_training_tiles:
         with rio.open(tiff_path) as tiff:
             tile_radius = config['tile_size'] // 2
 
-            # reading training band (pumping/netGWIrr) and stateID array
+            # reading training band (pumping/netGWIrr) + stateID + pixelID array
             bands = tiff.descriptions  # list of band names
 
             train_band_idx = bands.index(train_band_name) + 1  # +1 due to rasterio-based indexing
@@ -347,6 +347,9 @@ class make_training_tiles:
 
             stateID_idx = bands.index('stateID') + 1  # +1 due to rasterio-based indexing
             stateID_band = tiff.read(stateID_idx)  # reading stateID band
+
+            pixelID_idx = bands.index('pixelID') + 1  # # +1 due to rasterio-based indexing
+            pixelID_band = tiff.read(pixelID_idx)  # reading pixelID band
 
             # The first loop iterates across chunk (each chunk has 100 rows by default) and
             # the second loop across the width (columns) of the raster.
@@ -359,8 +362,9 @@ class make_training_tiles:
             for row in chunk:
                 for col in range(tile_radius, tiff.width - tile_radius):
                     try:
-                        # extracting stateID of the center pixel
+                        # extracting stateID and pixelID of the center pixel
                         stateID_val = stateID_band[row, col]
+                        pixelID_val = pixelID_band[row, col]
 
                         # skipping tile with NoData in the center pixel of the tile
                         center_train_value = training_band[row, col]
@@ -371,13 +375,16 @@ class make_training_tiles:
                         window = Window(col_off=col - tile_radius, row_off=row - tile_radius,
                                         width=config['tile_size'], height=config['tile_size'])
 
-                        # keeping only the arrays except the train data (pumping_mm/netGWIrr) and stateID band
+                        # keeping only the arrays except the train data (pumping_mm/netGWIrr),
+                        # stateID and pixelID band
                         all_band_idxs = list(range(len(bands)))  # 0-based indices
-                        exclude_band_idxs = [train_band_idx - 1, stateID_idx - 1]  # -1 as the indices were 1-based
+                        exclude_band_idxs = [train_band_idx - 1, stateID_idx - 1,
+                                             pixelID_idx - 1]  # -1 as the indices were 1-based
                         valid_band_idxs = [i + 1 for i in all_band_idxs
                                            if i not in exclude_band_idxs]  # +1 again to convert to 1-based indexing
 
-                        # reading multi-band array for the window with train data and stateID valid_bands excluded
+                        # reading multi-band array for the window for the valid bands
+                        # train data (pumping_mm/netGWIrr), stateID, and pixelID excluded
                         tile_arr = tiff.read(valid_band_idxs, window=window)
 
                         # checking if any array in the windowed tiff in entirely null (only no data values)
@@ -416,6 +423,7 @@ class make_training_tiles:
 
                         # append target (training) data to target_data_list, along with tile_no and stateID
                         target_data_list.append({'tile_no': tile_no, 'stateID': stateID_val,
+                                                 'pixelID': pixelID_val,
                                                  'target_value': center_train_value})
 
                     except Exception as e:
@@ -597,7 +605,7 @@ def create_train_val_test_tile_dir_path(df, input_tile_dir):
 
 def train_val_test_split_tiles(target_data_csv, input_tile_dir, train_dir, val_dir, test_dir,
                                train_size=0.7, val_size=0.15, test_size=0.15,
-                               random_state=42, stratify=True, skip_processing=False):
+                               random_state=42, skip_processing=False):
     """
     Splits the tiles into train, validation, and test datasets, along with their target values.
 
@@ -610,7 +618,6 @@ def train_val_test_split_tiles(target_data_csv, input_tile_dir, train_dir, val_d
     :param val_size: float. Proportion of the dataset to include in the validation split. Default is 0.15.
     :param test_size: float. Proportion of the dataset to include in the test split. Default is 0.15.
     :param random_state: int. Random seed for reproducibility. Default is 42.
-    :param stratify: Whether to staritify based on 'stateID'. Default set to True to do stratified split.
     :param skip_processing: Set to True to skip processing. Default is False.
 
     :return: None.
@@ -626,44 +633,42 @@ def train_val_test_split_tiles(target_data_csv, input_tile_dir, train_dir, val_d
         # loading the target data CSV
         target_df = pd.read_csv(target_data_csv)
 
-        # performing the split for train, validation, and test based on target values
-        if stratify:
-            train_data, temp_data = train_test_split(target_df, train_size=train_size,
-                                                     stratify=target_df['stateID'], random_state=random_state)
-            val_data, test_data = train_test_split(temp_data, test_size=test_size / (val_size + test_size),
-                                                   stratify=temp_data['stateID'], random_state=random_state)
-        else:
-            train_data, temp_data = train_test_split(target_df, train_size=train_size, random_state=random_state)
-            val_data, test_data = train_test_split(temp_data, test_size=test_size / (val_size + test_size),
+        # getting unique pixelID and stateID
+        unique_pixels = target_df[['pixelID', 'stateID']].drop_duplicates()
+
+        # Splitting at the pixelID level
+        train_pixels, temp_pixels = train_test_split(unique_pixels, train_size=train_size,
+                                                     stratify=unique_pixels['stateID'],
+                                                     random_state=random_state)
+        val_pixels, test_pixels = train_test_split(temp_pixels, test_size=test_size / (val_size + test_size),
+                                                   stratify=temp_pixels['stateID'],
                                                    random_state=random_state)
 
+        # assigning dataset labels to full dataset
+        target_df['split'] = 'test'    # Default to test
+        target_df.loc[target_df['pixelID'].isin(train_pixels['pixelID']), 'split'] = 'train'
+        target_df.loc[target_df['pixelID'].isin(val_pixels['pixelID']), 'split'] = 'val'
 
+        # splitting into separate DataFrames
+        train_df = target_df[target_df['split'] == 'train']
+        val_df = target_df[target_df['split'] == 'val']
+        test_df = target_df[target_df['split'] == 'test']
 
         # Storing splitted train, val, and test target values and associated tile path in a csv.
         # In this approach we are not copying the train-val-test tiles to the respective directory directly
         # to save computational time.
-        train_data_df = pd.DataFrame(train_data)
-        train_data_df = create_train_val_test_tile_dir_path(train_data_df, input_tile_dir)
-        train_data_df.dropna(inplace=True)
+        train_df = create_train_val_test_tile_dir_path(train_df, input_tile_dir)
+        train_df.dropna(inplace=True)
 
-        val_data_df = pd.DataFrame(val_data)
-        val_data_df = create_train_val_test_tile_dir_path(val_data_df, input_tile_dir)
-        val_data_df.dropna(inplace=True)
+        val_df = create_train_val_test_tile_dir_path(val_df, input_tile_dir)
+        val_df.dropna(inplace=True)
 
-        test_data_df = pd.DataFrame(test_data)
-        test_data_df = create_train_val_test_tile_dir_path(test_data_df, input_tile_dir)
-        test_data_df.dropna(inplace=True)
+        test_df = create_train_val_test_tile_dir_path(test_df, input_tile_dir)
+        test_df.dropna(inplace=True)
 
-        train_data_df.to_csv(os.path.join(train_dir, 'train.csv'), index=False)
-        val_data_df.to_csv(os.path.join(val_dir, 'val.csv'), index=False)
-        test_data_df.to_csv(os.path.join(test_dir, 'test.csv'), index=False)
-
-        # # This was the parallel batch copying option to copy train-val-test tiles into respective directories
-        # # not using it now
-        # # copying tiles to respective train, val, and test directories
-        # copy_tiles_parallel(train_data, input_tile_dir, train_dir, num_workers)
-        # copy_tiles_parallel(val_data, input_tile_dir, val_dir, num_workers)
-        # copy_tiles_parallel(test_data, input_tile_dir, test_dir, num_workers)
+        train_df.to_csv(os.path.join(train_dir, 'train.csv'), index=False)
+        val_df.to_csv(os.path.join(val_dir, 'val.csv'), index=False)
+        test_df.to_csv(os.path.join(test_dir, 'test.csv'), index=False)
 
     else:
         pass
@@ -985,4 +990,60 @@ def standardize_train_val_test(split_csv, mean_dict, std_dict,  exclude_bands_fr
     else:
         pass
 
-
+# # the older version of train-val-test split function
+# def train_val_test_split_tiles(target_data_csv, input_tile_dir, train_dir, val_dir, test_dir,
+#                                train_size=0.7, val_size=0.15, test_size=0.15,
+#                                random_state=42, skip_processing=False):
+#     """
+#     Splits the tiles into train, validation, and test datasets, along with their target values.
+#
+#     :param target_data_csv: str. Path to the CSV file containing target values and tile numbers.
+#     :param input_tile_dir: str. Path of input tiles containing input variables.
+#     :param train_dir: str. Directory to save the training tiles and target csv.
+#     :param val_dir: str. Directory to save the validation tiles and target csv.
+#     :param test_dir: str. Directory to save the test tiles and target csv.
+#     :param train_size: float. Proportion of the dataset to include in the train split. Default is 0.7.
+#     :param val_size: float. Proportion of the dataset to include in the validation split. Default is 0.15.
+#     :param test_size: float. Proportion of the dataset to include in the test split. Default is 0.15.
+#     :param random_state: int. Random seed for reproducibility. Default is 42.
+#     :param skip_processing: Set to True to skip processing. Default is False.
+#
+#     :return: None.
+#     """
+#     if not skip_processing:
+#         print(f'making train-validation-test ({train_size * 100}-{val_size * 100}-{test_size * 100} %) splits....\n')
+#
+#         # cleaning existing data from the directories
+#         clean_and_make_directory(train_dir)
+#         clean_and_make_directory(val_dir)
+#         clean_and_make_directory(test_dir)
+#
+#         # loading the target data CSV
+#         target_df = pd.read_csv(target_data_csv)
+#
+#         # Splitting at the pixelID level
+#         train_data, temp_data = train_test_split(target_df, train_size=train_size,
+#                                                      stratify=target_df['stateID'],
+#                                                      random_state=random_state)
+#         val_data, test_data = train_test_split(temp_data, test_size=test_size / (val_size + test_size),
+#                                                    stratify=temp_data['stateID'],
+#                                                    random_state=random_state)
+#
+#         # Storing splitted train, val, and test target values and associated tile path in a csv.
+#         # In this approach we are not copying the train-val-test tiles to the respective directory directly
+#         # to save computational time.
+#         train_df = create_train_val_test_tile_dir_path(train_data, input_tile_dir)
+#         train_df.dropna(inplace=True)
+#
+#         val_df = create_train_val_test_tile_dir_path(val_data, input_tile_dir)
+#         val_df.dropna(inplace=True)
+#
+#         test_df = create_train_val_test_tile_dir_path(test_data, input_tile_dir)
+#         test_df.dropna(inplace=True)
+#
+#         train_df.to_csv(os.path.join(train_dir, 'train.csv'), index=False)
+#         val_df.to_csv(os.path.join(val_dir, 'val.csv'), index=False)
+#         test_df.to_csv(os.path.join(test_dir, 'test.csv'), index=False)
+#
+#     else:
+#         pass

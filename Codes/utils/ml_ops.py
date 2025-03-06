@@ -84,8 +84,7 @@ def create_train_test_dataframe(years_list, yearly_data_path_dict,
     if not skip_processing:
         print('\ncreating train-test dataframe for annual model...')
 
-        output_dir = os.path.dirname(output_parquet)
-        makedirs([output_dir])
+        makedirs([os.path.dirname(output_parquet)])
 
         variable_dict = {}
 
@@ -133,10 +132,10 @@ def create_train_test_dataframe(years_list, yearly_data_path_dict,
         return output_parquet
 
 
-def split_train_val_test_set(input_csv, pred_attr, exclude_columns, output_dir,
-                             model_version, test_perc=0.3, validation_perc=0,
-                             random_state=0, verbose=True, stratify=True,
-                             skip_processing=False):
+def split_train_val_test_set_v1(input_csv, pred_attr, exclude_columns, output_dir,
+                                model_version, test_perc=0.3, validation_perc=0,
+                                random_state=0, verbose=True, stratify=True,
+                                skip_processing=False):
     """
     Split dataset into train, validation, and test data based on a train/test/validation ratio.
 
@@ -786,7 +785,7 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
 
     :param trained_model: Trained ML model object.
     :param x_test: Filepath of x_test csv or dataframe. In case of dataframe, it has to come directly from the
-                    split_train_val_test_set() function.
+                    split_train_val_test_set_v1() function.
     :param y_test: Filepath of y_test csv or dataframe.
     :param output_dir: Output directory filepath to save the plot.
     :param plot_name: Plot name. Must contain 'png', 'jpeg'.

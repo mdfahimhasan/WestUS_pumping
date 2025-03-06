@@ -125,7 +125,6 @@ def create_multiband_raster(input_files_list, band_key_list, output_file, nodata
             nodata=nodata
     ) as dst:
         for id, (layer, layer_name) in enumerate(zip(input_files_list, band_key_list), start=1):
-
             # # good checks to know if right data is placed under the right band during multiband creation
             print(f'{layer=}')
             print(f'{layer_name=}')
@@ -222,10 +221,9 @@ class make_training_tiles:
         self.tile_size = tile_size
         self.nodata_value = nodata_value
         self.nodata_threshold = nodata_threshold
-        self.start_tile_no = 1              # initiating start_tile_no as 1, will be updated after every tiff processing
+        self.start_tile_no = 1  # initiating start_tile_no as 1, will be updated after every tiff processing
         self.num_workers = num_workers
         self.train_band_name = train_band_name
-
 
         # implementing the tiling using multi-processing (multiprocess has been used to fasten processing speed)
         if not skip_processing:
@@ -278,7 +276,7 @@ class make_training_tiles:
             tiff_height = tiff.height
             tile_radius = self.tile_size // 2
             row_chunks = [range(start, min(start + 100, tiff_height - tile_radius))
-                          for start in range(tile_radius, tiff_height - tile_radius, 100)]    # Chunk size of 100 rows
+                          for start in range(tile_radius, tiff_height - tile_radius, 100)]  # Chunk size of 100 rows
 
             print(f'Processing raster in {len(row_chunks)} chunks...')
 
@@ -309,7 +307,6 @@ class make_training_tiles:
             last_tile_no = max([res for res in results if res is not None], default=self.start_tile_no)
 
             return last_tile_no, target_data_list
-
 
     def _process_chunk_worker(self, args):
         """
@@ -399,7 +396,7 @@ class make_training_tiles:
                         # assigning a sequential tile number using shared counter
                         with lock:
                             tile_no = tile_counter.value
-                            tile_counter.value += 1      # incrementing counter
+                            tile_counter.value += 1  # incrementing counter
 
                         # Keeping track of the last tile number used
                         last_tile_no = tile_no
@@ -474,7 +471,6 @@ class make_training_tiles:
 
         return perc_counts_all_bands
 
-
     def _is_image_null(self, tile_arr):
         """
         Checks all all_bands in an image array to see if there is an entirely null value band. A tile (image array) with
@@ -519,7 +515,7 @@ class make_training_tiles:
             target_df.loc[target_df['stateID'] == 1, 'stateID'] = 12
 
         # saving the dataframe
-        target_df.to_csv(self.target_data_output_csv,  mode='a',
+        target_df.to_csv(self.target_data_output_csv, mode='a',
                          header=not os.path.exists(self.target_data_output_csv), index=False)
 
 
@@ -551,9 +547,10 @@ def copy_tiles_batch(batch, input_dir, copy_dir):
             for file in matching_files:
                 subprocess.run(['robocopy', input_dir, copy_dir, os.path.basename(file),
                                 '/NFL', '/NDL', '/NJH', '/NJS', '/NC', '/NS', '/NP'],
-                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         else:  # for linux
-            subprocess.run(['rsync', '-a', '--progress'] + matching_files + [copy_dir], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(['rsync', '-a', '--progress'] + matching_files + [copy_dir], stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL)
 
 
 # multiprocessing helper function for copying files
@@ -573,7 +570,7 @@ def copy_tiles_parallel(splitted_target_df, input_dir, copy_dir, num_workers, ba
     tile_list = splitted_target_df['tile_no'].tolist()
 
     # splitting tiles into batches
-    tile_batches = [tile_list[i: i+batch_size] for i in range(0, len(tile_list), batch_size)]
+    tile_batches = [tile_list[i: i + batch_size] for i in range(0, len(tile_list), batch_size)]
 
     # preparing iterable of argument tuples for starmap
     args = [(batch, input_dir, copy_dir) for batch in tile_batches]
@@ -595,7 +592,7 @@ def create_train_val_test_tile_dir_path(df, input_tile_dir):
 
     # making a dictionary for all tiles in the input tile dir. The key has tile no and the item has tile path
     tile_dict = {int(f.split('_')[-1].replace('.tif', '')): os.path.join(input_tile_dir, f)
-                    for f in os.listdir(input_tile_dir) if f.endswith('tif')}
+                 for f in os.listdir(input_tile_dir) if f.endswith('tif')}
 
     # mapping tile_no to file path
     df['tile_paths'] = df['tile_no'].astype(int).apply(lambda x: tile_dict[x])
@@ -603,9 +600,9 @@ def create_train_val_test_tile_dir_path(df, input_tile_dir):
     return df
 
 
-def train_val_test_split_tiles(target_data_csv, input_tile_dir, train_dir, val_dir, test_dir,
-                               train_size=0.7, val_size=0.15, test_size=0.15,
-                               random_state=42, skip_processing=False):
+def train_val_test_split_tiles_v2(target_data_csv, input_tile_dir, train_dir, val_dir, test_dir,
+                                  train_size=0.7, val_size=0.15, test_size=0.15,
+                                  random_state=42, skip_processing=False):
     """
     Splits the tiles into train, validation, and test datasets, along with their target values.
 
@@ -645,7 +642,7 @@ def train_val_test_split_tiles(target_data_csv, input_tile_dir, train_dir, val_d
                                                    random_state=random_state)
 
         # assigning dataset labels to full dataset
-        target_df['split'] = 'test'    # Default to test
+        target_df['split'] = 'test'  # Default to test
         target_df.loc[target_df['pixelID'].isin(train_pixels['pixelID']), 'split'] = 'train'
         target_df.loc[target_df['pixelID'].isin(val_pixels['pixelID']), 'split'] = 'val'
 
@@ -711,7 +708,7 @@ def accumulate_band_values_each_tile(tile, valid_idxs, valid_bands, nodata):
 
 
 def load_statistics_from_csv(output_dir):
-    """Loads mean, std, min, max statistics from CSV files into dictionaries."""
+    """Loads mean, std statistics from CSV files into dictionaries."""
     mean_csv = pd.read_csv(os.path.join(output_dir, 'mean.csv'))
     std_csv = pd.read_csv(os.path.join(output_dir, 'std.csv'))
 
@@ -767,10 +764,12 @@ def calc_scaling_statistics(train_csv, mode, exclude_bands,
 
             # getting band descriptions and no data info
             bands = rio.open(all_tiles[0]).descriptions
-            bands = [band[0: band.rfind('_')] for band in bands]   # band.rfind('_') finds the index of the last '_' that separates the year attribute
+            bands = [band[0: band.rfind('_')] for band in
+                     bands]  # band.rfind('_') finds the index of the last '_' that separates the year attribute
 
             # keeping only the arrays except the train data (pumping_mm/netGWIrr) and stateID band
-            valid_band_idxs = [i+1 for i, j in enumerate(bands) if j not in exclude_bands]  # +1 for rasterio-based indexingas the indices were 1-based
+            valid_band_idxs = [i + 1 for i, j in enumerate(bands) if
+                               j not in exclude_bands]  # +1 for rasterio-based indexingas the indices were 1-based
             valid_bands = [band for band in bands if band not in exclude_bands]
 
             print(f'Band processed for statistics: {valid_bands} \n')
@@ -879,7 +878,6 @@ def standardize_single_tile(tile, exclude_bands_from_standardizing, mean_dict, s
     bands = [band[0: band.rfind('_')] for band in
              bands]  # band.rfind('_') finds the index of the last '_' that separates the year attribute
 
-
     if file.count != len(bands):  # exiting code in case number of band names and number of array don't match
         raise ValueError("Number of all_bands in metadata and number of array don't match")
 
@@ -933,11 +931,11 @@ def standardize_single_tile(tile, exclude_bands_from_standardizing, mean_dict, s
             nodata=-9999
     ) as dst:
         for idx, band_arr in enumerate(standardized_arr):
-            dst.write(band_arr, idx+1)
-            dst.set_band_description(idx+1, bands[idx])
+            dst.write(band_arr, idx + 1)
+            dst.set_band_description(idx + 1, bands[idx])
 
 
-def standardize_train_val_test(split_csv, mean_dict, std_dict,  exclude_bands_from_standardizing, output_dir,
+def standardize_train_val_test(split_csv, mean_dict, std_dict, exclude_bands_from_standardizing, output_dir,
                                split_type='train', num_workers=30, skip_processing=False):
     """
     Standardizes multi-band raster tiles and target values for train, validation, or test datasets.
@@ -975,7 +973,6 @@ def standardize_train_val_test(split_csv, mean_dict, std_dict,  exclude_bands_fr
         with Pool(processes=num_workers) as pool:
             pool.starmap(standardize_single_tile, args)
 
-
         # extracting mean and std values from respective dictionaries
         mean_val = mean_dict['target']
         std_val = std_dict['target']
@@ -990,60 +987,61 @@ def standardize_train_val_test(split_csv, mean_dict, std_dict,  exclude_bands_fr
     else:
         pass
 
+
 # # the older version of train-val-test split function
-# def train_val_test_split_tiles(target_data_csv, input_tile_dir, train_dir, val_dir, test_dir,
-#                                train_size=0.7, val_size=0.15, test_size=0.15,
-#                                random_state=42, skip_processing=False):
-#     """
-#     Splits the tiles into train, validation, and test datasets, along with their target values.
-#
-#     :param target_data_csv: str. Path to the CSV file containing target values and tile numbers.
-#     :param input_tile_dir: str. Path of input tiles containing input variables.
-#     :param train_dir: str. Directory to save the training tiles and target csv.
-#     :param val_dir: str. Directory to save the validation tiles and target csv.
-#     :param test_dir: str. Directory to save the test tiles and target csv.
-#     :param train_size: float. Proportion of the dataset to include in the train split. Default is 0.7.
-#     :param val_size: float. Proportion of the dataset to include in the validation split. Default is 0.15.
-#     :param test_size: float. Proportion of the dataset to include in the test split. Default is 0.15.
-#     :param random_state: int. Random seed for reproducibility. Default is 42.
-#     :param skip_processing: Set to True to skip processing. Default is False.
-#
-#     :return: None.
-#     """
-#     if not skip_processing:
-#         print(f'making train-validation-test ({train_size * 100}-{val_size * 100}-{test_size * 100} %) splits....\n')
-#
-#         # cleaning existing data from the directories
-#         clean_and_make_directory(train_dir)
-#         clean_and_make_directory(val_dir)
-#         clean_and_make_directory(test_dir)
-#
-#         # loading the target data CSV
-#         target_df = pd.read_csv(target_data_csv)
-#
-#         # Splitting at the pixelID level
-#         train_data, temp_data = train_test_split(target_df, train_size=train_size,
-#                                                      stratify=target_df['stateID'],
-#                                                      random_state=random_state)
-#         val_data, test_data = train_test_split(temp_data, test_size=test_size / (val_size + test_size),
-#                                                    stratify=temp_data['stateID'],
-#                                                    random_state=random_state)
-#
-#         # Storing splitted train, val, and test target values and associated tile path in a csv.
-#         # In this approach we are not copying the train-val-test tiles to the respective directory directly
-#         # to save computational time.
-#         train_df = create_train_val_test_tile_dir_path(train_data, input_tile_dir)
-#         train_df.dropna(inplace=True)
-#
-#         val_df = create_train_val_test_tile_dir_path(val_data, input_tile_dir)
-#         val_df.dropna(inplace=True)
-#
-#         test_df = create_train_val_test_tile_dir_path(test_data, input_tile_dir)
-#         test_df.dropna(inplace=True)
-#
-#         train_df.to_csv(os.path.join(train_dir, 'train.csv'), index=False)
-#         val_df.to_csv(os.path.join(val_dir, 'val.csv'), index=False)
-#         test_df.to_csv(os.path.join(test_dir, 'test.csv'), index=False)
-#
-#     else:
-#         pass
+def train_val_test_split_v1(target_data_csv, input_tile_dir, train_dir, val_dir, test_dir,
+                            train_size=0.7, val_size=0.15, test_size=0.15,
+                            random_state=42, skip_processing=False):
+    """
+    Splits the tiles into train, validation, and test datasets, along with their target values.
+
+    :param target_data_csv: str. Path to the CSV file containing target values and tile numbers.
+    :param input_tile_dir: str. Path of input tiles containing input variables.
+    :param train_dir: str. Directory to save the training tiles and target csv.
+    :param val_dir: str. Directory to save the validation tiles and target csv.
+    :param test_dir: str. Directory to save the test tiles and target csv.
+    :param train_size: float. Proportion of the dataset to include in the train split. Default is 0.7.
+    :param val_size: float. Proportion of the dataset to include in the validation split. Default is 0.15.
+    :param test_size: float. Proportion of the dataset to include in the test split. Default is 0.15.
+    :param random_state: int. Random seed for reproducibility. Default is 42.
+    :param skip_processing: Set to True to skip processing. Default is False.
+
+    :return: None.
+    """
+    if not skip_processing:
+        print(f'making train-validation-test ({train_size * 100}-{val_size * 100}-{test_size * 100} %) splits....\n')
+
+        # cleaning existing data from the directories
+        clean_and_make_directory(train_dir)
+        clean_and_make_directory(val_dir)
+        clean_and_make_directory(test_dir)
+
+        # loading the target data CSV
+        target_df = pd.read_csv(target_data_csv)
+
+        # Splitting at the pixelID level
+        train_data, temp_data = train_test_split(target_df, train_size=train_size,
+                                                 stratify=target_df['stateID'],
+                                                 random_state=random_state)
+        val_data, test_data = train_test_split(temp_data, test_size=test_size / (val_size + test_size),
+                                               stratify=temp_data['stateID'],
+                                               random_state=random_state)
+
+        # Storing splitted train, val, and test target values and associated tile path in a csv.
+        # In this approach we are not copying the train-val-test tiles to the respective directory directly
+        # to save computational time.
+        train_df = create_train_val_test_tile_dir_path(train_data, input_tile_dir)
+        train_df.dropna(inplace=True)
+
+        val_df = create_train_val_test_tile_dir_path(val_data, input_tile_dir)
+        val_df.dropna(inplace=True)
+
+        test_df = create_train_val_test_tile_dir_path(test_data, input_tile_dir)
+        test_df.dropna(inplace=True)
+
+        train_df.to_csv(os.path.join(train_dir, 'train.csv'), index=False)
+        val_df.to_csv(os.path.join(val_dir, 'val.csv'), index=False)
+        test_df.to_csv(os.path.join(test_dir, 'test.csv'), index=False)
+
+    else:
+        pass

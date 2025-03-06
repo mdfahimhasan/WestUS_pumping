@@ -47,7 +47,8 @@ class DataLoaderCreator:
     """
 
     def __init__(self, tile_dir, target_csv, sample_perc_tiles='all',
-                 bands_to_exclude=None, batch_size=64, data_type='train', verbose=False):
+                 bands_to_exclude=None, batch_size=64, shuffle=True,
+                 data_type='train', verbose=False):
         """
         Initialize the DataLoader to batch the data.
 
@@ -59,6 +60,7 @@ class DataLoaderCreator:
                                                Default set to 'all' to use all tiles.
         :param bands_to_exclude (list): List of valid_bands to exclude during training. Default set to None.
         :param batch_size (int): Batch size for the DataLoader.
+        :param shuffle (bool): Default set to True to shuffle during training. Must set False during validation and testing.
         :param data_type (str): Type of data (train/validation/test) passed to the DataLoader class.
         :param verbose (bool): Set to True if want to print before and after batching tensor size. 
         """
@@ -120,7 +122,7 @@ class DataLoaderCreator:
 
         # creating the DataLoader
         self.dataloader = DataLoader(self.dataset, batch_size=batch_size,
-                                     shuffle=True)  # shuffle True is randomizing the the data
+                                     shuffle=shuffle)
 
         if verbose:
             # checking and printing the shapes of the tensors before batching
@@ -562,7 +564,7 @@ def test(model, tile_dir, target_csv, sample_perc_tiles, bands_to_exclude, batch
     DataLoader = DataLoaderCreator(tile_dir, target_csv,
                                    sample_perc_tiles=sample_perc_tiles,
                                    bands_to_exclude=bands_to_exclude,
-                                   batch_size=batch_size,
+                                   batch_size=batch_size, shuffle=False,
                                    data_type=data_type).get_dataloader()
 
     # setting model to evaluation mode
@@ -719,7 +721,7 @@ def run_default_model(train_loader, val_loader,
         best_val_loss = early_stopping.best_loss
 
     # saving model state_dict, hyperparamters and architecture information and losses
-    model_info['state_dict'] = model.state_dict()
+    model_state = model.state_dict()
 
     model_info['params'] = {
         'lr': lr,
@@ -739,7 +741,7 @@ def run_default_model(train_loader, val_loader,
     model_info['val_losses'] = val_losses
     model_info['val_loss'] = best_val_loss
 
-    return model, model_info
+    return model, model_state, model_info
 
 
 def run_and_tune_model(trial, train_loader, val_loader,
@@ -777,7 +779,7 @@ def run_and_tune_model(trial, train_loader, val_loader,
     print(f'\nStarting trial number {trial.number}...\n')
 
     # sample hyperparameters
-    lr = trial.suggest_float('lr', 1e-4, 5e-3, log=True)
+    lr = trial.suggest_float('lr', 1e-5, 5e-3, log=True)
     weight_decay = trial.suggest_float('weight_decay', 1e-5, 1e-3, log=True)
 
     # sample convolutional architecture
@@ -796,26 +798,23 @@ def run_and_tune_model(trial, train_loader, val_loader,
     fc_units.append(trial.suggest_int('fc_units_layer_0', 128, 256, step=32))  # largest layer
 
     for i in range(1, num_fc_layers):
-        high_val = max(64, fc_units[i - 1] - 32)  # Always compute the next layer
-        fc_units.append(trial.suggest_int(f'fc_units_layer_{i}', 32, high_val, step=32))
+        min_val = 32  # Minimum neurons per layer
+        high_val = max(64, fc_units[i - 1] // 2)  # Ensure gradual reduction
 
-    # fc_units.append(trial.suggest_int('fc_units_layer_0', 128, 256, step=64))  # largest layer
-    #
-    # for i in range(1, num_fc_layers):
-    #     high_val = max(64, fc_units[i - 1] - 32)  # Ensure decrease
-    #     fc_units.append(trial.suggest_int(f'fc_units_layer_{i}', 64, high_val, step=32))
+        fc_units.append(trial.suggest_int(f'fc_units_layer_{i}', min_val, high_val, step=32))
 
     # training the model with the sampled parameters
-    _, model_info = run_default_model(train_loader, val_loader,
-                                      n_features=n_features, input_size=input_size,
-                                      n_epochs=n_epochs, filters=filters,
-                                      padding=padding, pooling=pooling,
-                                      lr=lr, kernel_size=kernel_size, stride=1,
-                                      activation_func=activation_func, fc_units=fc_units,
-                                      weight_decay=weight_decay, dropout_rate=dropout_rate,
-                                      implement_earlyStopping=implement_earlyStopping,
-                                      patience=patience, start_EarlyStop_count_from_epoch=start_EarlyStop_count_from_epoch,
-                                      verbose=True)
+    _, model_state, model_info = \
+        run_default_model(train_loader, val_loader,
+                          n_features=n_features, input_size=input_size,
+                          n_epochs=n_epochs, filters=filters,
+                          padding=padding, pooling=pooling,
+                          lr=lr, kernel_size=kernel_size, stride=1,
+                          activation_func=activation_func, fc_units=fc_units,
+                          weight_decay=weight_decay, dropout_rate=dropout_rate,
+                          implement_earlyStopping=implement_earlyStopping,
+                          patience=patience, start_EarlyStop_count_from_epoch=start_EarlyStop_count_from_epoch,
+                          verbose=True)
 
     # objective function
     best_val_loss = model_info['val_loss']  # for a specific trial
@@ -921,13 +920,13 @@ def main(tile_dir_train, target_csv_train,
     train_loader = DataLoaderCreator(tile_dir_train, target_csv_train,
                                      sample_perc_tiles=sample_perc_tiles,
                                      bands_to_exclude=bands_to_exclude,
-                                     batch_size=batch_size,
+                                     batch_size=batch_size, shuffle=True,
                                      data_type='train').get_dataloader()
 
     val_loader = DataLoaderCreator(tile_dir_val, target_csv_val,
                                    sample_perc_tiles=sample_perc_tiles,
                                    bands_to_exclude=bands_to_exclude,
-                                   batch_size=batch_size,
+                                   batch_size=batch_size, shuffle=False,
                                    data_type='validation').get_dataloader()
 
     # # parameter tuning mode
@@ -952,30 +951,32 @@ def main(tile_dir_train, target_csv_train,
 
         # retraining the best model (optional)
         print('\nRetraining the best model...')
-        trained_model, best_model_info = run_default_model(
-                                         train_loader=train_loader,
-                                         val_loader=val_loader,
-                                         n_features=n_features,
-                                         input_size=input_size,
-                                         n_epochs=best_epoch,
-                                         filters=[best_params[f'filters_layer_{i}'] for i in range(2)],  # Num conv layers fixed at 2
-                                         kernel_size=[best_params[f'kernel_size_layer_{i}'] for i in range(2)],  # Num conv layers fixed at 2
-                                         fc_units=[best_params[f'fc_units_layer_{i}'] for i in range(best_params['num_fc_layers'])],
-                                         padding=padding,
-                                         pooling=pooling,
-                                         lr=best_params['lr'],
-                                         activation_func=activation_func,
-                                         weight_decay=best_params['weight_decay'],
-                                         dropout_rate=best_params['dropout'],
-                                         implement_earlyStopping=implement_earlyStopping,
-                                         patience=patience,
-                                         start_EarlyStop_count_from_epoch=start_EarlyStop_count_from_epoch,
-                                         verbose=True)
+        trained_model, best_model_state, best_model_info = \
+            run_default_model(train_loader=train_loader,
+                              val_loader=val_loader,
+                              n_features=n_features,
+                              input_size=input_size,
+                              n_epochs=best_epoch,
+                              filters=[best_params[f'filters_layer_{i}'] for i in range(2)],  # Num conv layers fixed at 2
+                              kernel_size=[best_params[f'kernel_size_layer_{i}'] for i in range(2)],  # Num conv layers fixed at 2
+                              fc_units=[best_params[f'fc_units_layer_{i}'] for i in range(best_params['num_fc_layers'])],
+                              padding=padding,
+                              pooling=pooling,
+                              lr=best_params['lr'],
+                              activation_func=activation_func,
+                              weight_decay=best_params['weight_decay'],
+                              dropout_rate=best_params['dropout'],
+                              implement_earlyStopping=implement_earlyStopping,
+                              patience=patience,
+                              start_EarlyStop_count_from_epoch=start_EarlyStop_count_from_epoch,
+                              verbose=True)
 
-        # save the best model's state_dict + information and the best model
-        torch.save(best_model_info, model_info_save_path)
+        # save the best model's state_dict and  information dictionary
+        torch.save(best_model_state, model_save_path)
 
-        torch.save(trained_model, model_save_path)
+        with open(model_info_save_path, 'wb') as f:
+            pickle.dump(best_model_info, f)
+
         print(f'\nFinal model saved at {model_save_path}')
 
         # printing model best parameters' summary
@@ -1000,31 +1001,32 @@ def main(tile_dir_train, target_csv_train,
         print(default_params)
 
         # running the model with default hyperparameters and configuration parameters
-        trained_model, model_info = run_default_model(
-                                    train_loader=train_loader,
-                                    val_loader=val_loader,
-                                    n_features=n_features,
-                                    input_size=input_size,
-                                    n_epochs=n_epochs,
-                                    filters=default_params['filters'],
-                                    kernel_size=default_params['kernel_size'],
-                                    fc_units=default_params['fc_units'],
-                                    padding=padding,
-                                    pooling=pooling,
-                                    lr=default_params['lr'],
-                                    activation_func=activation_func,
-                                    weight_decay=default_params['weight_decay'],
-                                    dropout_rate=default_params['dropout'],
-                                    implement_earlyStopping=implement_earlyStopping,
-                                    patience=patience,
-                                    start_EarlyStop_count_from_epoch=start_EarlyStop_count_from_epoch,
-                                    verbose=True)
+        trained_model, model_state, model_info = \
+            run_default_model(train_loader=train_loader,
+                              val_loader=val_loader,
+                              n_features=n_features,
+                              input_size=input_size,
+                              n_epochs=n_epochs,
+                              filters=default_params['filters'],
+                              kernel_size=default_params['kernel_size'],
+                              fc_units=default_params['fc_units'],
+                              padding=padding,
+                              pooling=pooling,
+                              lr=default_params['lr'],
+                              activation_func=activation_func,
+                              weight_decay=default_params['weight_decay'],
+                              dropout_rate=default_params['dropout'],
+                              implement_earlyStopping=implement_earlyStopping,
+                              patience=patience,
+                              start_EarlyStop_count_from_epoch=start_EarlyStop_count_from_epoch,
+                              verbose=True)
 
-        # saving the model information and model
+        # saving the model state and information
+        torch.save(model_state, model_save_path)
+
         with open(model_info_save_path, 'wb') as f:
             pickle.dump(model_info, f)
 
-        torch.save(trained_model, model_save_path)
         print(f'\nModel saved at {model_save_path}')
 
         # printing model best parameters' summary
@@ -1064,7 +1066,7 @@ def unstandardize_save_and_test(model, tile_dir, target_csv, sample_perc_tiles,
         DataLoader = DataLoaderCreator(tile_dir, target_csv,
                                        sample_perc_tiles=sample_perc_tiles,
                                        bands_to_exclude=bands_to_exclude,
-                                       batch_size=batch_size,
+                                       batch_size=batch_size, shuffle=False,
                                        data_type=data_type).get_dataloader()
 
         # empty lists to store predictions and tileNo
@@ -1180,7 +1182,7 @@ def plot_shap_values(trained_model, tile_dir, target_csv, sample_perc_tiles,
         dataloader = DataLoaderCreator(tile_dir, target_csv,
                                        sample_perc_tiles=sample_perc_tiles,
                                        bands_to_exclude=bands_to_exclude,
-                                       batch_size=batch_size,
+                                       batch_size=batch_size, shuffle=False,
                                        data_type=data_type).get_dataloader()
 
         # setting model to evaluation mode

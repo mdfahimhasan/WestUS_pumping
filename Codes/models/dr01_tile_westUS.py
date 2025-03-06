@@ -13,18 +13,18 @@ sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import assign_cpu_nodes
 from utils_tiles import make_multiband_datasets, make_training_tiles, \
-        train_val_test_split_tiles, calc_scaling_statistics, standardize_train_val_test
+        train_val_test_split_tiles_v2, calc_scaling_statistics, standardize_train_val_test
 
 
 if __name__ == '__main__':
     # flags and vars
-    skip_create_multiband_raster = True    #############################################################################
-    skip_create_tile = True                #############################################################################
+    skip_create_multiband_raster = False    #############################################################################
+    skip_create_tile = False                #############################################################################
     skip_split_train_val_test = False       #############################################################################
-    skip_calc_stats = True                #############################################################################
-    skip_standardize_train = True          #############################################################################
-    skip_standardize_val = True            #############################################################################
-    skip_standardize_test = True           #############################################################################
+    skip_calc_stats = False                #############################################################################
+    skip_standardize_train = False          #############################################################################
+    skip_standardize_val = False            #############################################################################
+    skip_standardize_test = False           #############################################################################
 
 
     static_keywords = {'stateID', 'pixelID', 'arid', 'cold',
@@ -67,9 +67,8 @@ if __name__ == '__main__':
     multiband_key_list = list(datasets_dict.values())  # 'pumping_mm', 'stateID', 'pixelID' included here
     westUS_multiband_dir = '../../Data_main/rasters/multibands_westUS/training/westUS'
 
-    training_years = [2000, 2001, 2002]
-        # (2000, 2001, 2002, 2003), 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
-        #               2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019)
+    training_years = (2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009,
+                      2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019)
 
     # multi-band raster creation
     make_multiband_datasets(list_of_temporal_var_dirs=temporal_vars_dir,
@@ -109,10 +108,10 @@ if __name__ == '__main__':
     val_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/val'
     test_dir = '../../Data_main/rasters/multibands_westUS/train_val_test_splits/test'
 
-    train_val_test_split_tiles(target_data_csv=target_csv, input_tile_dir=multiband_tile_dir,
-                               train_dir=train_dir, val_dir=val_dir, test_dir=test_dir,
-                               train_size=0.7, val_size=0.15, test_size=0.15,
-                               random_state=42, skip_processing=skip_split_train_val_test)
+    train_val_test_split_tiles_v2(target_data_csv=target_csv, input_tile_dir=multiband_tile_dir,
+                                  train_dir=train_dir, val_dir=val_dir, test_dir=test_dir,
+                                  train_size=0.7, val_size=0.15, test_size=0.15,
+                                  random_state=42, skip_processing=skip_split_train_val_test)
 
     # ------------------------------------------------------------------------------------------------------------------
     # 4. Calculate standardization statistics

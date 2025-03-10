@@ -21,10 +21,8 @@ if __name__ == '__main__':
     skip_create_multiband_raster = False    #############################################################################
     skip_create_tile = False                #############################################################################
     skip_split_train_val_test = False       #############################################################################
-    skip_calc_stats = False                #############################################################################
-    skip_standardize_train = False          #############################################################################
-    skip_standardize_val = False            #############################################################################
-    skip_standardize_test = False           #############################################################################
+    skip_calc_stats = False                ##############################################################################
+    skip_standardize = False               ##############################################################################
 
 
     static_keywords = {'stateID', 'pixelID', 'arid', 'cold',
@@ -120,7 +118,7 @@ if __name__ == '__main__':
 
     use_cpu_nodes = assign_cpu_nodes([skip_calc_stats])
 
-    mean_dict, std_dict = \
+    mean_dict, std_dict, min_dict, max_dict = \
         calc_scaling_statistics(train_csv=os.path.join(train_dir, 'train.csv'),
                                 exclude_bands=exclude_standardizing_bands,
                                 mode='pretrain',        # here the model is not TL, however set to 'pretrain'
@@ -143,22 +141,28 @@ if __name__ == '__main__':
     standardized_test_dir = r'../../Data_main/rasters/multibands_westUS/train_val_test_splits/standardized/test'
 
 
-    use_cpu_nodes = assign_cpu_nodes([skip_standardize_train, skip_standardize_val, skip_standardize_test])
+    use_cpu_nodes = assign_cpu_nodes([skip_standardize])
 
     standardize_train_val_test(split_csv=train_csv, exclude_bands_from_standardizing=exclude_standardizing_bands,
-                               mean_dict=mean_dict, std_dict=std_dict,
+                               mean_dict=None, std_dict=None,
+                               min_dict=min_dict, max_dict=max_dict,
+                               standardize_or_normalize='standardize',
                                split_type='train', output_dir=standardized_train_dir,
                                num_workers=use_cpu_nodes,
-                               skip_processing=skip_standardize_train)
+                               skip_processing=skip_standardize)
 
     standardize_train_val_test(split_csv=val_csv, exclude_bands_from_standardizing=exclude_standardizing_bands,
-                               mean_dict=mean_dict, std_dict=std_dict,
+                               mean_dict=None, std_dict=None,
+                               min_dict=min_dict, max_dict=max_dict,
+                               standardize_or_normalize='standardized',
                                split_type='val', output_dir=standardized_val_dir,
                                num_workers=use_cpu_nodes,
-                               skip_processing=skip_standardize_val)
+                               skip_processing=skip_standardize)
 
     standardize_train_val_test(split_csv=test_csv, exclude_bands_from_standardizing=exclude_standardizing_bands,
-                               mean_dict=mean_dict, std_dict=std_dict,
+                               mean_dict=None, std_dict=None,
+                               min_dict=min_dict, max_dict=max_dict,
+                               standardize_or_normalize='standardized',
                                split_type='test', output_dir=standardized_test_dir,
                                num_workers=use_cpu_nodes,
-                               skip_processing=skip_standardize_test)
+                               skip_processing=skip_standardize)

@@ -368,6 +368,9 @@ class make_training_tiles:
                         if center_train_value == self.nodata_value:
                             continue
 
+                        # extracting lat-lon
+                        lon, lat = rio.transform.xy(tiff.transform, row, col)
+
                         # creating a window around the central pixel and reading the data
                         window = Window(col_off=col - tile_radius, row_off=row - tile_radius,
                                         width=config['tile_size'], height=config['tile_size'])
@@ -419,7 +422,10 @@ class make_training_tiles:
                             continue
 
                         # append target (training) data to target_data_list, along with tile_no and stateID
-                        target_data_list.append({'tile_no': tile_no, 'stateID': stateID_val,
+                        target_data_list.append({'tile_no': tile_no,
+                                                 'lon': lon,
+                                                 'lat': lat,
+                                                 'stateID': stateID_val,
                                                  'pixelID': pixelID_val,
                                                  'target_value': center_train_value})
 
@@ -494,7 +500,7 @@ class make_training_tiles:
 
     def _save_target_data(self, target_data_list):
         """
-        Saves target_data_list as a csv holding tile_no and taget value.
+        Saves target_data_list as a csv holding tile_no and target value.
 
         :param target_data_list: A list of dictionary holding 'tile_no', 'stateID', and 'target_value' and their values
                                 as key, value pairs. Generated from the __process_chunk_worker() function.
@@ -505,7 +511,8 @@ class make_training_tiles:
         if len(target_data_list) > 0:
             target_df = pd.DataFrame(list(target_data_list))  # converting Manager.list() to python list >> DataFrame
         else:
-            target_df = pd.DataFrame(columns=['tile_no', 'stateID', 'target_value'])  # ensuring correct column names
+            target_df = pd.DataFrame(columns=['tile_no', 'lon', 'lat',
+                                              'stateID', 'pixelID', 'target_value'])  # ensuring correct column names
 
         if self.mode == 'pretrain':
             # replacing samples (very few) with stateID 3 - Nebraska and 1 -  Oklahoma. They belong to kansas
@@ -708,19 +715,24 @@ def accumulate_band_values_each_tile(tile, valid_idxs, valid_bands, nodata):
 
 
 def load_statistics_from_csv(output_dir):
-    """Loads mean, std statistics from CSV files into dictionaries."""
+    """Loads mean, std, min, max statistics from CSV files into dictionaries."""
     mean_csv = pd.read_csv(os.path.join(output_dir, 'mean.csv'))
     std_csv = pd.read_csv(os.path.join(output_dir, 'std.csv'))
+    min_csv = pd.read_csv(os.path.join(output_dir, 'min.csv'))
+    max_csv = pd.read_csv(os.path.join(output_dir, 'max.csv'))
 
     return (
         dict(zip(mean_csv['variable'], mean_csv['value'])),
-        dict(zip(std_csv['variable'], std_csv['value']))
+        dict(zip(std_csv['variable'], std_csv['value'])),
+        dict(zip(min_csv['variable'], min_csv['value'])),
+        dict(zip(max_csv['variable'], max_csv['value']))
+
     )
 
 
 def save_statistics_to_csv(statistics_dicts, output_dir):
     """Saves multiple statistics dictionaries to CSV."""
-    for dict_name, dictionary in zip(['mean', 'std'], statistics_dicts):
+    for dict_name, dictionary in zip(['mean', 'std', 'min', 'max'], statistics_dicts):
         df = pd.DataFrame(dictionary.items(), columns=['variable', 'value'])
         df.to_csv(os.path.join(output_dir, f'{dict_name}.csv'), index=False)
 
@@ -729,7 +741,7 @@ def calc_scaling_statistics(train_csv, mode, exclude_bands,
                             pretrain_output_dir, finetune_output_dir=None,
                             num_workers=3, skip_processing=False):
     """
-    Calculates the mean and standard deviation for each band across all tiles in the training directory.
+    Calculates the mean, stdv, min, and max for each band across all tiles in the training directory.
 
     :param train_csv: filepath str. Filepath to the csv containing training tile_no, target_value, and filepath.
                       Have to be respective train_csv for 'pretrain' or 'finetune' mode.
@@ -803,6 +815,8 @@ def calc_scaling_statistics(train_csv, mode, exclude_bands,
             # calculating statistics
             mean_dict = {band: np.nanmean(aggregated_values[band]) for band in valid_bands}
             std_dict = {band: np.nanstd(aggregated_values[band]) for band in valid_bands}
+            min_dict = {band: np.nanmin(aggregated_values[band]) for band in valid_bands}
+            max_dict = {band: np.nanmax(aggregated_values[band]) for band in valid_bands}
 
             # calculating  target statistics (pretrain mode)
             target_val = np.array(train_df['target_value'].tolist())
@@ -811,11 +825,14 @@ def calc_scaling_statistics(train_csv, mode, exclude_bands,
             # for 'pretrain' and 'finetune' mode won't affect
             mean_dict['target'] = np.nanmean(target_val)
             std_dict['target'] = np.nanstd(target_val)
+            min_dict['target'] = np.nanmin(target_val)
+            max_dict['target'] = np.nanmax(target_val)
 
             # saving dictionaries as csv
-            save_statistics_to_csv(statistics_dicts=[mean_dict, std_dict], output_dir=pretrain_output_dir)
+            save_statistics_to_csv(statistics_dicts=[mean_dict, std_dict, min_dict, max_dict],
+                                   output_dir=pretrain_output_dir)
 
-            return mean_dict, std_dict
+            return mean_dict, std_dict, min_dict, max_dict
 
         elif mode == 'finetune':
             print('calculating statistics for data scaling...')
@@ -823,7 +840,7 @@ def calc_scaling_statistics(train_csv, mode, exclude_bands,
             clean_and_make_directory(finetune_output_dir)
 
             # loading statistics dir from pretrain phase
-            mean_dict, std_dict = load_statistics_from_csv(pretrain_output_dir)
+            mean_dict, std_dict, min_dict, max_dict = load_statistics_from_csv(pretrain_output_dir)
 
             # calculating target statistics (finetune mode)
             train_df = pd.read_csv(train_csv)
@@ -833,28 +850,33 @@ def calc_scaling_statistics(train_csv, mode, exclude_bands,
             # for 'pretrain' and 'finetune' mode won't affect
             mean_dict['target'] = np.nanmean(target_val)
             std_dict['target'] = np.nanstd(target_val)
+            min_dict['target'] = np.nanmin(target_val)
+            max_dict['target'] = np.nanmax(target_val)
 
             # saving dictionaries as pickle
-            save_statistics_to_csv(statistics_dicts=[mean_dict, std_dict], output_dir=finetune_output_dir)
+            save_statistics_to_csv(statistics_dicts=[mean_dict, std_dict, min_dict, max_dict],
+                                   output_dir=finetune_output_dir)
 
-            return mean_dict, std_dict
+            return mean_dict, std_dict, min_dict, max_dict
 
     else:  # loading the saved statistics
         if mode not in ['pretrain', 'finetune']:
             raise ValueError("mode must be either 'pretrain' or 'finetune'")
 
         if mode == 'pretrain':
-            mean_dict, std_dict = load_statistics_from_csv(pretrain_output_dir)
+            mean_dict, std_dict, min_dict, max_dict = load_statistics_from_csv(pretrain_output_dir)
 
-            return mean_dict, std_dict
+            return mean_dict, std_dict, min_dict, max_dict
 
         elif mode == 'finetune':
-            mean_dict, std_dict = load_statistics_from_csv(finetune_output_dir)
+            mean_dict, std_dict, min_dict, max_dict = load_statistics_from_csv(finetune_output_dir)
 
-            return mean_dict, std_dict
+            return mean_dict, std_dict, min_dict, max_dict
 
 
-def standardize_single_tile(tile, exclude_bands_from_standardizing, mean_dict, std_dict, output_dir):
+def standardize_single_tile(tile, exclude_bands_from_standardizing, output_dir,
+                            mean_dict=None, std_dict=None, min_dict=None, max_dict=None,
+                            standardize_or_normalize='standardize'):
     """
     Standardizes multi-band raster tiles and target values for train, validation, or test datasets.
     The mean and std statistics used for standardizing comes from the train_set using the dictionaries generated by
@@ -862,12 +884,18 @@ def standardize_single_tile(tile, exclude_bands_from_standardizing, mean_dict, s
 
     :param tile: str. Path to the tile.
     :param exclude_bands_from_standardizing: List of band names to exclude from standardizing.
-    :param mean_dict: dictionary. A dictionary containing mean values (from train_set) for each band and the target variable.
-    :param std_dict: dictionary. A dictionary containing std values (from train_set) for each band and the target variable.
     :param output_dir: str. Path to the directory to save standardized outputs (tiles).
+    :param mean_dict: A dictionary containing mean values (from train_set) for each band and the target variable. Default None.
+    :param std_dict: A dictionary containing std values (from train_set) for each band and the target variable. Default None.
+    :param min_dict: A dictionary containing min values (from train_set) for each band and the target variable. Default None.
+    :param max_dict: A dictionary containing max values (from train_set) for each band and the target variable. Default None.
+    :param standardize_or_normalize: Set to 'standardize for [-1, 1] scaling and 'normalize for [0, 1] scaling.
 
     :return: None.
     """
+    if standardize_or_normalize not in {'standardize', 'normalize'}:
+        raise ValueError("`standardize_or_normalize` must be either 'standardize' or 'normalize'")
+
     # opening data for each tile, getting all_bands, crs, and affine transformation
     file = rio.open(tile)
     data_arr = file.read()
@@ -885,7 +913,7 @@ def standardize_single_tile(tile, exclude_bands_from_standardizing, mean_dict, s
         raise ValueError(f"Expected no data value to be NaN, but got {file.nodata}.")
 
     # initiating a new array (with all zeros) to store standardized all_bands
-    standardized_arr = np.zeros_like(data_arr, dtype=np.float32)
+    scaled_arr = np.zeros_like(data_arr, dtype=np.float32)
 
     # performing standardization for each band
     # for irr_cropland array, skipping standardization as the data is already binary
@@ -897,11 +925,19 @@ def standardize_single_tile(tile, exclude_bands_from_standardizing, mean_dict, s
         # standardizing (except specifically listed all_bands, boolean arrays)
         if band not in exclude_bands_from_standardizing:
 
-            mean_val = mean_dict[band]
-            std_val = std_dict[band]
+            if standardize_or_normalize == 'standardize':
+                mean_val = mean_dict[band]
+                std_val = std_dict[band]
 
-            band_arr = data_arr[band_idx]
-            band_arr = np.where(~np.isnan(band_arr), (band_arr - mean_val) / std_val, band_arr)
+                band_arr = data_arr[band_idx]
+                band_arr = np.where(~np.isnan(band_arr), (band_arr - mean_val) / std_val, band_arr)
+
+            elif standardize_or_normalize == 'normalize':
+                min_val = min_dict[band]
+                max_val = max_dict[band]
+
+                band_arr = data_arr[band_idx]
+                band_arr = np.where(~np.isnan(band_arr), (band_arr - min_val) / (max_val - min_val), band_arr)
 
 
         # for bands in 'exclude_bands_from_standardizing', using the original array with standardization
@@ -909,12 +945,12 @@ def standardize_single_tile(tile, exclude_bands_from_standardizing, mean_dict, s
             band_arr = data_arr[band_idx]
 
         # saving band in the initiated zero array
-        standardized_arr[band_idx] = band_arr
+        scaled_arr[band_idx] = band_arr
 
     # The tiles have no data pixels which are being set to zero here to not pass nan in the CNN model.
     # We are also maintaining a high nodata percentage threshold to not allow too many nodata pixels
     # in each band of a tile (refer to make_training_tiles class) setting all no data (np.nan) values to zero
-    standardized_arr[np.isnan(standardized_arr)] = 0
+    scaled_arr[np.isnan(scaled_arr)] = 0
 
     # saving standardized tile as a new array
     new_tile_path = os.path.join(output_dir, os.path.basename(tile))
@@ -922,20 +958,22 @@ def standardize_single_tile(tile, exclude_bands_from_standardizing, mean_dict, s
             new_tile_path,
             'w',
             driver='GTiff',
-            height=standardized_arr.shape[1],
-            width=standardized_arr.shape[2],
-            count=standardized_arr.shape[0],
+            height=scaled_arr.shape[1],
+            width=scaled_arr.shape[2],
+            count=scaled_arr.shape[0],
             dtype=np.float32,
             crs=file_crs,
             transform=file_transform,
             nodata=-9999
     ) as dst:
-        for idx, band_arr in enumerate(standardized_arr):
+        for idx, band_arr in enumerate(scaled_arr):
             dst.write(band_arr, idx + 1)
             dst.set_band_description(idx + 1, bands[idx])
 
 
-def standardize_train_val_test(split_csv, mean_dict, std_dict, exclude_bands_from_standardizing, output_dir,
+def standardize_train_val_test(split_csv, exclude_bands_from_standardizing, output_dir,
+                               mean_dict=None, std_dict=None, min_dict=None, max_dict=None,
+                               standardize_or_normalize='standardize',
                                split_type='train', num_workers=30, skip_processing=False):
     """
     Standardizes multi-band raster tiles and target values for train, validation, or test datasets.
@@ -944,10 +982,13 @@ def standardize_train_val_test(split_csv, mean_dict, std_dict, exclude_bands_fro
 
     :param split_csv: Filepath of train/val/test csv. Must consists of the tile_paths of the train/val/test tiles and
                       associated target value.
-    :param mean_dict: dictionary. A dictionary containing mean values (from train_set) for each band and the target variable.
-    :param std_dict: dictionary. A dictionary containing std values (from train_set) for each band and the target variable.
     :param exclude_bands_from_standardizing: List of band names to exclude from standardizing.
     :param output_dir: str. Path to the directory to save standardized outputs (tiles).
+    :param mean_dict: A dictionary containing mean values (from train_set) for each band and the target variable. Default None.
+    :param std_dict: A dictionary containing std values (from train_set) for each band and the target variable. Default None.
+    :param min_dict: A dictionary containing min values (from train_set) for each band and the target variable. Default None.
+    :param max_dict: A dictionary containing max values (from train_set) for each band and the target variable. Default None.
+    :param standardize_or_normalize: Set to 'standardize for [-1, 1] scaling and 'normalize for [0, 1] scaling.
     :param split_type: str. Should be something from ['train', 'val', 'test'].
     :param num_workers: int. Number of parallel processes to use for multiprocessing. Default is 30.
     :param skip_processing: boolean. Set to True to skip this step.
@@ -968,17 +1009,24 @@ def standardize_train_val_test(split_csv, mean_dict, std_dict, exclude_bands_fro
         all_tiles = df['tile_paths'].tolist()
 
         # standardizing each tile with multiprocessing
-        args = [(tile, exclude_bands_from_standardizing, mean_dict, std_dict, output_dir) for tile in all_tiles]
+        args = [(tile, exclude_bands_from_standardizing,
+                 output_dir, mean_dict, std_dict, min_dict, max_dict, standardize_or_normalize) for tile in all_tiles]
 
         with Pool(processes=num_workers) as pool:
             pool.starmap(standardize_single_tile, args)
 
-        # extracting mean and std values from respective dictionaries
-        mean_val = mean_dict['target']
-        std_val = std_dict['target']
+        # standardizing/normalizing
+        if standardize_or_normalize == 'standardize':
+            mean_val = mean_dict['target']
+            std_val = std_dict['target']
 
-        # standardizing
-        df['standardized_value'] = (df['target_value'] - mean_val) / std_val
+            df['standardized_value'] = (df['target_value'] - mean_val) / std_val
+
+        elif standardize_or_normalize == 'normalize':
+            min_val = min_dict['target']
+            max_val = max_dict['target']
+
+            df['standardized_value'] = (df['target_value'] - min_val) / (max_val - min_val)
 
         # saving standardized target values as csv
         target_df = df[['tile_no', 'stateID', 'target_value', 'standardized_value']]

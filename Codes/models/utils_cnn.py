@@ -48,7 +48,7 @@ class DataLoaderCreator:
 
     def __init__(self, tile_dir, target_csv, sample_perc_tiles='all',
                  bands_to_exclude=None, batch_size=64, shuffle=True,
-                 data_type='train', verbose=False):
+                 num_workers=10, data_type='train', verbose=False):
         """
         Initialize the DataLoader to batch the data.
 
@@ -61,6 +61,7 @@ class DataLoaderCreator:
         :param bands_to_exclude (list): List of valid_bands to exclude during training. Default set to None.
         :param batch_size (int): Batch size for the DataLoader.
         :param shuffle (bool): Default set to True to shuffle during training. Must set False during validation and testing.
+        :param num_workers (int): Number of process (cpu cores) to use in data loading. Default set to 10.
         :param data_type (str): Type of data (train/validation/test) passed to the DataLoader class.
         :param verbose (bool): Set to True if want to print before and after batching tensor size. 
         """
@@ -122,7 +123,7 @@ class DataLoaderCreator:
 
         # creating the DataLoader
         self.dataloader = DataLoader(self.dataset, batch_size=batch_size,
-                                     shuffle=shuffle)
+                                     shuffle=shuffle, num_workers=num_workers)
 
         if verbose:
             # checking and printing the shapes of the tensors before batching
@@ -1233,6 +1234,8 @@ def plot_shap_values(trained_model, tile_dir, target_csv, sample_perc_tiles,
     else:
         pass
 
+
+# # The following codes are not fully evaluated and finalized yet
 
 def load_and_prep_for_FineTuning(model_info_path, training_last_fcLayers=2, device='cuda'):
     """

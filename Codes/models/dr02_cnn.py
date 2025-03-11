@@ -12,24 +12,24 @@ from Codes.models.utils_cnn import main, plot_learning_curve, test, unstandardiz
 
 if __name__ == '__main__':
     # model version
-    model_version = 'v10'                                                #####
+    model_version = 'v11'                                                #####
 
     # model switches
     tune_params = True                                 ################################################################
-    n_trials_for_tuning = 150                           ################################################################
-    implement_earlyStopping = False                     #################################################################
-    plot_hyperparam_importance = True                  #################################################################
+    n_trials_for_tuning = 50                           ################################################################
+    implement_earlyStopping = True                     #################################################################
+    plot_hyperparam_importance = False                  #################################################################
     skip_unstandardizing_training = True               #################################################################
     skip_unstandardizing_testing = False                #################################################################
     skip_plot_SHAP_plot = True                         #################################################################
 
     # default variables (from hyperparameter tuning process)
-    batch_size = 64                                                     ##### batch size of DataLoader
+    batch_size = 128    # was 64                                                 ##### batch size of DataLoader
     n_features = 13                                                     ##### number of input channel in a tile
     n_epochs = 200                                                       #####
     input_size = 7                                                      ##### height/width dim of a tile
     padding = 'same'                                                    #####
-    activation = 'relu'                                                 #####
+    activation = 'leakyrelu'                                                 #####
     pooling = 'avgpool'                                                 #####
     patience = 20                                                       ##### early stopping counter patient set to 10 epoch
     start_earlyStopping_at_epoch = 40                                   ##### early stopping will initialize after 40 epochs
@@ -44,7 +44,7 @@ if __name__ == '__main__':
         'filters': [16, 16],                                                ##### convolutional layers
         'kernel_size': [5, 5],                                          ##### kernel size for each Conv layer
         'fc_units': [128, 64],                                          ##### fully connected layer
-        'lr':  0.0024276656258408573,  #0.0005,                                   ##### learning rate
+        'lr':  0.0024276656258408573,                                    ##### learning rate
         'weight_decay': 0.0007952453375154921,                         ##### weight decay
         'dropout': 0.5                                  ##### dropout rate
     }

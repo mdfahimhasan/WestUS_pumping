@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from sklearn.metrics import r2_score, root_mean_squared_error, mean_absolute_error
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 
 
 def calculate_rmse(Y_pred, Y_obsv):
@@ -15,7 +15,7 @@ def calculate_rmse(Y_pred, Y_obsv):
     if isinstance(Y_pred, np.ndarray):
         Y_pred = pd.Series(Y_pred)
 
-    rmse_val = root_mean_squared_error(y_true=Y_obsv, y_pred=Y_pred)
+    rmse_val = mean_squared_error(y_true=Y_obsv, y_pred=Y_pred)
 
     return rmse_val
 

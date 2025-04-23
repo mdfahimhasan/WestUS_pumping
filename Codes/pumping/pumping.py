@@ -491,7 +491,7 @@ def filter_out_low_high_pumping_values_v1(year, pumping_arr, ET_dir,
     growing season. Invalid pumping values are set to zero in the returned array.
 
     **Filter Conditions**: (modified after Ott et a. (2024))
-    - total water = pumpin + peff + surface irrigation (if needed for specific region)
+    - total water = pumping + peff + surface irrigation (if needed for specific region)
     - total water / ET >= low fraction (depending on regions the low fraction can be 0.75 - 0.85) and Peff not Nan
     - total water / ET <= high fraction (can eb around 1.5-1.6) and Peff not Nan
 

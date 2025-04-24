@@ -858,7 +858,7 @@ def save_param_importance_plot(study, save_path):
     plt.savefig(save_path, format='png', dpi=300)
     plt.close()
 
-    print(f'\nParameter importance plot saved from paramater tuning process')
+    print(f'\nParameter importance plot saved from parameter tuning process')
 
 
 def main(tile_dir_train, target_csv_train,
@@ -1037,93 +1037,6 @@ def main(tile_dir_train, target_csv_train,
         print(f"\nLast val loss - {model_info['val_losses'][-1]:.3f}")
 
         return trained_model, model_info
-
-
-def unstandardize_save_and_test(model, tile_dir, target_csv, sample_perc_tiles,
-                                bands_to_exclude, batch_size, mean_csv, std_csv,
-                                output_csv, data_type='test', skip_processing=False):
-    """
-    Unstandardizes the trained model's prediction, saves the results in a csv, and does performance testing on the
-    unstandardized data.
-
-    :param model: The trained model object.
-    :param tile_dir: Directory containing train/test/validation set input tiles.
-    :param target_csv: CSV file with train/test/validation set target values.
-    :param sample_perc_tiles : Percentage of data sample (tiles) to use for model training.
-                               Must be 'all' or an integer between 1 to 100. Default set to 'all' to use all tiles.
-    :param bands_to_exclude: List of bands to exclude from model training. Can be set to None to run with all bands.
-    :param mean_csv: Filepath of csv with mean values of features and target data. Used in unstandardizing.
-    :param std_csv: Filepath of csv with standard deviation values of features and target data. Used in unstandardizing.
-    :param output_csv: Filepath of output csv that will hold the unstandardized results.
-    :param batch_size: Batch size used in the DataLoader.
-    :param data_type: Default set to 'test' as we generally apply model.eval() mode to do
-                      model performance testing on any data by regarding them as 'test' data.
-    :param skip_processing: Set to True to skip this step.
-
-    :return: None.
-    """
-    if not skip_processing:
-        # DataLoader
-        DataLoader = DataLoaderCreator(tile_dir, target_csv,
-                                       sample_perc_tiles=sample_perc_tiles,
-                                       bands_to_exclude=bands_to_exclude,
-                                       batch_size=batch_size, shuffle=False,
-                                       data_type=data_type).get_dataloader()
-
-        # empty lists to store predictions and tileNo
-        predictions, tile_no_list = [], []
-
-        # setting model to evaluation mode
-        # in evaluation mode, PyTorch removes all dropout layers
-        model.eval()
-
-        with torch.no_grad():  # disable gradient computation
-            for features, targets, tileNo in DataLoader:
-                features, targets = features.to(model.device), targets.to(model.device).view(-1, 1)
-
-                # forward pass
-                preds = model(features)
-
-                # collect predictions and actuals for metrics
-                predictions.extend(preds.cpu().numpy().flatten())
-                tile_no_list.extend(tileNo.cpu().numpy().flatten())
-
-        # making a new dataframe out of tile_no and standardized predictions
-        model_output_df = pd.DataFrame({'tile_no': tile_no_list, 'standardized_pred': predictions})
-
-        # unstandardizing predictions
-        mean_df = pd.read_csv(mean_csv)
-        std_df = pd.read_csv(std_csv)
-
-        target_mean = mean_df.set_index('variable').loc['target', 'value']
-        target_std = std_df.set_index('variable').loc['target', 'value']
-
-        model_output_df['unstandardized_pred'] = (model_output_df['standardized_pred'] * target_std) \
-                                                 + target_mean
-
-        # loading dataframe with actual values of target
-        original_df = pd.read_csv(target_csv)
-
-        # merging the two dataframes
-        final_df = model_output_df.merge(original_df, on='tile_no')
-
-        # saving the csv
-        makedirs([os.path.dirname(output_csv)])
-        final_df.to_csv(output_csv, index=False)
-
-        # checking scores for unstandardized model output and actual target data
-        metrics_dict = calculate_metrics(predictions=final_df['unstandardized_pred'].tolist(),
-                                         targets=final_df['target_value'].tolist())
-
-        rmse = metrics_dict['RMSE']
-        mae = metrics_dict['MAE']
-        r2 = metrics_dict['R2']
-        nrmse = metrics_dict['Normalized RMSE']
-
-        return rmse, mae, r2, nrmse
-
-    else:
-        pass
 
 
 def plot_learning_curve(train_loss, val_loss, plot_save_path):

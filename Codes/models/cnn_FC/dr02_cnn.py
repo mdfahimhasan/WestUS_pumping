@@ -8,7 +8,7 @@ from os.path import dirname, abspath
 
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
-from Codes.models.utils_cnn import main, plot_learning_curve, test, unstandardize_save_and_test, plot_shap_values
+from Codes.models.utils_cnn import main, plot_learning_curve, test, plot_shap_values
 
 if __name__ == '__main__':
     # model version
@@ -108,29 +108,6 @@ if __name__ == '__main__':
 
     # model performances on unstandardized (actual) data
     print('########## Model performance on unstandardized (actual) data ##########\n')
-
-    # for train set, just using model and storing the unstandardized results
-    # the performance metrices estimated using this function isn't representative of the true training performance
-    unstandardize_save_and_test(trained_model,
-                                tile_dir=tile_dir_train, target_csv=target_csv_train,
-                                sample_perc_tiles='all', bands_to_exclude=exclude_bands_from_training,
-                                batch_size=batch_size, data_type='test',
-                                mean_csv=mean_csv, std_csv=std_csv,
-                                output_csv=f'../../Model_run/DL_model/output_csv/trainSet_results_{model_version}.csv',
-                                skip_processing=skip_unstandardizing_training)
-
-
-    print('Test performance:')
-    test_rmse, test_mae, test_r2, test_nrmse = \
-        unstandardize_save_and_test(trained_model,
-                                    tile_dir=tile_dir_test, target_csv=target_csv_test,
-                                    sample_perc_tiles='all', bands_to_exclude=exclude_bands_from_training,
-                                    batch_size=batch_size, data_type='test',
-                                    mean_csv=mean_csv, std_csv=std_csv,
-                                    output_csv=f'../../Model_run/DL_model/output_csv/testSet_results_{model_version}.csv',
-                                    skip_processing=skip_unstandardizing_testing)
-
-    print(f'Results -> RMSE: {test_rmse:.4f}, MAE: {test_mae:.4f}, NRMSE: {test_nrmse:.4f}, R²: {test_r2:.4f}\n')
 
     # ------------------------------------------------------------------------------------------------------------------
     # 4. Explainable AI plots (using SHAP)

@@ -170,7 +170,8 @@ def process_AZ_pumping_csv(raw_csv_dir, well_reg_shp, well_reg_dict, output_shp,
                                              geometry=gpd.points_from_xy(compiled_pump_df['Lon'],
                                                                          compiled_pump_df['Lat']))
 
-        compiled_pump_gdf.to_file(output_shp, crs='EPSG:4269')
+        compiled_pump_gdf = compiled_pump_gdf.set_crs('EPSG:4269')
+        compiled_pump_gdf.to_file(output_shp)
     else:
         pass
 
@@ -248,8 +249,8 @@ def process_KS_pumping_csv(raw_csv, output_pump_csv, output_pump_shp,
         af_melted_gdf = gpd.GeoDataFrame(af_melted,
                                          geometry=gpd.points_from_xy(af_melted['Lon'],
                                                                      af_melted['Lat']))
-
-        af_melted_gdf.to_file(output_pump_shp, crs='EPSG:4269')
+        af_melted_gdf = af_melted_gdf.set_crs('EPSG:4269')
+        af_melted_gdf.to_file(output_pump_shp)
 
         # saving acres records
         acres_melted = acres_melted.rename(columns={'lat_nad83': 'Lat', 'long_nad83': 'Lon'})
@@ -298,7 +299,8 @@ def process_CO_pumping_data(raw_csv, output_pump_shp, skip_process=False):
                                        geometry=gpd.points_from_xy(pumping_df['Lon'],
                                                                    pumping_df['Lat']))
 
-        pumping_gdf.to_file(output_pump_shp, crs='EPSG:4696')
+        pumping_gdf = pumping_gdf.set_crs('EPSG:4696')
+        pumping_gdf.to_file(output_pump_shp)
 
     else:
         pass
@@ -367,7 +369,8 @@ def process_UT_pumping_data(raw_csv, output_pump_shp, skip_process=False, **kwar
                                        geometry=gpd.points_from_xy(pumping_df['Lon'],
                                                                    pumping_df['Lat']))
 
-        pumping_gdf.to_file(output_pump_shp, crs='EPSG:4269')
+        pumping_gdf = pumping_gdf.set_crs('EPSG:4269')
+        pumping_gdf.to_file(output_pump_shp)
 
     else:
         pass
@@ -470,6 +473,7 @@ def pumping_pts_to_raster_v1(state_code, years, pumping_pts_shp, pumping_attr_AF
                                                           surface_irrig_dir,
                                                           skip_processing=skip_outlier_removal)
 
+
             # filling nan positions (0 values) with -9999 as
             # -9999 is used for discarding no pumping data for tile creation
             pumping_mm_arr[pumping_mm_arr == 0] = -9999
@@ -508,8 +512,6 @@ def filter_out_low_high_pumping_values_v1(year, pumping_arr, ET_dir,
 
     :return: Filtered pumping array with invalid values set to zero.
     """
-    global surf_irr_arr
-
     if not skip_processing:
         # reading growing season cropET data for irrigated croplands
         ET_data = glob(os.path.join(ET_dir, f'*{year}*.tif'))[0]
@@ -519,19 +521,18 @@ def filter_out_low_high_pumping_values_v1(year, pumping_arr, ET_dir,
         peff = glob(os.path.join(Peff_dir, f'*{year}*.tif'))[0]
         peff_arr = read_raster_arr_object(peff, get_file=False)
 
-        if surface_irrig_dir is not None:
-            # reading annual surface water irrigation data (distributed using USGS HUC12 dataset)
-            surf_irr = glob(os.path.join(surface_irrig_dir, f'*{year}*.tif'))[0]
-            surf_irr_arr = read_raster_arr_object(surf_irr, get_file=False)
-
         # calculating total water
         if surface_irrig_dir is None:
             total_water = peff_arr + pumping_arr
 
         else:
+            # reading annual surface water irrigation data (distributed using USGS HUC12 dataset)
+            surf_irr = glob(os.path.join(surface_irrig_dir, f'*{year}*.tif'))[0]
+            surf_irr_arr = read_raster_arr_object(surf_irr, get_file=False)
+
             total_water = peff_arr + pumping_arr + surf_irr_arr
 
-        # fraction of total_water / ET_arr (modified after Ott et a. (2024))
+        # fraction of total_water / ET_arr (modified after Ott et al. (2024))
         ET_arr = np.where(ET_arr > 1e-6, ET_arr, np.nan)  # 1e-6 used as threshold to avoid division by very small value
         total_water = np.where(total_water > 0, total_water, np.nan)
 
@@ -545,6 +546,46 @@ def filter_out_low_high_pumping_values_v1(year, pumping_arr, ET_dir,
 
     else:
         pass
+
+
+# def filter_out_low_high_pumping_values_v2(year, pumping_arr, netGW_dir,
+#                                           low_fraction, high_fraction,
+#                                           skip_processing=False):
+#     """
+#     Filters out high and low in-situ pumping values.
+#
+#     This function processes annual pumping data by filtering out values that do not meet specific
+#     conditions based on the ratio of pumping to consumptive groundwater use.
+#     Invalid pumping values are set to zero in the returned array.
+#
+#
+#     :param year: The year for which the data is being processed.
+#     :param pumping_arr: The array of pumping values to filter.
+#     :param netGW_dir: Directory containing raster files of growing season consumptive groundwater use data.
+#     :param low_fraction: The minimum threshold for `(total_water / ET)` ratio.
+#     :param high_fraction: The maximum threshold for `(total_water / ET)` ratio.
+#     :param skip_processing: If True, skip processing. Default is False.
+#
+#     :return: Filtered pumping array with invalid values set to zero.
+#     """
+#     if not skip_processing:
+#         # reading growing season netGW data
+#         netGW_data = glob(os.path.join(netGW_dir, f'*{year}*.tif'))[0]
+#         netGW_arr = read_raster_arr_object(netGW_data, get_file=False)
+#
+#         # fraction of pumping / netGW (following Ott et al. (2024))
+#         netGW_arr = np.where(netGW_arr > 1e-6, netGW_arr, np.nan)  # 1e-6 used as threshold to avoid division by very small value
+#
+#         water_frac = np.where(~np.isnan(pumping_arr) & ~np.isnan(netGW_arr), pumping_arr/netGW_arr, -9999)
+#
+#         # applying filter to identify valid pumping values
+#         mask = (water_frac >= low_fraction) & (water_frac <= high_fraction) & (netGW_arr != -9999)
+#         pumping_arr = pumping_arr * mask  # invalid values are set to 0
+#
+#         return pumping_arr
+#
+#     else:
+#         pass
 
 
 def pumping_pts_to_raster_v2(state_code, years, pumping_pts_shp, pumping_attr_AF,
@@ -722,7 +763,7 @@ if __name__ == '__main__':
     )
 
     pumping_pts_to_raster_v2(state_code='AZ', years=list(range(2000, 2020)),  # up to 2019 as Peff data (used for filtering) is available up to 2019
-                             pumping_pts_shp='../../Data_main/pumping/Arizona/Final/pumping_AZ_v0.shp',  # # make sure that this is the final filtered pumping shapefile
+                             pumping_pts_shp='../../Data_main/pumping/Arizona/Final/pumping_AZ_v1.shp',  # # make sure that this is the final filtered pumping shapefile
                              pumping_attr_AF='AF_pumped',
                              year_attr='Year',
                              output_dir='../../Data_main/pumping/rasters/Arizona',
@@ -758,7 +799,7 @@ if __name__ == '__main__':
                             skip_process=skip_process_CO_pumping)
 
     pumping_pts_to_raster_v1(state_code='CO', years=list(range(2000, 2020)),  # up to 2019 as Peff data (used for filtering) is available up to 2019
-                             pumping_pts_shp='../../Data_main/pumping/Colorado/Final/pumping_CO_v1.shp',  # # make sure that this is the final filtered pumping shapefile
+                             pumping_pts_shp='../../Data_main/pumping/Colorado/Final/pumping_CO_v2.shp',  # # make sure that this is the final filtered pumping shapefile
                              pumping_attr_AF='AF_pumped',
                              year_attr='Year',
                              output_dir='../../Data_main/pumping/rasters/Colorado',

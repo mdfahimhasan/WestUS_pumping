@@ -242,6 +242,70 @@ def split_train_val_test_set_v1(input_csv, pred_attr, exclude_columns, output_di
             return x_train, x_val, x_test, y_train, y_val, y_test
 
 
+def split_train_val_test_set_v2(data_parquet, pred_attr, exclude_columns, output_dir,
+                                model_version, train_size=0.7, test_size=0.3,
+                                random_state=42, skip_processing=False):
+    """
+    Splits the tiles into train, validation, and test datasets, along with their target values.
+
+    :return: None.
+    """
+    if not skip_processing:
+
+        df = pd.read_parquet(data_parquet)
+
+        # replacing samples (very few) with stateID 3 - Nebraska and 1 -  Oklahoma. They belong to kansas
+        # but came in Nebraska and Oklahoma during stateID raster creation (along state border)
+        # otherwise train_val_test split function throws error
+        df.loc[df['stateID'] == 3, 'stateID'] = 12
+        df.loc[df['stateID'] == 1, 'stateID'] = 12
+
+        # getting unique pixelID and stateID
+        unique_pixels = df[['pixelID', 'stateID']].drop_duplicates()
+
+        # Splitting at the pixelID level
+        train_pixels, test_pixels = train_test_split(unique_pixels, train_size=train_size, test_size=test_size,
+                                                     stratify=unique_pixels['stateID'],
+                                                     random_state=random_state)
+
+        # assigning dataset labels to full dataset
+        df['split'] = 'test'    # Default to test
+        df.loc[df['pixelID'].isin(train_pixels['pixelID']), 'split'] = 'train'
+
+        # splitting into separate DataFrames
+        train_df = df[df['split'] == 'train']
+        test_df = df[df['split'] == 'test']
+
+        # dropping columns that has been specified to not include
+        if exclude_columns is not None:
+            drop_columns = exclude_columns + ['split', pred_attr]
+        else:
+            drop_columns = ['split', pred_attr]
+
+        # separating x_train and y_train
+        x_train = train_df.drop(columns=drop_columns)
+        x_test = test_df.drop(columns=drop_columns)
+
+        y_train = train_df[[pred_attr]]
+        y_test = test_df[[pred_attr]]
+
+        # saving
+        x_train.to_csv(os.path.join(output_dir, f'x_train_{model_version}.csv'), index=False)
+        y_train.to_csv(os.path.join(output_dir, f'y_train_{model_version}.csv'), index=False)
+        x_test.to_csv(os.path.join(output_dir, f'x_test_{model_version}.csv'), index=False)
+        y_test.to_csv(os.path.join(output_dir, f'y_test_{model_version}.csv'), index=False)
+
+        return x_train, x_test, y_train, y_test
+
+    else:
+        x_train = pd.read_csv(os.path.join(output_dir, f'x_train_{model_version}.csv'))
+        x_test = pd.read_csv(os.path.join(output_dir, f'x_test_{model_version}.csv'))
+        y_train = pd.read_csv(os.path.join(output_dir, f'y_train_{model_version}.csv'))
+        y_test = pd.read_csv(os.path.join(output_dir, f'y_test_{model_version}.csv'))
+
+        return x_train, x_test, y_train, y_test
+
+
 def objective_func_bayes(params, train_set, iteration_csv, n_fold):
     """
     Objective function for Bayesian optimization using Hyperopt and LightGBM.
@@ -926,8 +990,8 @@ def create_annual_dataframes_for_pumping_prediction(years_list, yearly_data_path
                 predictor_df = predictor_df.dropna()
 
                 # saving input predictor csv
-                monthly_output_csv = os.path.join(output_dir, f'predictors_{year}.csv')
-                predictor_df.to_csv(monthly_output_csv, index=False)
+                annual_output_csv = os.path.join(output_dir, f'predictors_{year}.csv')
+                predictor_df.to_csv(annual_output_csv, index=False)
 
                 # creating nan position dictionary based on irrigated cropland data and saving it
                 irrigated_cropland_raster = glob(os.path.join(irrigated_cropland_dir, f'*{year}.tif'))[0]

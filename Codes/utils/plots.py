@@ -28,7 +28,7 @@ def scatter_plot_of_same_vars(Y_pred, Y_obsv, x_label, y_label, plot_name, saved
     :param axis_lim: A list of minimum and maximum values of x and y axis.
                      Default set to None (will calculate and set xlim, ylim itself)
     :param tick_interval: X and Y tick intervals to plot.
-                          Default set to 50 for units of mm/month. For annual model use fraction.
+                          Default set to 50 for units of mm/month.
 
     :return: A scatter plot of model prediction vs observed data.
     """

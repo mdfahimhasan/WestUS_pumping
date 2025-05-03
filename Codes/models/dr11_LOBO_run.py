@@ -37,7 +37,7 @@ def perform_LOBO(basin_code, model_version, exclude_features_from_training, skip
 
         # default variables (from hyperparameter tuning process)
         batch_size = 256
-        n_features = 13
+        n_features = 14
         n_epochs = 70
         activation = 'leakyrelu'
         lr = 0.001

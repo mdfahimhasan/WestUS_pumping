@@ -17,12 +17,12 @@ from Codes.models.utils_mlp import DataLoaderCreator, main, plot_learning_curve,
 
 if __name__ == '__main__':
     # # # model version
-    model_version = 'v3'                                ################################################################
+    model_version = 'v4'                                ################################################################
 
     # # # model switches
     # setting 'RUN_MODEL' to False will skip all model running processing
     # setting 'skip_create_prediction_rasters' to False will load a trained model to create prediction raster
-    RUN_MODEL = False                                  ################################################################
+    RUN_MODEL = True                                  ################################################################
     tune_params = False                                ################################################################
     n_trials_for_tuning = 100                           ################################################################
     implement_earlyStopping = False                     #################################################################
@@ -33,7 +33,7 @@ if __name__ == '__main__':
 
     # # # default variables (from hyperparameter tuning process)
     batch_size = 256
-    n_features = 13
+    n_features = 14
     n_epochs = 70
     lr = 0.001
     lr_scheduler = 'CosineAnnealingLR'
@@ -42,7 +42,7 @@ if __name__ == '__main__':
     start_earlyStopping_at_epoch = 20
     # using optimizer 'AdamW'
 
-    exclude_features_from_training = ['lon', 'lat', 'year', 'pixelID', 'stateID', 'SW_Irr']
+    exclude_features_from_training = ['lon', 'lat', 'year', 'pixelID', 'stateID']
 
     # default model architecture
     default_params = {

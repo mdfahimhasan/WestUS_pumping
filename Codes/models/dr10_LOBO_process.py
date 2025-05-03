@@ -181,7 +181,7 @@ exclude_columns_in_scaling = ['stateID', 'pixelID', 'year', 'lon', 'lat', 'targe
 if __name__ == '__main__':
 
     # flags
-    model_version = 'v3'
+    model_version = 'v4'
     skip_LOBO_GMD3 = False              ##### GMD3, KS
     skip_LOBO_GMD4 = False              ##### GMD4, KS
     skip_LOBO_RPB = False               ##### Republican Basin, CO

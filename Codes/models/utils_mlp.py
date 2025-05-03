@@ -1081,6 +1081,7 @@ def load_model_and_predict_raster(trained_model_path, trained_model_info, years_
     :param output_dir: str. Path to the output directory where predicted rasters will be saved.
     :param ref_raster: Western US reference raster for reshaping prediction raster's shape.
     :param irrig_fraction_dir: Directory path of irrigation fraction rasters.
+    :param peff_dir: Directory path of growing season effective precipitation rasters.
     :param verbose: Set to True to print the loaded trained model.
     :param skip_processing: bool. Set to True to skip this code run.
 
@@ -1164,7 +1165,6 @@ def load_model_and_predict_raster(trained_model_path, trained_model_info, years_
             # # # filter out predictions for <2% irrigated fraction
             # the training data only has pixels with > 2% irrigated fraction
             irrig_frac_data = glob(os.path.join(irrig_fraction_dir, f'*{year}.tif'))[0]
-            print(irrig_frac_data)
             irrig_frac_arr = rio.open(irrig_frac_data).read(1)
 
             pred_arr[irrig_frac_arr < 0.02] = -9999

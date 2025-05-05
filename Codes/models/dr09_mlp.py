@@ -13,7 +13,7 @@ sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.plots import scatter_plot_of_same_vars
 from Codes.models.utils_mlp import DataLoaderCreator, main, plot_learning_curve, test, \
-    calc_rangeWise_RMSE, load_model_and_predict_raster
+    calc_rangeWise_RMSE, load_model_and_predict_raster, plot_shap_summary_plot, plot_shap_interaction_plot
 
 if __name__ == '__main__':
     # # # model version
@@ -27,9 +27,11 @@ if __name__ == '__main__':
     n_trials_for_tuning = 100                           ################################################################
     implement_earlyStopping = False                     #################################################################
     plot_hyperparam_importance = True                  #################################################################
-    skip_plot_shap_values = False                       ################################################################
 
-    skip_create_prediction_rasters = False              ################################################################
+    skip_SHAP_summary_plot = True                      ################################################################
+    skip_SHAP_interaction_plot = True                  ################################################################
+
+    skip_create_prediction_rasters = True              ################################################################
 
     # # # default variables (from hyperparameter tuning process)
     batch_size = 256
@@ -127,14 +129,26 @@ if __name__ == '__main__':
                                   color_format='o', marker_size=5, title='performance on validation set',
                                   tick_interval=200)
 
-        # --------------------------------------------------------------------------------------------------------------
-        # 4. Plotting shapely values
-        # --------------------------------------------------------------------------------------------------------------
-        # plot_shap_values(trained_model_path=model_save_path, trained_model_info=model_info_save_path,
-        #                  data_csv=test_csv, exclude_features=exclude_features_from_training,
-        #                  save_plot_path=f'../../Model_run/MLP_model/Shap_{model_version}.png',
-        #                  skip_processing=skip_plot_shap_values)
+    # --------------------------------------------------------------------------------------------------------------
+    # 4. Plotting shapely values
+    # --------------------------------------------------------------------------------------------------------------
 
+    # SHAP summary plot
+    plot_shap_summary_plot(trained_model_path=model_save_path, trained_model_info=model_info_save_path,
+                           use_samples=2000, data_csv=test_csv,
+                           exclude_features=exclude_features_from_training,
+                           save_plot_path=f'../../Model_run/MLP_model/SHAP/MLP_SHAP_summary_{model_version}.png',
+                           skip_processing=skip_SHAP_summary_plot)
+
+    # SHAP interaction plot
+    features_to_plot = ['Consumptive groundwater use', 'Effective precipitation', 'Shortwave radiation',
+                        'Irrigated crop fraction', 'ET', 'Reference ET', 'Field capacity',
+                        'Precipitation', 'Surface water irrigation']
+    plot_shap_interaction_plot(model_version=model_version,
+                               features_to_plot=features_to_plot, trained_model_path=model_save_path,
+                               trained_model_info=model_info_save_path, use_samples=2000, data_csv=test_csv,
+                               save_plot_dir=f'../../Model_run/MLP_model/SHAP',
+                               skip_processing=skip_SHAP_interaction_plot)
 
     # ------------------------------------------------------------------------------------------------------------------
     # 5. Annual GW pumping prediction

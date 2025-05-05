@@ -12,7 +12,9 @@ import pandas as pd
 from glob import glob
 import rasterio as rio
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 
+import shap
 import torch
 import optuna
 import torch.nn as nn
@@ -952,75 +954,225 @@ def calc_rangeWise_RMSE(results_csv, value_ranges, output_txt):
             f.write(results_str + '\n')
 
 
-# def plot_shap_values(trained_model_path, trained_model_info,
-#                      data_csv, exclude_features, save_plot_path,
-#                      skip_processing=False):
-#     """
-#     Plot input variables importance plot based on SHAP values.
-#
-#     :param save_plot_path: Path to save plotted figure. Should have extensions like .png or 'jpg.
-#     :param trained_model_path: str. Path to the `.pth` file containing the saved model's state_dict.
-#     :param trained_model_info: str. Path to the `.pkl` file containing model configuration and metadata.
-#     :param data_csv: str. Path to the input CSV file containing features for prediction.
-#     :param exclude_features: list. List of feature column names to exclude from the input data
-#     :param skip_processing: Set to True to skip making this plot.
-#
-#     :return: None.
-#     """
-#     if not skip_processing:
-#         # loading model
-#         trained_model_info = pickle.load(open(trained_model_info, 'rb'))
-#         trained_model = MLPRegression(
-#             n_features=trained_model_info['params']['n_features'],
-#             fc_layers=trained_model_info['params']['fc_units'],
-#             activation_func=trained_model_info['params']['activation_func'],
-#             dropout_rate=trained_model_info['params']['dropout_rate']
-#         )
-#
-#         # loading state_dict of the trained model
-#         trained_model.load_state_dict(torch.load(trained_model_path, weights_only=True))
-#
-#         print(trained_model)
-#
-#         # model set to evaluation mode
-#         trained_model = trained_model.to('cuda')
-#         trained_model.eval()
-#
-#         print('\n___________________________________________________________________________')
-#         print(f'\nplotting SHAP feature importance...')
-#
-#         # loading data in DataLoader
-#         if 'target' not in exclude_features:
-#             exclude_features = exclude_features + ['target']
-#
-#         df = pd.read_csv(data_csv)
-#         df = df.drop(columns=exclude_features)
-#         df = df.sample(n=1000, random_state=43)         # sampling 1000 rows for faster code execution
-#         feature_names = np.array(df.columns.tolist())
-#         print(feature_names)
-#
-#         # converting to numpy to convert to torch tensor
-#         data_tensor = torch.tensor(df.values, dtype=torch.float32).to('cuda')
-#
-#         # using SHAP GradientExplainer designed for PyTorch/TensorFlow (DeepExplainer doesn't work for some reasons)
-#         explainer = shap.GradientExplainer(trained_model, data_tensor)
-#         shap_values = explainer(data_tensor)
-#
-#         # converting SHAP values to numpy for plotting
-#         shap_values_np = shap_values.values
-#         data_np = shap_values.data
-#
-#         # plotting (use summary_plot for numpy arrays and feature names)
-#         shap.summary_plot(shap_values_np, data_np, feature_names=feature_names)
-#
-#         # plotting
-#         fig = plt.gcf()  # getting current figure
-#         fig.savefig(save_plot_path, dpi=200, bbox_inches='tight')
-#         plt.figure(figsize=(8, 5))
-#         plt.close(fig)
-#
-#     else:
-#         pass
+def plot_shap_summary_plot(trained_model_path, trained_model_info, use_samples,
+                           data_csv, exclude_features, save_plot_path,
+                           skip_processing=False):
+    """
+    Generate and save a SHAP summary (beeswarm) plot to visualize feature importance.
+
+    :param trained_model_path: str
+        Path to the `.pth` file containing the saved model's state_dict.
+
+    :param trained_model_info: str
+        Path to the `.pkl` file with model configuration and metadata.
+
+    :param use_samples: int
+        Number of samples to randomly draw from the dataset for SHAP analysis.
+
+    :param data_csv: str
+        Path to the CSV file containing the input feature data.
+
+    :param exclude_features: list
+        List of column names to exclude from the input (e.g., target, IDs).
+
+    :param save_plot_path: str
+        File path (with extension) where the SHAP summary plot will be saved.
+
+    :param skip_processing: bool, optional (default=False)
+        If True, skip execution.
+
+    :return: None
+    """
+    if not skip_processing:
+        makedirs([os.path.dirname(save_plot_path)])
+
+        # loading model
+        trained_model_info = pickle.load(open(trained_model_info, 'rb'))
+        trained_model = MLPRegression(
+            n_features=trained_model_info['params']['n_features'],
+            fc_layers=trained_model_info['params']['fc_units'],
+            activation_func=trained_model_info['params']['activation_func'],
+            dropout_rate=trained_model_info['params']['dropout_rate']
+        )
+
+        # loading state_dict of the trained model
+        trained_model.load_state_dict(torch.load(f=trained_model_path, weights_only=True))
+
+        print(trained_model)
+
+        # model set to evaluation mode
+        trained_model = trained_model.to('cuda')
+        trained_model.eval()
+
+        print('\n___________________________________________________________________________')
+        print(f'\nplotting SHAP feature importance...')
+
+        # loading data + random sampling + renaming dataframe features
+        if 'target' not in exclude_features:
+            exclude_features = exclude_features + ['target']
+
+        df = pd.read_csv(data_csv)
+        df = df.drop(columns=exclude_features)
+        df = df.sample(n=use_samples, random_state=43)         # sampling 'use_samples' of rows for SHAP plotting
+
+        feature_names_dict = {'netGW_Irr': 'Consumptive groundwater use', 'peff': 'Effective precipitation',
+                              'SW_Irr': 'Surface water irrigation', 'ret': 'Reference ET', 'precip': 'Precipitation',
+                              'tmax': 'Temperature (max)', 'ET': 'ET', 'irr_crop_frac': 'Irrigated crop fraction',
+                              'maxRH': 'Relative humidity (max)', 'minRH': 'Relative humidity (min)',
+                              'shortRad': 'Shortwave radiation', 'vpd': 'Vapor pressure deficit',
+                              'sunHr': 'Sun hour', 'FC': 'Field capacity'}
+        df = df.rename(columns=feature_names_dict)
+        feature_names = np.array(df.columns.tolist())
+
+        # converting to numpy to convert to torch tensor
+        data_tensor = torch.tensor(df.values, dtype=torch.float32).to('cuda')
+
+        # using SHAP GradientExplainer designed for PyTorch/TensorFlow (DeepExplainer doesn't work for some reasons)
+        explainer = shap.GradientExplainer(trained_model, data_tensor)
+        shap_values = explainer(data_tensor)
+
+        # converting SHAP values to numpy for plotting
+        shap_values_np = shap_values.values.squeeze(-1)     # Remove singleton third dimension from SHAP array: shape [n, m, 1] → [n, m]
+        data_np = data_tensor.cpu().numpy()
+
+        # plotting
+        fig = plt.figure()
+        shap.summary_plot(shap_values_np, data_np, feature_names=feature_names)
+
+        fig.savefig(save_plot_path, dpi=200, bbox_inches='tight')
+
+    else:
+        pass
+
+
+def plot_shap_interaction_plot(model_version, features_to_plot, trained_model_path,
+                               trained_model_info, use_samples,
+                               data_csv, save_plot_dir,
+                               skip_processing=False):
+    """
+    Generate individual SHAP dependence plots for selected features and compile them into a grid image.
+
+    :param model_version: str
+        Model version. Used to save and track corresponding SHAP plots for respective model.
+
+    :param features_to_plot: list
+        Human-readable feature names to generate SHAP dependence plots for.
+        Must match the renamed columns after feature mapping.
+
+        Select from this list-
+         ['Consumptive groundwater use', 'Effective precipitation',
+         'Surface water irrigation', 'Reference ET', 'Precipitation',
+         'Temperature (max)', 'ET', 'Irrigated crop fraction',
+         'Relative humidity (max)', 'Relative humidity (min)',
+         'Shortwave radiation', 'Vapor pressure deficit',
+         'Sun hour', ''Field capacity']
+
+    :param trained_model_path: str
+        Path to the `.pth` file containing the saved model's state_dict.
+
+    :param trained_model_info: str
+        Path to the `.pkl` file with model configuration and metadata.
+
+    :param use_samples: int
+        Number of samples to randomly draw from the dataset for SHAP analysis.
+
+    :param data_csv: str
+        Path to the CSV file containing input features.
+
+    :param save_plot_dir: str
+        Directory where individual dependence plots and the compiled grid image will be saved.
+
+    :param skip_processing: bool, optional (default=False)
+        If True, skip execution.
+
+    :return: None
+    """
+    if not skip_processing:
+        makedirs([save_plot_dir])
+
+        # loading model
+        trained_model_info = pickle.load(open(trained_model_info, 'rb'))
+        trained_model = MLPRegression(
+            n_features=trained_model_info['params']['n_features'],
+            fc_layers=trained_model_info['params']['fc_units'],
+            activation_func=trained_model_info['params']['activation_func'],
+            dropout_rate=trained_model_info['params']['dropout_rate']
+        )
+
+        # loading state_dict of the trained model
+        trained_model.load_state_dict(torch.load(f=trained_model_path, weights_only=True))
+
+        print(trained_model)
+
+        # model set to evaluation mode
+        trained_model = trained_model.to('cuda')
+        trained_model.eval()
+
+        print('\n___________________________________________________________________________')
+        print(f'\nplotting SHAP feature importance...')
+
+        # loading data + random sampling + renaming dataframe features
+        exclude_features = ['lon', 'lat', 'year', 'pixelID', 'stateID']
+
+        if 'target' not in exclude_features:
+            exclude_features = exclude_features + ['target']
+
+        df = pd.read_csv(data_csv)
+        df = df.drop(columns=exclude_features)
+        df = df.sample(n=use_samples, random_state=43)  # sampling 'use_samples' of rows for SHAP plotting
+
+        feature_names_dict = {'netGW_Irr': 'Consumptive groundwater use', 'peff': 'Effective precipitation',
+                              'SW_Irr': 'Surface water irrigation', 'ret': 'Reference ET', 'precip': 'Precipitation',
+                              'tmax': 'Temperature (max)', 'ET': 'ET', 'irr_crop_frac': 'Irrigated crop fraction',
+                              'maxRH': 'Relative humidity (max)', 'minRH': 'Relative humidity (min)',
+                              'shortRad': 'Shortwave radiation', 'vpd': 'Vapor pressure deficit',
+                              'sunHr': 'Sun hour', 'FC': 'Field capacity'}
+        df = df.rename(columns=feature_names_dict)
+        feature_names = np.array(df.columns.tolist())
+
+        # converting to numpy to convert to torch tensor
+        data_tensor = torch.tensor(df.values, dtype=torch.float32).to('cuda')
+
+        # using SHAP GradientExplainer designed for PyTorch/TensorFlow (DeepExplainer doesn't work for some reasons)
+        explainer = shap.GradientExplainer(trained_model, data_tensor)
+        shap_values = explainer(data_tensor)
+
+        # converting SHAP values to numpy for plotting
+        shap_values_np = shap_values.values.squeeze(-1)  # Remove singleton third dimension from SHAP array: shape [n, m, 1] → [n, m]
+        data_np = data_tensor.cpu().numpy()
+
+        # plotting and saving individual shap dependence plots
+        for feature in features_to_plot:
+            shap.dependence_plot(feature, shap_values_np, data_np, feature_names=feature_names,
+                                 interaction_index=None, show=False)
+            plt.gca().set_ylabel('SHAP value')
+            plt.gca().set_xlabel(feature)
+
+            plt.savefig(os.path.join(save_plot_dir, f'{feature}.png'), dpi=200, bbox_inches='tight')
+
+        # compiling individual shap plot in a grid plot
+        n_cols = 3
+        n_rows = (len(features_to_plot) + n_cols - 1) //n_cols
+
+        fig, axs = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows))
+        axs = axs.flatten()
+
+        for i, feature in enumerate(features_to_plot):
+            img = mpimg.imread(os.path.join(save_plot_dir, f'{feature}.png'))
+            axs[i].imshow(img)
+            axs[i].axis('off')
+
+        # hiding unsued axes if any
+        for j in range(i + 1, len(axs)):
+            axs[j].axis('off')
+
+        # saving plot
+        plt.tight_layout(pad=0.1)
+        plt.subplots_adjust(wspace=0.05, hspace=0.05)
+        plt.savefig(os.path.join(save_plot_dir, f'SHAP_interaction_all_{model_version}.png'), dpi=150, bbox_inches='tight')
+
+    else:
+        pass
 
 
 def write_array_to_raster(raster_arr, raster_file, transform, output_path, dtype=None,

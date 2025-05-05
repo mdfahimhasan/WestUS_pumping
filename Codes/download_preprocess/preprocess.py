@@ -609,6 +609,40 @@ def create_pixelID_raster(WestUS_refraster, output_dir, skip_processing=False):
                               output_path)
 
 
+def create_canal_coverage_raster(canal_shapefile, output_dir,
+                                 ref_raster=WestUS_raster, resolution=model_res,
+                                 skip_processing=False):
+    """
+    Create canal coverage raster.
+
+    :param canal_shapefile: Filepath of canal coverage shapefile.
+    :param output_dir: Output directory path to save canal coverage rasters.
+    :param ref_raster: Filepath of reference raster.
+    :param resolution: Model resolution.
+    :param skip_processing: Set to True to skip this step.
+
+    :return: None.
+    """
+    if not skip_processing:
+        interim_dir = os.path.join(output_dir, 'interim')
+        makedirs([interim_dir, output_dir])
+
+        # creating an overall canal coverage raster, where all pixels that have canal coverage have value 1
+        canal_raster = shapefile_to_raster(input_shape=canal_shapefile, output_dir=interim_dir,
+                                           raster_name='canal_coverage.tif', burnvalue=1, use_attr=False, add=None,
+                                           ref_raster=ref_raster, resolution=resolution, alltouched=True)
+
+        # replacing nan values with zero using reference raster
+        canal_arr, file = read_raster_arr_object(canal_raster)
+        ref_arr = read_raster_arr_object(ref_raster, get_file=False)
+        canal_arr = np.where(np.isnan(canal_arr) & (ref_arr == 0), ref_arr, canal_arr)
+
+        write_array_to_raster(canal_arr, file, file.transform, os.path.join(output_dir, 'canal_coverage.tif'))
+
+    else:
+        pass
+
+
 def run_all_preprocessing(skip_stateID_raster_creation=False,
                           skip_pixelID_raster_creation=False,
                           skip_process_GrowSeason_data=False,
@@ -627,7 +661,8 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
                           skip_daymet_sunHr_processing=False,
                           skip_HUC12_SW_processing=False,
                           skip_HUC12_GW_perc_processing=False,
-                          skip_koppen_geiger_processing=False):
+                          skip_koppen_geiger_processing=False,
+                          skip_create_canal_cover_raster=False):
     """
     Run all preprocessing steps.
 
@@ -650,6 +685,7 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     :param skip_HUC12_SW_processing: Set to True to skip create SW irrigation dataset.
     :param skip_HUC12_GW_perc_processing: Set to True to skip create GW use % dataset.
     :param skip_koppen_geiger_processing: Set to False to skip Koppen Geigar climate data processing and One-Hot-Encoding.
+    :param skip_create_canal_cover_raster: Set to True to skip create canal cover raster.
 
     :return: None.
     """
@@ -791,4 +827,10 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
         koppen_geiger_raster='../../Data_main/rasters/Koppen_geiger/1991_2020/koppen_geiger_0p00833333.tif',
         output_dir='../../Data_main/rasters/Koppen_geiger',
         skip_processing=skip_koppen_geiger_processing)
+
+    # Canal cover raster
+    create_canal_coverage_raster(canal_shapefile='../../Data_main/shapefiles/Surface_water_shapes/canals_buffered_1km_epsg_4269.shp',
+                                 output_dir='../../Data_main/rasters/Canal_cover',
+                                 ref_raster=WestUS_raster, resolution=model_res,
+                                 skip_processing=skip_create_canal_cover_raster)
 

@@ -44,7 +44,7 @@ if __name__ == '__main__':
     start_earlyStopping_at_epoch = 20
     # using optimizer 'AdamW'
 
-    exclude_features_from_training = ['lon', 'lat', 'year', 'pixelID', 'stateID']
+    exclude_features_from_training = ['lon', 'lat', 'year', 'pixelID', 'stateID', 'Canal']
 
     # default model architecture
     default_params = {

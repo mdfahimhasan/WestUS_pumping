@@ -25,22 +25,21 @@ def create_train_test_dataframe(years_list, yearly_data_path_dict,
                                 n_partitions=20, skip_processing=False):
     """
     Compile yearly/static datasets into a dataframe. This function-generated dataframe will be used as
-    train-test data for ML model at annual scale.
+    train-test data for ML/DL model at annual scale.
 
     *** if there is no static data, set static_data_path_dict to None.
 
-    :param years_list: A list of years_list for which data to include in the dataframe.
-    :param yearly_data_path_dict: A dictionary with yearly variables' names as keys and their paths as values.
-                                  Can't be None.
-    :param static_data_path_dict: A dictionary with static variables' names as keys and their paths as values.
-                                  Set to None if there is static dataset.
-    :param datasets_to_include: A list of datasets to include in the dataframe.
-    :param output_parquet: Output filepath of the parquet file to save. Using parquet as it requires lesser memory.
-                            Can also save smaller dataframe as csv file if name has '.csv' extension.
-    :param n_partitions: Number of partitions to save the parquet file in using dask dataframe.
-    :param skip_processing: Set to True to skip this dataframe creation process.
+    :param years_list: list. List of years to include in the dataset.
+    :param yearly_data_path_dict: dict. Dictionary where keys are variable names and values are paths to
+                                  yearly raster data folders.
+    :param static_data_path_dict: dict or None. Dictionary where keys are variable names and values are paths
+                                  to static raster files. Use None if no static variables.
+    :param datasets_to_include: list. List of dataset variable names to include in the final dataframe.
+    :param output_parquet: str. Output path for the parquet or CSV file to save the compiled data.
+    :param n_partitions: int. Number of partitions to split the dask dataframe into (used for parquet).
+    :param skip_processing: bool. If True, skips processing and returns the output path directly.
 
-    :return: The filepath of the output parquet file.
+    :return: str. Filepath of the saved dataframe (parquet or CSV).
     """
     if not skip_processing:
         print('\ncreating train-test dataframe for annual model...')
@@ -111,9 +110,21 @@ def split_train_val_test_set_v2(data_parquet, output_dir,
                                 train_size=0.7, val_size=0.15, test_size=0.15,
                                 random_state=42, skip_processing=False):
     """
-    Splits dataset into train, validation, and test datasets, along with their target values.
+    Splits a full dataset into training, validation, and test sets at the pixel level,
+    preserving stateID-based stratification.
 
-    :return: None.
+    ** This function ensures that each pixel is consistently assigned to the same split (train, validation, or test)
+    across all years
+
+    :param data_parquet: str. Path to the input parquet file containing the full dataset.
+    :param output_dir: str. Directory where the train/val/test CSVs will be saved.
+    :param train_size: float. Proportion of data to include in the training split.
+    :param val_size: float. Proportion of data to include in the validation split.
+    :param test_size: float. Proportion of data to include in the test split.
+    :param random_state: int. Seed for reproducibility in data splitting.
+    :param skip_processing: bool. If True, skips processing and does nothing.
+
+    :return: None. Saves the split datasets as CSV files.
     """
     if not skip_processing:
         print(f'\nmaking train-validation-test ({train_size * 100}-{val_size * 100}-{test_size * 100} %) splits....\n')
@@ -163,14 +174,27 @@ def split_train_val_test_set_v2(data_parquet, output_dir,
 
 
 def save_statistics_to_csv(statistics_dicts, output_dir):
-    """Saves multiple statistics dictionaries to CSV."""
+    """
+    Saves mean and standard deviation dictionaries as CSV files.
+
+    :param statistics_dicts: list. A list containing two dictionaries [mean_dict, std_dict].
+    :param output_dir: str. Directory where the CSVs will be saved.
+
+    :return: None.
+    """
     for dict_name, dictionary in zip(['mean', 'std'], statistics_dicts):
         df = pd.DataFrame(dictionary.items(), columns=['variable', 'value'])
         df.to_csv(os.path.join(output_dir, f'{dict_name}.csv'), index=False)
 
 
 def load_statistics_from_csv(output_dir):
-    """Loads mean, std statistics from CSV files into dictionaries."""
+    """
+    Loads mean and standard deviation statistics from saved CSV files into dictionaries.
+
+    :param output_dir: str. Directory where the statistics CSVs ('mean.csv' and 'std.csv') are stored.
+
+    :return: tuple. A tuple of two dictionaries: (mean_dict, std_dict).
+    """
     mean_csv = pd.read_csv(os.path.join(output_dir, 'mean.csv'))
     std_csv = pd.read_csv(os.path.join(output_dir, 'std.csv'))
 
@@ -183,10 +207,15 @@ def load_statistics_from_csv(output_dir):
 def calc_scaling_statistics(train_csv, features_to_exclude,
                             output_dir, skip_processing=False):
     """
-    Calculates the mean and standard deviation for each features and the target value.
+    Calculates mean and standard deviation for each feature in the training dataset,
+    excluding identifier or location variables.
 
+    :param train_csv: str. Path to the training CSV file.
+    :param features_to_exclude: list. List of features to exclude from statistic computation.
+    :param output_dir: str. Directory to save the mean and std CSVs.
+    :param skip_processing: bool. If True, skips computation and loads existing statistics.
 
-    :return: Four dictionaries: mean_csv, std_csv.
+    :return: tuple. A tuple of two dictionaries: (mean_dict, std_dict).
     """
     if not skip_processing:  # calculating the statistics
 
@@ -196,6 +225,7 @@ def calc_scaling_statistics(train_csv, features_to_exclude,
         train_df = pd.read_csv(train_csv)
 
         features_to_exclude = set(features_to_exclude or [])  # convert to set to ensure uniqueness and handle None case
+        features_to_exclude.add('stateID')  # exclude 'stateID'
         features_to_exclude.add('pixelID')  # exclude 'pixelID'
         features_to_exclude.add('year')     # exclude 'year'
         features_to_exclude.add('lon')      # exclude 'lon'
@@ -224,7 +254,17 @@ def standardize_train_val_test(split_csv, mean_dict, std_dict,
                                exclude_features_from_standardizing, output_dir,
                                split_type='train', skip_processing=False):
     """
-    Standardizing features and target with calculated statistics.
+    Standardizes the train/val/test dataset using provided mean and std statistics.
+
+    :param split_csv: str. Path to the CSV file (train, val, or test) to be standardized.
+    :param mean_dict: dict. Dictionary of mean values for each feature.
+    :param std_dict: dict. Dictionary of standard deviation values for each feature.
+    :param exclude_features_from_standardizing: list. Features to exclude from standardization.
+    :param output_dir: str. Directory where the standardized CSV will be saved.
+    :param split_type: str. One of 'train', 'val', or 'test' to name the output file.
+    :param skip_processing: bool. If True, skips standardization.
+
+    :return: None.
     """
     if not skip_processing:
         print(f"standardizing '{split_type}' dataset... \n")
@@ -312,17 +352,18 @@ if __name__ == '__main__':
         'vpd': '../../Data_main/rasters/vpd/WestUS_growing_season',
         'sunHr': '../../Data_main/rasters/sunHr/WestUS_growing_season',
         'FC': '../../Data_main/rasters/Field_capacity/WestUS',
+        'Canal': '../../Data_main/rasters/Canal_cover',
         'pixelID': '../../Data_main/ref_rasters/pixelID',
         'stateID': '../../Data_main/ref_rasters/stateID'
     }
 
     datasets_to_include = data_path_dict.keys()  # datasets to include in the main dataframe
-    static_vars = {'FC', 'stateID', 'pixelID'}  # static vars
+    static_vars = {'FC', 'Canal', 'stateID', 'pixelID'}  # static vars
     annual_data_path_dict = {i: j for i, j in data_path_dict.items() if i not in static_vars}  # annual data paths
     static_data_path_dict = {i: j for i, j in data_path_dict.items() if i in static_vars}  # static data paths
 
     # exclude columns during scaling
-    exclude_columns_in_scaling = ['stateID', 'pixelID', 'year', 'lon', 'lat', 'target']
+    exclude_columns_in_scaling = ['stateID', 'pixelID', 'year', 'lon', 'lat', 'Canal', 'target']
 
     # training time periods
     years_list = [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
@@ -388,7 +429,7 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
 
     # Annual dataframe creation
-    static_vars = {'FC', 'stateID', 'pixelID'}  # static vars
+    static_vars = {'FC', 'Canal', 'stateID', 'pixelID'}  # static vars
     annual_data_path_dict = {i: j for i, j in data_path_dict.items() if i not in list(static_vars) + ['target']}  # annual data paths
     static_data_path_dict = {i: j for i, j in data_path_dict.items() if i in static_vars}  # static data paths
 

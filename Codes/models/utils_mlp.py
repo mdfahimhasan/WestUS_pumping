@@ -1020,7 +1020,8 @@ def plot_shap_summary_plot(trained_model_path, trained_model_info, use_samples,
                               'tmax': 'Temperature (max)', 'ET': 'ET', 'irr_crop_frac': 'Irrigated crop fraction',
                               'maxRH': 'Relative humidity (max)', 'minRH': 'Relative humidity (min)',
                               'shortRad': 'Shortwave radiation', 'vpd': 'Vapor pressure deficit',
-                              'sunHr': 'Sun hour', 'FC': 'Field capacity'}
+                              'sunHr': 'Sun hour', 'FC': 'Field capacity',
+                              'SW_distance': 'Distance from surface water', 'Canal_density': 'Irrigation canal density'}
         df = df.rename(columns=feature_names_dict)
         feature_names = np.array(df.columns.tolist())
 
@@ -1126,7 +1127,8 @@ def plot_shap_interaction_plot(model_version, features_to_plot, trained_model_pa
                               'tmax': 'Temperature (max)', 'ET': 'ET', 'irr_crop_frac': 'Irrigated crop fraction',
                               'maxRH': 'Relative humidity (max)', 'minRH': 'Relative humidity (min)',
                               'shortRad': 'Shortwave radiation', 'vpd': 'Vapor pressure deficit',
-                              'sunHr': 'Sun hour', 'FC': 'Field capacity'}
+                              'sunHr': 'Sun hour', 'FC': 'Field capacity',
+                              'SW_distance': 'Distance from surface water', 'Canal_density': 'Irrigation canal density'}
         df = df.rename(columns=feature_names_dict)
         feature_names = np.array(df.columns.tolist())
 

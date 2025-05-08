@@ -154,6 +154,7 @@ def process_dataset_for_LOBO(model_version, basin_code, basin_shape,
 data_path_dict = {
     'netGW_Irr': '../../Data_main/rasters/NetGW_irrigation/WesternUS',
     'peff': '../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
+    'SW_Irr': '../../Data_main/rasters/SW_irrigation',
     'ret': '../../Data_main/rasters/RET/WestUS_growing_season',
     'precip': '../../Data_main/rasters/Precip/WestUS_growing_season',
     'tmax': '../../Data_main/rasters/Tmax/WestUS_growing_season',
@@ -164,14 +165,15 @@ data_path_dict = {
     'shortRad': '../../Data_main/rasters/shortRad/WestUS_growing_season',
     'vpd': '../../Data_main/rasters/vpd/WestUS_growing_season',
     'sunHr': '../../Data_main/rasters/sunHr/WestUS_growing_season',
-    'sw_huc12': '../../Data_main/rasters/HUC12_SW/MinMax_normalized',
     'FC': '../../Data_main/rasters/Field_capacity/WestUS',
+    'Canal_density': '../../Data_main/rasters/Canal_density',
+    'SW_distance': '../../Data_main/rasters/SW_distance',
     'pixelID': '../../Data_main/ref_rasters/pixelID',
     'stateID': '../../Data_main/ref_rasters/stateID'
 }
 
 datasets_to_include = data_path_dict.keys()  # datasets to include in the main dataframe
-static_vars = {'FC', 'stateID', 'pixelID'}  # static vars
+static_vars = {'FC', 'Canal_density', 'SW_distance', 'stateID', 'pixelID'}  # static vars
 annual_data_path_dict = {i: j for i, j in data_path_dict.items() if i not in static_vars}  # annual data paths
 static_data_path_dict = {i: j for i, j in data_path_dict.items() if i in static_vars}  # static data paths
 
@@ -181,7 +183,7 @@ exclude_columns_in_scaling = ['stateID', 'pixelID', 'year', 'lon', 'lat', 'targe
 if __name__ == '__main__':
 
     # flags
-    model_version = 'v4'
+    model_version = 'v5'
     skip_LOBO_GMD3 = False              ##### GMD3, KS
     skip_LOBO_GMD4 = False              ##### GMD4, KS
     skip_LOBO_RPB = False               ##### Republican Basin, CO

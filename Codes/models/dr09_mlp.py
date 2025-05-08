@@ -17,25 +17,25 @@ from Codes.models.utils_mlp import DataLoaderCreator, main, plot_learning_curve,
 
 if __name__ == '__main__':
     # # # model version
-    model_version = 'v4'                                ################################################################
+    model_version = 'v5'                                ################################################################
 
     # # # model switches
     # setting 'RUN_MODEL' to False will skip all model running processing
     # setting 'skip_create_prediction_rasters' to False will load a trained model to create prediction raster
-    RUN_MODEL = True                                  ################################################################
+    RUN_MODEL = False                                  ################################################################
     tune_params = False                                ################################################################
     n_trials_for_tuning = 100                           ################################################################
     implement_earlyStopping = False                     #################################################################
     plot_hyperparam_importance = True                  #################################################################
 
-    skip_SHAP_summary_plot = True                      ################################################################
-    skip_SHAP_interaction_plot = True                  ################################################################
+    skip_SHAP_summary_plot = False                      ################################################################
+    skip_SHAP_interaction_plot = False                  ################################################################
 
     skip_create_prediction_rasters = True              ################################################################
 
     # # # default variables (from hyperparameter tuning process)
     batch_size = 256
-    n_features = 14
+    n_features = 16
     n_epochs = 70
     lr = 0.001
     lr_scheduler = 'CosineAnnealingLR'
@@ -44,7 +44,7 @@ if __name__ == '__main__':
     start_earlyStopping_at_epoch = 20
     # using optimizer 'AdamW'
 
-    exclude_features_from_training = ['lon', 'lat', 'year', 'pixelID', 'stateID', 'Canal']
+    exclude_features_from_training = ['lon', 'lat', 'year', 'pixelID', 'stateID']
 
     # default model architecture
     default_params = {
@@ -137,13 +137,14 @@ if __name__ == '__main__':
     plot_shap_summary_plot(trained_model_path=model_save_path, trained_model_info=model_info_save_path,
                            use_samples=2000, data_csv=test_csv,
                            exclude_features=exclude_features_from_training,
-                           save_plot_path=f'../../Model_run/MLP_model/SHAP/MLP_SHAP_summary_{model_version}.png',
+                           save_plot_path=f'../../Model_run/MLP_model/SHAP/SHAP_summary_{model_version}.png',
                            skip_processing=skip_SHAP_summary_plot)
 
     # SHAP interaction plot
     features_to_plot = ['Consumptive groundwater use', 'Effective precipitation', 'Shortwave radiation',
                         'Irrigated crop fraction', 'ET', 'Reference ET', 'Field capacity',
-                        'Precipitation', 'Surface water irrigation']
+                        'Precipitation', 'Surface water irrigation', 'Distance from surface water',
+                        'Irrigation canal density']
     plot_shap_interaction_plot(model_version=model_version,
                                features_to_plot=features_to_plot, trained_model_path=model_save_path,
                                trained_model_info=model_info_save_path, use_samples=2000, data_csv=test_csv,

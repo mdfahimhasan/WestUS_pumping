@@ -13,6 +13,8 @@ import geopandas as gpd
 from rasterio.mask import mask
 from rasterio.merge import merge
 from rasterio.enums import Resampling
+import astropy.concolution as apc
+from scipy.ndimage import gaussian_filter
 
 from Codes.utils.system_ops import make_gdal_sys_call
 from Codes.utils.system_ops import makedirs
@@ -685,5 +687,79 @@ def create_ref_raster(input_raster, output_ref_raster):
     input_arr = np.where(np.isnan(input_arr), -9999, 0)
     write_array_to_raster(raster_arr=input_arr, raster_file=input_file, transform=input_file.transform,
                           output_path=output_ref_raster)
+
+
+def apply_gaussian_filter(input_raster, output_raster, sigma=2, ignore_nan=True, normalize=True,
+                          nodata=-9999, ref_raster=WestUS_raster):
+    """
+    Applies Gaussian filter to raster.
+
+    :param input_raster : Input Raster.
+    :param output_raster : Output raster filepath.
+    :param sigma : Standard Deviation for gaussian kernel. Defaults to 2.
+    :param ignore_nan :  Set true to ignore nan values during convolution.
+    :param normalize : Set true to normalize the filtered raster at the end.
+    :param nodata : No_Data_Value.
+    :param ref_raster : Reference Raster. Defaults to referenceraster.
+
+    Returns: Gaussian filtered raster.
+    """
+    raster_arr, raster_file = read_raster_arr_object(input_raster)
+    if ignore_nan:
+        Gauss_kernel = apc.Gaussian2DKernel(x_stddev=sigma, x_size=3 * sigma, y_size=3 * sigma)
+        raster_arr_flt = apc.convolve(raster_arr, kernel=Gauss_kernel, preserve_nan=True)
+
+    else:
+        raster_arr[np.isnan(raster_arr)] = 0
+        raster_arr_flt = gaussian_filter(input=raster_arr, sigma=sigma,
+                                         order=0)  # order 0 corresponds to convolution with a Gaussian kernel
+
+    if normalize:
+        if ignore_nan:
+            raster_arr_flt[np.isnan(raster_arr_flt)] = 0
+        raster_arr_flt = np.abs(raster_arr_flt)
+        raster_arr_flt -= np.min(raster_arr_flt)
+        raster_arr_flt /= np.ptp(raster_arr_flt)
+
+    ref_arr = read_raster_arr_object(ref_raster, get_file=False)
+    raster_arr_flt[np.isnan(ref_arr)] = nodata
+
+    write_array_to_raster(raster_arr=raster_arr_flt, raster_file=raster_file, transform=raster_file.transform,
+                          output_path=output_raster)
+
+    return output_raster
+
+
+def compute_proximity(input_raster, output_raster, target_values=(1,), nodatavalue=-9999):
+    """
+    Computes proximity (Euclidean distance) raster from target pixel values in the input raster.
+
+    :param input_raster : Path to the input raster file.
+    :param output_raster : Output proximity raster filepath.
+    :param target_values : Tuple of target values to compute proximity from. Defaults to (1,).
+    :param nodatavalue : No-data value to set in the output raster. Defaults to -9999.
+
+    Returns: Path to the output proximity raster.
+    """
+    inras_file = gdal.Open(input_raster, gdal.GA_ReadOnly)
+    inras_band = inras_file.GetRasterBand(1)
+    driver = gdal.GetDriverByName('GTiff')
+
+    x_size = inras_file.RasterXSize
+    y_size = inras_file.RasterYSize
+    dest_ds = driver.Create(output_raster, x_size, y_size, 1, gdal.GDT_Float32)
+    dest_ds.SetProjection(inras_file.GetProjection())
+    dest_ds.SetGeoTransform(inras_file.GetGeoTransform())
+    dest_band = dest_ds.GetRasterBand(1)
+    dest_band.SetNoDataValue(nodatavalue)
+
+    target_values_list = list(target_values)
+    values = 'VALUES=' + ','.join(str(val) for val in target_values_list)
+
+    gdal.ComputeProximity(inras_band, dest_band, [values, "DISTUNITS=GEO"])
+
+    inras_file, inras_band, dest_ds, dest_band = None, None, None, None
+
+    return output_raster
 
 

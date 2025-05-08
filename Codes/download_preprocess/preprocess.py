@@ -644,6 +644,10 @@ def create_canal_density_raster(canal_shapefile, output_dir,
         apply_gaussian_filter(input_raster=canal_raster, output_raster=os.path.join(output_dir, 'canal_density.tif'),
                               sigma=1, ignore_nan=True, normalize=False,
                               nodata=-9999, ref_raster=WestUS_raster)
+
+        # deleting the canal coverage raster
+        # needed for handling density raster for dataframe creation
+        os.remove(canal_raster)
     else:
         pass
 
@@ -690,6 +694,10 @@ def create_distance_SurfaceWater_raster(SurfaceWater_shapefile, output_dir,
 
         write_array_to_raster(proximity_arr, proximity_file, proximity_file.transform,
                               os.path.join(output_dir, 'SW_distance.tif'))
+
+        # deleting the SW_locations raster
+        # needed for handling the proximity raster for dataframe creation
+        os.remove(SW_raster)
 
     else:
         pass

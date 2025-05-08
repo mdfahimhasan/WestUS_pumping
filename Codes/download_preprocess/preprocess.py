@@ -17,7 +17,7 @@ sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import makedirs
 from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster, \
-    clip_resample_reproject_raster, shapefile_to_raster
+    clip_resample_reproject_raster, shapefile_to_raster, apply_gaussian_filter, compute_proximity
 
 no_data_value = -9999
 model_res = 0.01976293625031605786  # in deg, ~2 km
@@ -608,12 +608,11 @@ def create_pixelID_raster(WestUS_refraster, output_dir, skip_processing=False):
         write_array_to_raster(pixelID_arr, ref_file, ref_file.transform,
                               output_path)
 
-
-def create_canal_coverage_raster(canal_shapefile, output_dir,
-                                 ref_raster=WestUS_raster, resolution=model_res,
-                                 skip_processing=False):
+def create_canal_density_raster(canal_shapefile, output_dir,
+                                ref_raster=WestUS_raster, resolution=model_res,
+                                skip_processing=False):
     """
-    Create canal coverage raster.
+    Create canal density raster.
 
     :param canal_shapefile: Filepath of canal coverage shapefile.
     :param output_dir: Output directory path to save canal coverage rasters.
@@ -637,8 +636,52 @@ def create_canal_coverage_raster(canal_shapefile, output_dir,
         ref_arr = read_raster_arr_object(ref_raster, get_file=False)
         canal_arr = np.where(np.isnan(canal_arr) & (ref_arr == 0), ref_arr, canal_arr)
 
-        write_array_to_raster(canal_arr, file, file.transform, os.path.join(output_dir, 'canal_coverage.tif'))
+        canal_raster = write_array_to_raster(canal_arr, file, file.transform,
+                                             os.path.join(output_dir, 'canal_coverage.tif'))
 
+        # canal density
+        apply_gaussian_filter(input_raster=canal_raster, output_raster=os.path.join(output_dir, 'canal_density.tif'),
+                              sigma=2, ignore_nan=True, normalize=False,
+                              nodata=-9999, ref_raster=WestUS_raster)
+    else:
+        pass
+
+
+def create_distance_SurfaceWater_raster(SurfaceWater_shapefile, output_dir,
+                                        ref_raster=WestUS_raster, resolution=model_res,
+                                        skip_processing=False):
+    """
+    Create distance from surface water source raster. These surface water sources are generally rivers, big canals,
+    reservoirs. The original shapefile is 'artificial path' extracted and processed from NHD dataset.
+
+    :param SurfaceWater_shapefile: Filepath of surface water (artificial path) shapefile.
+    :param output_dir: Output directory path to save canal coverage rasters.
+    :param ref_raster: Filepath of reference raster.
+    :param resolution: Model resolution.
+    :param skip_processing: Set to True to skip this step.
+
+    :return: None.
+    """
+    if not skip_processing:
+        interim_dir = os.path.join(output_dir, 'interim')
+        makedirs([interim_dir, output_dir])
+
+        # creating an overall surface water location raster, where all pixels that have surface water have value 1
+        SW_raster = shapefile_to_raster(input_shape=SurfaceWater_shapefile, output_dir=interim_dir,
+                                        raster_name='SW_locations.tif', burnvalue=1, use_attr=False, add=None,
+                                        ref_raster=ref_raster, resolution=resolution, alltouched=True)
+
+        # replacing nan values with zero using reference raster
+        sw_arr, file = read_raster_arr_object(SW_raster)
+        ref_arr = read_raster_arr_object(ref_raster, get_file=False)
+        sw_arr = np.where(np.isnan(sw_arr) & (ref_arr == 0), ref_arr, sw_arr)
+
+        SW_raster = write_array_to_raster(sw_arr, file, file.transform,
+                                          os.path.join(output_dir, 'SW_locations.tif'))
+
+        # distance from surface water soruces
+        compute_proximity(input_raster=SW_raster, output_raster=os.path.join(output_dir, 'SW_distance.tif'),
+                          target_values=(1,), nodatavalue=-9999)
     else:
         pass
 
@@ -662,7 +705,8 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
                           skip_HUC12_SW_processing=False,
                           skip_HUC12_GW_perc_processing=False,
                           skip_koppen_geiger_processing=False,
-                          skip_create_canal_cover_raster=False):
+                          skip_create_canal_density_raster=False,
+                          skip_create_SW_distance_raster=False):
     """
     Run all preprocessing steps.
 
@@ -685,7 +729,8 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     :param skip_HUC12_SW_processing: Set to True to skip create SW irrigation dataset.
     :param skip_HUC12_GW_perc_processing: Set to True to skip create GW use % dataset.
     :param skip_koppen_geiger_processing: Set to False to skip Koppen Geigar climate data processing and One-Hot-Encoding.
-    :param skip_create_canal_cover_raster: Set to True to skip create canal cover raster.
+    :param skip_create_canal_density_raster: Set to True to skip create canal density raster.
+    :param skip_create_SW_distance_raster: Set to True to skip create distance from surface water raster.
 
     :return: None.
     """
@@ -828,9 +873,16 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
         output_dir='../../Data_main/rasters/Koppen_geiger',
         skip_processing=skip_koppen_geiger_processing)
 
-    # Canal cover raster
-    create_canal_coverage_raster(canal_shapefile='../../Data_main/shapefiles/Surface_water_shapes/canals_buffered_1km_epsg_4269.shp',
-                                 output_dir='../../Data_main/rasters/Canal_cover',
-                                 ref_raster=WestUS_raster, resolution=model_res,
-                                 skip_processing=skip_create_canal_cover_raster)
+
+    # Canal density raster processing
+    create_canal_density_raster(canal_shapefile='../../Data_main/shapefiles/Surface_water_shapes/NHD/NHD_CanalDitch.shp',
+                                output_dir='../../Data_main/rasters/Canal_density',
+                                ref_raster=WestUS_raster, resolution=model_res,
+                                skip_processing=skip_create_canal_density_raster)
+
+    # Distance from surface water raster processing
+    create_distance_SurfaceWater_raster(SurfaceWater_shapefile='../../Data_main/shapefiles/Surface_water_shapes/NHD/NHD_ArtificialPath.shp',
+                                        output_dir='../../Data_main/rasters/SW_distance',
+                                        ref_raster=WestUS_raster, resolution=model_res,
+                                        skip_processing=skip_create_SW_distance_raster)
 

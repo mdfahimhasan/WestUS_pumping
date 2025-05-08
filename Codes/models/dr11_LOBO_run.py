@@ -37,7 +37,7 @@ def perform_LOBO(basin_code, model_version, exclude_features_from_training, skip
 
         # default variables (from hyperparameter tuning process)
         batch_size = 256
-        n_features = 14
+        n_features = 16
         n_epochs = 70
         activation = 'leakyrelu'
         lr = 0.001
@@ -95,7 +95,7 @@ exclude_features_from_training = ['lon', 'lat', 'year', 'pixelID', 'stateID']
 
 if __name__ == '__main__':
     # # flags
-    model_version = 'v4'
+    model_version = 'v5'
     skip_LOBO_GMD3 = False              ##### GMD3, KS
     skip_LOBO_GMD4 = False              ##### GMD4, KS
     skip_LOBO_RPB = False               ##### Republican Basin, CO

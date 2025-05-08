@@ -608,6 +608,7 @@ def create_pixelID_raster(WestUS_refraster, output_dir, skip_processing=False):
         write_array_to_raster(pixelID_arr, ref_file, ref_file.transform,
                               output_path)
 
+
 def create_canal_density_raster(canal_shapefile, output_dir,
                                 ref_raster=WestUS_raster, resolution=model_res,
                                 skip_processing=False):
@@ -641,7 +642,7 @@ def create_canal_density_raster(canal_shapefile, output_dir,
 
         # canal density
         apply_gaussian_filter(input_raster=canal_raster, output_raster=os.path.join(output_dir, 'canal_density.tif'),
-                              sigma=2, ignore_nan=True, normalize=False,
+                              sigma=1, ignore_nan=True, normalize=False,
                               nodata=-9999, ref_raster=WestUS_raster)
     else:
         pass
@@ -680,8 +681,16 @@ def create_distance_SurfaceWater_raster(SurfaceWater_shapefile, output_dir,
                                           os.path.join(output_dir, 'SW_locations.tif'))
 
         # distance from surface water soruces
-        compute_proximity(input_raster=SW_raster, output_raster=os.path.join(output_dir, 'SW_distance.tif'),
-                          target_values=(1,), nodatavalue=-9999)
+        proximity_raster = \
+            compute_proximity(input_raster=SW_raster, output_raster=os.path.join(interim_dir, 'SW_distance.tif'),
+                              target_values=(1,), nodatavalue=-9999)
+
+        proximity_arr, proximity_file = read_raster_arr_object(proximity_raster)
+        proximity_arr[ref_arr != 0] = -9999
+
+        write_array_to_raster(proximity_arr, proximity_file, proximity_file.transform,
+                              os.path.join(output_dir, 'SW_distance.tif'))
+
     else:
         pass
 

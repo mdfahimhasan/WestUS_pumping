@@ -13,7 +13,7 @@ import geopandas as gpd
 from rasterio.mask import mask
 from rasterio.merge import merge
 from rasterio.enums import Resampling
-import astropy.concolution as apc
+import astropy.convolution as apc
 from scipy.ndimage import gaussian_filter
 
 from Codes.utils.system_ops import make_gdal_sys_call
@@ -689,14 +689,14 @@ def create_ref_raster(input_raster, output_ref_raster):
                           output_path=output_ref_raster)
 
 
-def apply_gaussian_filter(input_raster, output_raster, sigma=2, ignore_nan=True, normalize=True,
+def apply_gaussian_filter(input_raster, output_raster, sigma=1, ignore_nan=True, normalize=True,
                           nodata=-9999, ref_raster=WestUS_raster):
     """
     Applies Gaussian filter to raster.
 
     :param input_raster : Input Raster.
     :param output_raster : Output raster filepath.
-    :param sigma : Standard Deviation for gaussian kernel. Defaults to 2.
+    :param sigma : Standard Deviation for gaussian kernel. Defaults to 1. Must be odd.
     :param ignore_nan :  Set true to ignore nan values during convolution.
     :param normalize : Set true to normalize the filtered raster at the end.
     :param nodata : No_Data_Value.
@@ -706,7 +706,7 @@ def apply_gaussian_filter(input_raster, output_raster, sigma=2, ignore_nan=True,
     """
     raster_arr, raster_file = read_raster_arr_object(input_raster)
     if ignore_nan:
-        Gauss_kernel = apc.Gaussian2DKernel(x_stddev=sigma, x_size=3 * sigma, y_size=3 * sigma)
+        Gauss_kernel = apc.Gaussian2DKernel(x_stddev=sigma, x_size=int(3 * sigma), y_size=int(3 * sigma))
         raster_arr_flt = apc.convolve(raster_arr, kernel=Gauss_kernel, preserve_nan=True)
 
     else:

@@ -48,7 +48,7 @@ def process_dataset_for_LOBO(model_version, basin_code, basin_shape,
                 raster_name = os.path.basename(ras)
 
                 set_nodata_inside_shapefile(input_raster=ras, input_shape=basin_shape,
-                                            output_dir=fitting_output_dir, raster_name=raster_name,)
+                                            output_dir=fitting_output_dir, raster_name=raster_name)
 
             # pumping for holdout
             holdout_dir = f'../../Data_main/rasters/MLP_LOBO/{basin_code}/holdout/pumping'

@@ -14,6 +14,7 @@ def makedirs(directory_list):
     Make directory (if not exists) from a list of directory. Can create multiple directories if provided in the arg as
     a list.
 
+    :rtype: None
     :param directory_list: A list of directories to create.
 
     :return: None.

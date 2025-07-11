@@ -79,7 +79,7 @@ class DataLoaderCreator:
 
         # creating the DataLoader
         self.dataloader = DataLoader(self.dataset, batch_size=batch_size,
-                                     shuffle=shuffle)  # shuffle True is randomizing the the data
+                                     shuffle=shuffle)  # shuffle True is randomizing the data
 
         if verbose:
             # checking and printing the shapes of the tensors before batching
@@ -481,12 +481,14 @@ def test(model, test_loader, output_csv):
     # mse function
     mse_func = torch.nn.MSELoss()
 
-    # empty lists to store predictions and actuals for estimating metrics
+    # empty lists to store predictions, actuals, and years for estimating metrics
     predictions, actuals = [], []
+    year_list = []
 
     with torch.no_grad():  # disable gradient computation
-        for features, targets, _, _ in test_loader:
+        for features, targets, _, years in test_loader:
             features, targets = features.to(model.device), targets.to(model.device).view(-1, 1)
+            years = years.to(model.device).view(-1, 1)
 
             # forward pass
             preds = model(features)
@@ -498,6 +500,7 @@ def test(model, test_loader, output_csv):
             # collect predictions and actuals for metrics
             predictions.extend(preds.cpu().numpy().flatten())
             actuals.extend(targets.cpu().numpy().flatten())
+            year_list.extend(years.cpu().numpy().flatten())
 
     # average loss for the epoch
     avg_loss = running_loss / len(test_loader)
@@ -515,7 +518,7 @@ def test(model, test_loader, output_csv):
           f'NRMSE: {nRMSE:4f}, NMAE:{nMAE:.4f}, R²: {r2:.4f}\n')
 
     # creating an output dataframe with tile_no, actual values, and model predictions
-    output_df = pd.DataFrame({'actual': actuals, 'predicted': predictions})
+    output_df = pd.DataFrame({'year': year_list, 'actual': actuals, 'predicted': predictions})
     output_df.to_csv(output_csv, index=False)
 
     return avg_loss, rmse, mae, r2
@@ -1154,7 +1157,7 @@ def plot_shap_interaction_plot(model_version, features_to_plot, trained_model_pa
 
         # compiling individual shap plot in a grid plot
         n_cols = 3
-        n_rows = (len(features_to_plot) + n_cols - 1) //n_cols
+        n_rows = (len(features_to_plot) + n_cols - 1) // n_cols
 
         fig, axs = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows))
         axs = axs.flatten()

@@ -9,9 +9,9 @@
 
 # # We also applied filtering out very low and high pumping values for Colorado and kansas.
 # Removed pixels where pumping + surface water irrigation (if happens) + Peff < irrigated crop ET (under a threshold).
-# For Arizona, we didn't do it as Arizona has large surface water irrigation and we don't have an accurate
+# For Arizona, we didn't do it as Arizona has large surface water irrigation, and we don't have an accurate
 # surface water irrigation dataset (we only have a decent proxy from USGS HUC12 dataset).
-# Moreover, both Kansas and Ariozna are known to have high quality pumping data.
+# Moreover, both Kansas and Arizona are known to have high quality pumping data.
 
 import os
 import sys
@@ -326,7 +326,7 @@ def process_UT_pumping_data(raw_csv, output_pump_shp, skip_process=False, **kwar
                                                                      'Method of Measurement', 'Year', 'Total'],
                                         - filter_conditions={'Source Type': 'Well',
                                                              'Diversion Type': 'Withdrawal',
-                                                             'Use Type': ['Agricultural', 'irrigation']})
+                                                             'Use Type': ['Agricultural', 'irrigation']}
    :return: None.
    """
     if not skip_process:
@@ -403,7 +403,7 @@ def pumping_pts_to_raster_v1(state_code, years, pumping_pts_shp, pumping_attr_AF
                      Default set to None.
     :param surface_irrig_dir: Directory containing raster files of surface water irrigation data.
                               Default set to None.
-                              Note that- this data was distributed into pixels from USGS HUC12 dataset and was used
+                              Note that-this data was distributed into pixels from USGS HUC12 dataset and was used
                                          as a proxy for surface water irrigation in our effective precipitation paper.
     :param low_fraction: The minimum threshold for `(total_water / Irr_cropET)` ratio.
     :param high_fraction: The maximum threshold for `(total_water / Irr_cropET)` ratio.
@@ -415,7 +415,7 @@ def pumping_pts_to_raster_v1(state_code, years, pumping_pts_shp, pumping_attr_AF
     if not skip_processing:
         print(f'Creating pumping rasters for {state_code}...')
 
-        # creating sub-directories
+        # creating subdirectories
         annual_pump_shp_dir = os.path.join(output_dir, 'annual_pumping_shp')
         pumping_AF_dir = os.path.join(output_dir, 'pumping_AF')
         pumping_mm_dir = os.path.join(output_dir, 'pumping_mm')
@@ -450,8 +450,8 @@ def pumping_pts_to_raster_v1(state_code, years, pumping_pts_shp, pumping_attr_AF
 
             # area of a 2 km pixel
             # 2199 meter is the pixel size in latitude direction. 1746 is the pixel size in longitude direction.
-            # For longitudinal dimension calculation, a average latitude of 37.42 deg was considered for the Western US.
-            # Distance of 1 deg Longitude at equator is = 111,320 m
+            # For longitudinal dimension calculation, an average latitude of 37.42 deg was considered for the Western US.
+            # Distance of 1 deg Longitude at the equator is = 111,320 m
             # 0.01976293625031605786 deg * 111320 * cos(37.42 * pi / 180) = 1746.53 m
             # 0.01976293625031605786 deg * 111320 = 2199.59 m
             area_mm2_single_pixel = (2199.59 * 1000) * (1746.53 * 1000)  # unit in mm2
@@ -494,7 +494,7 @@ def filter_out_low_high_pumping_values_v1(year, pumping_arr, ET_dir,
     conditions based on the ratio of total water to evapotranspiration (ET) during the
     growing season. Invalid pumping values are set to zero in the returned array.
 
-    **Filter Conditions**: (modified after Ott et a. (2024))
+    **Filter Conditions**: (modified after Ott et al. (2024))
     - total water = pumping + peff + surface irrigation (if needed for specific region)
     - total water / ET >= low fraction (depending on regions the low fraction can be 0.75 - 0.85) and Peff not Nan
     - total water / ET <= high fraction (can eb around 1.5-1.6) and Peff not Nan

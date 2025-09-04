@@ -22,7 +22,7 @@ if __name__ == '__main__':
     # # # model switches
     # setting 'RUN_MODEL' to False will skip all model running processing
     # setting 'skip_create_prediction_rasters' to False will load a trained model to create prediction raster
-    RUN_MODEL = False                                  ################################################################
+    RUN_MODEL = True                                  ################################################################
     tune_params = False                                ################################################################
     n_trials_for_tuning = 100                           ################################################################
     implement_earlyStopping = False                     #################################################################

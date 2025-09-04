@@ -353,13 +353,13 @@ if __name__ == '__main__':
         'sunHr': '../../Data_main/rasters/sunHr/WestUS_growing_season',
         'FC': '../../Data_main/rasters/Field_capacity/WestUS',
         'Canal_density': '../../Data_main/rasters/Canal_density',
-        'SW_distance': '../../Data_main/rasters/SW_distance',
+        'Canal_distance': '../../Data_main/rasters/Canal_distance',
         'pixelID': '../../Data_main/ref_rasters/pixelID',
         'stateID': '../../Data_main/ref_rasters/stateID'
     }
 
     datasets_to_include = data_path_dict.keys()  # datasets to include in the main dataframe
-    static_vars = {'FC', 'Canal_density', 'SW_distance', 'stateID', 'pixelID'}  # static vars
+    static_vars = {'FC', 'Canal_density', 'Canal_distance', 'stateID', 'pixelID'}  # static vars
     annual_data_path_dict = {i: j for i, j in data_path_dict.items() if i not in static_vars}  # annual data paths
     static_data_path_dict = {i: j for i, j in data_path_dict.items() if i in static_vars}  # static data paths
 
@@ -430,7 +430,7 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
 
     # Annual dataframe creation
-    static_vars = {'FC', 'Canal_density', 'SW_distance', 'stateID', 'pixelID'}  # static vars
+    static_vars = {'FC', 'Canal_density', 'Canal_distance', 'stateID', 'pixelID'}  # static vars
     annual_data_path_dict = {i: j for i, j in data_path_dict.items() if i not in list(static_vars) + ['target']}  # annual data paths
     static_data_path_dict = {i: j for i, j in data_path_dict.items() if i in static_vars}  # static data paths
 

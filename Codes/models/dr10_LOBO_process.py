@@ -167,13 +167,13 @@ data_path_dict = {
     'sunHr': '../../Data_main/rasters/sunHr/WestUS_growing_season',
     'FC': '../../Data_main/rasters/Field_capacity/WestUS',
     'Canal_density': '../../Data_main/rasters/Canal_density',
-    'SW_distance': '../../Data_main/rasters/SW_distance',
+    'Canal_distance': '../../Data_main/rasters/Canal_distance',
     'pixelID': '../../Data_main/ref_rasters/pixelID',
     'stateID': '../../Data_main/ref_rasters/stateID'
 }
 
 datasets_to_include = data_path_dict.keys()  # datasets to include in the main dataframe
-static_vars = {'FC', 'Canal_density', 'SW_distance', 'stateID', 'pixelID'}  # static vars
+static_vars = {'FC', 'Canal_density', 'Canal_distance', 'stateID', 'pixelID'}  # static vars
 annual_data_path_dict = {i: j for i, j in data_path_dict.items() if i not in static_vars}  # annual data paths
 static_data_path_dict = {i: j for i, j in data_path_dict.items() if i in static_vars}  # static data paths
 
@@ -187,6 +187,9 @@ if __name__ == '__main__':
     skip_LOBO_GMD3 = False              ##### GMD3, KS
     skip_LOBO_GMD4 = False              ##### GMD4, KS
     skip_LOBO_RPB = False               ##### Republican Basin, CO
+    skip_LOBO_SPB = False               ##### South Platte River Basin, CO
+    skip_LOBO_AR = False                ##### Arkansas River Basin, CO
+    skip_LOBO_SLV = False               ##### San Luis Valley, CO
     skip_LOBO_HQR = False               ##### Harquahala INA, AZ
     skip_LOBO_DOUG = False              ##### Douglas AMA, AZ
     skip_LOBO_PHX = False               ##### Phoenix AMA, AZ
@@ -207,13 +210,33 @@ if __name__ == '__main__':
                              exclude_columns_in_scaling=exclude_columns_in_scaling,
                              skip_processing=skip_LOBO_GMD4)
 
-    # # RPB, CO
+    # # Republican River Basin, CO
     process_dataset_for_LOBO(model_version=model_version, basin_code='RPB',
                              basin_shape='../../Data_main/shapefiles/Basins_of_interest/Republican_Basin.shp',
                              annual_data_path_dict=annual_data_path_dict, static_data_path_dict=static_data_path_dict,
                              exclude_columns_in_scaling=exclude_columns_in_scaling,
                              skip_processing=skip_LOBO_RPB)
 
+    # # South Platten River Basin, CO
+    process_dataset_for_LOBO(model_version=model_version, basin_code='SPB',
+                             basin_shape='../../Data_main/shapefiles/Basins_of_interest/South_Platte_Basin.shp',
+                             annual_data_path_dict=annual_data_path_dict, static_data_path_dict=static_data_path_dict,
+                             exclude_columns_in_scaling=exclude_columns_in_scaling,
+                             skip_processing=skip_LOBO_SPB)
+    # # Arkansas River Basin, CO
+    process_dataset_for_LOBO(model_version=model_version, basin_code='AR',
+                             basin_shape='../../Data_main/shapefiles/Basins_of_interest/Arkansas_Basin.shp',
+                             annual_data_path_dict=annual_data_path_dict, static_data_path_dict=static_data_path_dict,
+                             exclude_columns_in_scaling=exclude_columns_in_scaling,
+                             skip_processing=skip_LOBO_AR)
+
+
+    # # San Luis Valley, CO
+    process_dataset_for_LOBO(model_version=model_version, basin_code='SLV',
+                             basin_shape='../../Data_main/shapefiles/Basins_of_interest/Rio_Grande_Basin.shp',
+                             annual_data_path_dict=annual_data_path_dict, static_data_path_dict=static_data_path_dict,
+                             exclude_columns_in_scaling=exclude_columns_in_scaling,
+                             skip_processing=skip_LOBO_SLV)
 
     # # Douglas AMA, AZ
     process_dataset_for_LOBO(model_version=model_version, basin_code='DOUG',
@@ -222,28 +245,28 @@ if __name__ == '__main__':
                              exclude_columns_in_scaling=exclude_columns_in_scaling,
                              skip_processing=skip_LOBO_DOUG)
 
-    # # Harquahala, AZ
+    # # Harquahala INA, AZ
     process_dataset_for_LOBO(model_version=model_version, basin_code='HQR',
                              basin_shape='../../Data_main/shapefiles/Basins_of_interest/Harquahala_INA.shp',
                              annual_data_path_dict=annual_data_path_dict, static_data_path_dict=static_data_path_dict,
                              exclude_columns_in_scaling=exclude_columns_in_scaling,
                              skip_processing=skip_LOBO_HQR)
 
-    # # Phoenix, AZ
+    # # Phoenix AMA, AZ
     process_dataset_for_LOBO(model_version=model_version, basin_code='PHX',
                              basin_shape='../../Data_main/shapefiles/Basins_of_interest/Phoenix_AMA.shp',
                              annual_data_path_dict=annual_data_path_dict, static_data_path_dict=static_data_path_dict,
                              exclude_columns_in_scaling=exclude_columns_in_scaling,
                              skip_processing=skip_LOBO_PHX)
 
-    # # Pinal, AZ
+    # # Pinal AMA, AZ
     process_dataset_for_LOBO(model_version=model_version, basin_code='PNL',
                              basin_shape='../../Data_main/shapefiles/Basins_of_interest/Pinal_AMA.shp',
                              annual_data_path_dict=annual_data_path_dict, static_data_path_dict=static_data_path_dict,
                              exclude_columns_in_scaling=exclude_columns_in_scaling,
                              skip_processing=skip_LOBO_PNL)
 
-    # # Santa Cruz, AZ
+    # # Santa Cruz AMA, AZ
     process_dataset_for_LOBO(model_version=model_version, basin_code='SCRUZ',
                              basin_shape='../../Data_main/shapefiles/Basins_of_interest/SantaCruz_AMA.shp',
                              annual_data_path_dict=annual_data_path_dict, static_data_path_dict=static_data_path_dict,

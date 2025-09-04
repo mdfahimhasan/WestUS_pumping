@@ -3,16 +3,14 @@
 # Colorado State university
 # Fahim.Hasan@colostate.edu
 
-import os
 import sys
 import pandas as pd
-from glob import glob
 from os.path import dirname, abspath
 
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.plots import scatter_plot_of_same_vars
-from Codes.models.utils_mlp import DataLoaderCreator, main, plot_learning_curve, test, \
+from Codes.utils.DL_ops import DataLoaderCreator, main, plot_learning_curve, test, \
     calc_rangeWise_RMSE, load_model_and_predict_raster, plot_shap_summary_plot, plot_shap_interaction_plot
 
 if __name__ == '__main__':

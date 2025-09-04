@@ -9,7 +9,7 @@ from os.path import dirname, abspath
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.plots import scatter_plot_of_same_vars
-from Codes.models.utils_mlp import DataLoaderCreator, main, test
+from Codes.utils.DL_ops import DataLoaderCreator, main, test
 
 
 def perform_LOBO(basin_code, model_version, exclude_features_from_training, skip_processing=False):

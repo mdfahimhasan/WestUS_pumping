@@ -51,8 +51,6 @@ if __name__ == '__main__':
 
     openET_data_list = [
         'OpenET_ensemble',
-        # 'Irrig_crop_OpenET_IrrMapper',
-        # 'Irrig_crop_OpenET_LANID',
         'Irrigation_Frac_IrrMapper',
         'Irrigation_Frac_LANID'
     ]
@@ -106,7 +104,7 @@ if __name__ == '__main__':
     skip_HUC12_GW_perc_processing = True        ########################################################################
     skip_koppen_geiger_processing = True        ########################################################################
     skip_create_canal_density_raster = True     ########################################################################
-    skip_create_SW_distance_raster = True       ########################################################################
+    skip_create_canal_distance_raster = True       ########################################################################
 
     run_all_preprocessing(skip_stateID_raster_creation=skip_stateID_raster_creation,
                           skip_pixelID_raster_creation=skip_pixelID_raster_creation,
@@ -128,5 +126,5 @@ if __name__ == '__main__':
                           skip_HUC12_GW_perc_processing=skip_HUC12_GW_perc_processing,
                           skip_koppen_geiger_processing=skip_koppen_geiger_processing,
                           skip_create_canal_density_raster=skip_create_canal_density_raster,
-                          skip_create_SW_distance_raster=skip_create_SW_distance_raster
+                          skip_create_canal_distance_raster=skip_create_canal_distance_raster
                           )

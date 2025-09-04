@@ -557,7 +557,7 @@ def train_model(x_train, y_train, params_dict,
         y_pred = trained_model.predict(x_train)
 
         # performance/error metrics
-        metrics_dict = calculate_metrics(predictions=y_pred, targets=y_train)
+        metrics_dict = calculate_metrics(predictions=y_pred, targets=y_train.values.ravel())
         rmse = metrics_dict['RMSE']
         mae = metrics_dict['MAE']
         r2 = metrics_dict['R2']
@@ -624,7 +624,7 @@ def test_model(trained_model, x_test, y_test, prediction_csv_path, categorical_c
     y_pred_test = trained_model.predict(x_test)
 
     # performance/error metrics
-    metrics_dict = calculate_metrics(predictions=y_pred_test, targets=y_test)
+    metrics_dict = calculate_metrics(predictions=y_pred_test, targets=y_test.values.ravel())
 
     rmse = metrics_dict['RMSE']
     mae = metrics_dict['MAE']
@@ -748,9 +748,8 @@ def create_pdplots(trained_model, x_train, features_to_include, output_dir, plot
             'ET': 'ET (mm/gs)', 'irr_crop_frac': 'Fraction of irrigated cropland', 'maxRH': 'Max. relative humidity (%)',
             'minRH': 'Min. relative humidity (%)', 'shortRad': 'Downward shortwave radiation (W/$m^2$)',
             'vpd': 'Vapour pressure deficit (kpa)', 'sunHr': 'Daylight duration (hr)',
-            'sw_huc12': 'Normalized HUC12 Surface water irrigation', 'gw_perc_huc12': 'Groundwater use at HUC12 (%)',
-            'climate': 'Climate', 'FC': 'Field capacity (%)', 'spi': 'Standardized precipitation index',
-            'spei': 'Standardized precipitation evapotranspiration index', 'eddi': 'Evaporative demand drought index'
+            'SW_Irr': 'Surface water irrigation (mm/gs)', 'FC': 'Field capacity',
+            'Canal density': 'Canal density', 'Canal_distances': 'Distance from canals'
         }
 
         # Subplot labels
@@ -931,7 +930,8 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
             'vpd': 'Vapour pressure deficit', 'sunHr': 'Daylight duration',
             'sw_huc12': 'Normalized HUC12 Surface water irrigation', 'gw_perc_huc12': 'Groundwater use % at HUC12',
             'climate': 'Climate', 'FC': 'Field capacity', 'spi': 'Standardized precipitation index',
-            'spei': 'Standardized precipitation evapotranspiration index', 'eddi': 'Evaporative demand drought index'
+            'spei': 'Standardized precipitation evapotranspiration index', 'eddi': 'Evaporative demand drought index',
+            'Canal density': 'Canal density', 'Canal_distances': 'Distance from canals'
         }
 
         importances = importances.rename(columns=feature_name_dict)
@@ -946,12 +946,12 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
         ax.tick_params(axis='y', labelsize=8)
 
         plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, plot_name), dpi=100)
+        plt.savefig(os.path.join(output_dir, plot_name), dpi=200)
 
         # saving the list to avoid running the permutation importance plot if not required (saves model running time)
         joblib.dump(sorted_imp_vars, os.path.join(output_dir, sorted_var_list_name))
 
-        print('Permutation importance plot generated...')
+        print('Permutation importance plot generated...\n')
 
     else:
         sorted_imp_vars = joblib.load(os.path.join(output_dir, sorted_var_list_name))

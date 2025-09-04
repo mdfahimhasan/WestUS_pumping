@@ -31,7 +31,7 @@ sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import makedirs
 from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster
-from Codes.utils.stats_ops import calculate_rmse, calculate_r2, calculate_mae
+from Codes.utils.stats_ops import calculate_metrics
 
 
 no_data_value = -9999
@@ -556,9 +556,22 @@ def train_model(x_train, y_train, params_dict,
 
         y_pred = trained_model.predict(x_train)
 
-        print('Train RMSE = {:.3f}'.format(calculate_rmse(Y_pred=y_pred, Y_obsv=y_train)))
-        print('Train R2 = {:.3f}'.format(calculate_r2(Y_pred=y_pred, Y_obsv=y_train)))
+        # performance/error metrics
+        metrics_dict = calculate_metrics(predictions=y_pred, targets=y_train)
+        rmse = metrics_dict['RMSE']
+        mae = metrics_dict['MAE']
+        r2 = metrics_dict['R2']
+        nrmse = metrics_dict['Normalized RMSE']
+        nmae = metrics_dict['Normalized MAE']
 
+        print(
+            f"Train Results:\n"
+            f"---------------------\n"
+            f"RMSE: {rmse:.4f}, MAE: {mae:.4f},\n"
+            f"NRMSE: {nrmse:.4f}, NMAE: {nmae:.4f}, R²: {r2:.4f}\n"
+        )
+
+        # save trained model
         if save_model:
             makedirs([save_folder])
             if '.joblib' not in model_save_name:
@@ -607,15 +620,24 @@ def test_model(trained_model, x_test, y_test, prediction_csv_path, categorical_c
         for col in categorical_columns:
             x_test[col] = x_test[col].astype('category')
 
-    # testing model performonce
+    # testing model performance
     y_pred_test = trained_model.predict(x_test)
-    test_rmse = calculate_rmse(Y_pred=y_pred_test, Y_obsv=y_test)
-    test_r2 = calculate_r2(Y_pred=y_pred_test, Y_obsv=y_test)
-    test_mae = calculate_mae(Y_pred=y_pred_test, Y_obsv=y_test)
 
-    print(f'\nRMSE = {test_rmse:.4f}')
-    print(f'MAE = {test_mae:.4f}')
-    print(f'R2 = {test_r2:.4f}')
+    # performance/error metrics
+    metrics_dict = calculate_metrics(predictions=y_pred_test, targets=y_test)
+
+    rmse = metrics_dict['RMSE']
+    mae = metrics_dict['MAE']
+    r2 = metrics_dict['R2']
+    nrmse = metrics_dict['Normalized RMSE']
+    nmae = metrics_dict['Normalized MAE']
+
+    print(
+        f"Test Results:\n"
+        f"---------------------\n"
+        f"RMSE: {rmse:.4f}, MAE: {mae:.4f},\n"
+        f"NRMSE: {nrmse:.4f}, NMAE: {nmae:.4f}, R²: {r2:.4f}\n"
+    )
 
     # saving test prediction
     test_obsv_predict_df = pd.DataFrame({'observed': y_test.values.ravel(),

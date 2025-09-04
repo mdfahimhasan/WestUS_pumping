@@ -55,6 +55,39 @@ def calculate_r2(Y_pred, Y_obsv):
     return r2_val
 
 
+def calculate_metrics(predictions, targets):
+    """
+    Calculates regression metrics: RMSE, MAE, R², Normalized RMSE, and Normalized MAE.
+
+    :param predictions: array-like or list. Predicted values.
+    :param targets: array-like or list. True target values.
+
+    :return: dict. Dictionary containing:
+        - 'RMSE': Root Mean Squared Error
+        - 'MAE': Mean Absolute Error
+        - 'R2': Coefficient of Determination
+        - 'Normalized RMSE': RMSE divided by the mean of targets
+        - 'Normalized MAE': MAE divided by the mean of targets
+    """
+    if isinstance(predictions, list):
+        predictions = np.array(predictions)
+        targets = np.array(targets)
+
+    rmse = np.sqrt(np.mean((predictions - targets) ** 2))
+    mae = np.mean(np.abs(predictions - targets))
+    r2 = 1 - (np.sum((predictions - targets) ** 2) /
+              np.sum((targets - np.mean(targets)) ** 2))
+
+    normalized_rmse = rmse / np.mean(targets)
+    normalized_mae = mae / np.mean(targets)
+
+    return {'RMSE': rmse,
+            'MAE': mae,
+            'R2': r2,
+            'Normalized RMSE': normalized_rmse,
+            'Normalized MAE': normalized_mae}
+
+
 def calc_outlier_ranges_IQR(data, axis=None, decrease_lower_range_by=None, increase_upper_range_by=None):
     """
     calculate lower and upper range of outlier detection using IQR method.

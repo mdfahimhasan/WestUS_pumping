@@ -15,7 +15,8 @@ def calculate_rmse(Y_pred, Y_obsv):
     if isinstance(Y_pred, np.ndarray):
         Y_pred = pd.Series(Y_pred)
 
-    rmse_val = mean_squared_error(y_true=Y_obsv, y_pred=Y_pred)
+    mse_val = mean_squared_error(y_true=Y_obsv, y_pred=Y_pred)
+    rmse_val = np.sqrt(mse_val)
 
     return rmse_val
 
@@ -32,7 +33,7 @@ def calculate_mae(Y_pred, Y_obsv):
     if isinstance(Y_pred, np.ndarray):
         Y_pred = pd.Series(Y_pred)
 
-    mae_val = mean_absolute_error(y_true=Y_obsv, y_pred=Y_pred, )
+    mae_val = mean_absolute_error(y_true=Y_obsv, y_pred=Y_pred)
 
     return mae_val
 

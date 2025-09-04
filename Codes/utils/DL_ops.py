@@ -396,9 +396,12 @@ def train(model, train_loader, optimizer, verbose=False):
     predictions, actuals = np.array(predictions), np.array(actuals)
     metrics_dict = calculate_metrics(predictions, actuals)
     rmse = metrics_dict['RMSE']
+    mae = metrics_dict['MAE']
     r2 = metrics_dict['R2']
+    nrmse = metrics_dict['Normalized RMSE']
+    nmae = metrics_dict['Normalized MAE']
 
-    return avg_loss, rmse, r2
+    return avg_loss, rmse, mae, r2, nrmse, nmae
 
 
 def validate(model, val_loader, verbose=False):
@@ -409,7 +412,7 @@ def validate(model, val_loader, verbose=False):
     :param val_loader: DataLoader. Batches of validation data.
     :param verbose: bool. If True, print batch-level loss information.
 
-    :return: tuple. (average_loss, RMSE, R²) for the validation epoch.
+    :return: tuple. (average_loss, RMSE, MAE, R², NRMSE, NMAE) for the validation epoch.
     """
     device = 'cuda'  # device is GPU by default
 
@@ -452,9 +455,12 @@ def validate(model, val_loader, verbose=False):
     predictions, actuals = np.array(predictions), np.array(actuals)
     metrics_dict = calculate_metrics(predictions, actuals)
     rmse = metrics_dict['RMSE']
+    mae = metrics_dict['MAE']
     r2 = metrics_dict['R2']
+    nrmse = metrics_dict['Normalized RMSE']
+    nmae = metrics_dict['Normalized MAE']
 
-    return avg_loss, rmse, r2
+    return avg_loss, rmse, mae, r2, nrmse, nmae
 
 
 def test(model, test_loader, output_csv):
@@ -590,8 +596,11 @@ def run_default_model(train_loader, val_loader,
         epoch = epoch + 1  # making epoch starting from 1
 
         # training and validation for one epoch
-        train_loss, train_rmse, train_r2 = train(model, train_loader, optimizer)
-        val_loss, val_rmse, val_r2 = validate(model, val_loader)
+        train_loss, train_rmse, train_mae, train_r2, train_nrmse, train_nmae = \
+            train(model, train_loader, optimizer)
+
+        val_loss, val_rmse, val_mae, val_r2, val_nrmse, val_nmae = \
+            validate(model, val_loader)
 
         # storing losses
         train_losses.append(train_loss)
@@ -607,8 +616,8 @@ def run_default_model(train_loader, val_loader,
 
         # printing progress
         if verbose and epoch % 10 == 0:
-            print(f'Train Epoch: {epoch} | Loss: {train_loss:.3f} | RMSE: {train_rmse:.3f} | R²: {train_r2:.3f}')
-            print(f'Val   Epoch: {epoch} | Loss: {val_loss:.3f}   | RMSE: {val_rmse:.3f}   | R²: {val_r2:.3f}')
+            print(f'Train Epoch: {epoch} | Loss: {train_loss:.3f} | RMSE: {train_rmse:.3f} | MAE: {train_mae:.3f} | R²: {train_r2:.3f} | NRMSE: {train_nrmse:.3f} | NMAE: {train_nmae:.3f}')
+            print(f'Val   Epoch: {epoch} | Loss: {val_loss:.3f}   | RMSE: {val_rmse:.3f}   | MAE: {val_mae:.3f}   | R²: {val_r2:.3f}   | NRMSE: {val_nrmse:.3f}   | NMAE: {val_nmae:.3f}')
             print('---------------------------------------------------------------------')
 
         # checking for early stopping
@@ -619,8 +628,8 @@ def run_default_model(train_loader, val_loader,
                 break
 
     # printing final performance (last trained epoch)
-    print(f'Final Train Epoch: {last_epoch} | Loss: {train_loss:.3f} | RMSE: {train_rmse:.3f} | R²: {train_r2:.3f}')
-    print(f'Final Val   Epoch: {last_epoch} | Loss: {val_loss:.3f}   | RMSE: {val_rmse:.3f}   | R²: {val_r2:.3f}')
+    print(f'Final Train Epoch: {epoch} | Loss: {train_loss:.3f} | RMSE: {train_rmse:.3f} | MAE: {train_mae:.3f} | R²: {train_r2:.3f} | NRMSE: {train_nrmse:.3f} | NMAE: {train_nmae:.3f}')
+    print(f'Final Val   Epoch: {epoch} | Loss: {val_loss:.3f}   | RMSE: {val_rmse:.3f}   | MAE: {val_mae:.3f}   | R²: {val_r2:.3f}   | NRMSE: {val_nrmse:.3f}   | NMAE: {val_nmae:.3f}')
     print('---------------------------------------------------------------------')
 
     # handling val_loss when early stopping is disabled

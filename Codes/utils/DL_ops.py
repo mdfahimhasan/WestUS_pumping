@@ -1033,7 +1033,7 @@ def plot_shap_summary_plot(trained_model_path, trained_model_info, use_samples,
                               'maxRH': 'Relative humidity (max)', 'minRH': 'Relative humidity (min)',
                               'shortRad': 'Shortwave radiation', 'vpd': 'Vapor pressure deficit',
                               'sunHr': 'Sun hour', 'FC': 'Field capacity',
-                              'SW_distance': 'Distance from surface water', 'Canal_density': 'Irrigation canal density'}
+                              'Canal_distance': 'Distance from canal', 'Canal_density': 'Canal density'}
         df = df.rename(columns=feature_names_dict)
         feature_names = np.array(df.columns.tolist())
 
@@ -1058,8 +1058,9 @@ def plot_shap_summary_plot(trained_model_path, trained_model_info, use_samples,
         pass
 
 
-def plot_shap_interaction_plot(model_version, features_to_plot, trained_model_path,
-                               trained_model_info, use_samples,
+def plot_shap_interaction_plot(model_version, features_to_plot,
+                               trained_model_path, trained_model_info,
+                               feature_excluded_in_training, use_samples,
                                data_csv, save_plot_dir,
                                skip_processing=False):
     """
@@ -1085,6 +1086,8 @@ def plot_shap_interaction_plot(model_version, features_to_plot, trained_model_pa
 
     :param trained_model_info: str
         Path to the `.pkl` file with model configuration and metadata.
+
+    :param feature_excluded_in_training: List of features excluded in trainined model.
 
     :param use_samples: int
         Number of samples to randomly draw from the dataset for SHAP analysis.
@@ -1125,13 +1128,12 @@ def plot_shap_interaction_plot(model_version, features_to_plot, trained_model_pa
         print(f'\nplotting SHAP feature importance...')
 
         # loading data + random sampling + renaming dataframe features
-        exclude_features = ['lon', 'lat', 'year', 'pixelID', 'stateID']
 
-        if 'target' not in exclude_features:
-            exclude_features = exclude_features + ['target']
+        if 'target' not in feature_excluded_in_training:
+            feature_excluded_in_training = feature_excluded_in_training + ['target']
 
         df = pd.read_csv(data_csv)
-        df = df.drop(columns=exclude_features)
+        df = df.drop(columns=feature_excluded_in_training)
         df = df.sample(n=use_samples, random_state=43)  # sampling 'use_samples' of rows for SHAP plotting
 
         feature_names_dict = {'netGW_Irr': 'Consumptive groundwater use', 'peff': 'Effective precipitation',
@@ -1140,7 +1142,9 @@ def plot_shap_interaction_plot(model_version, features_to_plot, trained_model_pa
                               'maxRH': 'Relative humidity (max)', 'minRH': 'Relative humidity (min)',
                               'shortRad': 'Shortwave radiation', 'vpd': 'Vapor pressure deficit',
                               'sunHr': 'Sun hour', 'FC': 'Field capacity',
-                              'SW_distance': 'Distance from surface water', 'Canal_density': 'Irrigation canal density'}
+                              'Canal_distance': 'Distance from canal',
+                              'Canal_density': 'Canal density'}
+
         df = df.rename(columns=feature_names_dict)
         feature_names = np.array(df.columns.tolist())
 
@@ -1176,7 +1180,7 @@ def plot_shap_interaction_plot(model_version, features_to_plot, trained_model_pa
             axs[i].imshow(img)
             axs[i].axis('off')
 
-        # hiding unsued axes if any
+        # hiding unused axes if any
         for j in range(i + 1, len(axs)):
             axs[j].axis('off')
 

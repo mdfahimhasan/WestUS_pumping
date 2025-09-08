@@ -42,7 +42,7 @@ def process_dataset_for_LOBO(model_version, basin_code, basin_shape,
             westUS_pumping_rasters = glob(os.path.join(westUS_pumping_dir, '*.tif'))
 
             # pumping for fitting (training)
-            fitting_output_dir = f'../../Data_main/rasters/MLP_LOBO/{basin_code}/fitting/pumping'
+            fitting_output_dir = f'../../Data_main/rasters/ANN_LOBO/{basin_code}/fitting/pumping'
 
             for ras in westUS_pumping_rasters:
                 raster_name = os.path.basename(ras)
@@ -51,15 +51,15 @@ def process_dataset_for_LOBO(model_version, basin_code, basin_shape,
                                             output_dir=fitting_output_dir, raster_name=raster_name)
 
             # pumping for holdout
-            holdout_dir = f'../../Data_main/rasters/MLP_LOBO/{basin_code}/holdout/pumping'
+            holdout_dir = f'../../Data_main/rasters/ANN_LOBO/{basin_code}/holdout/pumping'
 
             for ras in westUS_pumping_rasters:
                 raster_name = os.path.basename(ras)
                 mask_raster_by_shape(input_raster=ras, input_shape=basin_shape, crop=False,
                                      output_dir=holdout_dir, raster_name=raster_name)
         else:
-            fitting_output_dir = f'../../Data_main/rasters/MLP_LOBO/{basin_code}/fitting/pumping'
-            holdout_dir = f'../../Data_main/rasters/MLP_LOBO/{basin_code}/holdout/pumping'
+            fitting_output_dir = f'../../Data_main/rasters/ANN_LOBO/{basin_code}/fitting/pumping'
+            holdout_dir = f'../../Data_main/rasters/ANN_LOBO/{basin_code}/holdout/pumping'
 
         # --------------------------------------------------------------------------------------------------------------
         # Dataframe creation + train-val split + standardization (for Train and validation dataset)
@@ -77,7 +77,7 @@ def process_dataset_for_LOBO(model_version, basin_code, basin_shape,
                       2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019]
 
         # create dataframe
-        train_test_parquet_path = f'../../Model_run/MLP_model/LOBO/{model_version}/{basin_code}/train_val.parquet'
+        train_test_parquet_path = f'../../Model_run/ANN_model/LOBO/{model_version}/{basin_code}/train_val.parquet'
 
         create_train_test_dataframe(years_list=years_list,
                                     yearly_data_path_dict=annual_training_data_path_dict,
@@ -88,7 +88,7 @@ def process_dataset_for_LOBO(model_version, basin_code, basin_shape,
                                     skip_processing=skip_df_creation)
 
         # train-test split
-        output_dir = f'../../Model_run/MLP_model/LOBO/{model_version}/{basin_code}'
+        output_dir = f'../../Model_run/ANN_model/LOBO/{model_version}/{basin_code}'
 
         split_train_val_test_set_v2(data_parquet=train_test_parquet_path, output_dir=output_dir,
                                     train_size=0.7, val_size=0.25, test_size=0.05,
@@ -132,7 +132,7 @@ def process_dataset_for_LOBO(model_version, basin_code, basin_shape,
                       2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019]
 
         # create dataframe
-        holdout_csv_path = f'../../Model_run/MLP_model/LOBO/{model_version}/{basin_code}/holdout.csv'
+        holdout_csv_path = f'../../Model_run/ANN_model/LOBO/{model_version}/{basin_code}/holdout.csv'
 
         holdout_csv = create_train_test_dataframe(years_list=years_list,
                                                   yearly_data_path_dict=annual_training_data_path_dict,
@@ -178,12 +178,12 @@ annual_data_path_dict = {i: j for i, j in data_path_dict.items() if i not in sta
 static_data_path_dict = {i: j for i, j in data_path_dict.items() if i in static_vars}  # static data paths
 
 # exclude columns during scaling
-exclude_columns_in_scaling = ['stateID', 'pixelID', 'year', 'lon', 'lat', 'target']
+exclude_columns_in_scaling = ['stateID', 'pixelID', 'year', 'target']
 
 if __name__ == '__main__':
 
     # flags
-    model_version = 'v5'
+    model_version = 'v6'
     skip_LOBO_GMD3 = False              ##### GMD3, KS
     skip_LOBO_GMD4 = False              ##### GMD4, KS
     skip_LOBO_RPB = False               ##### Republican Basin, CO
@@ -229,7 +229,6 @@ if __name__ == '__main__':
                              annual_data_path_dict=annual_data_path_dict, static_data_path_dict=static_data_path_dict,
                              exclude_columns_in_scaling=exclude_columns_in_scaling,
                              skip_processing=skip_LOBO_AR)
-
 
     # # San Luis Valley, CO
     process_dataset_for_LOBO(model_version=model_version, basin_code='SLV',

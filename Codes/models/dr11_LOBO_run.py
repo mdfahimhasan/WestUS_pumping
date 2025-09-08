@@ -37,7 +37,7 @@ def perform_LOBO(basin_code, model_version, exclude_features_from_training, skip
 
         # default variables (from hyperparameter tuning process)
         batch_size = 256
-        n_features = 16
+        n_features = 13
         n_epochs = 70
         activation = 'leakyrelu'
         lr = 0.001
@@ -51,12 +51,12 @@ def perform_LOBO(basin_code, model_version, exclude_features_from_training, skip
         }
 
         # directories
-        train_csv = f'../../Model_run/MLP_model/LOBO/{model_version}/{basin_code}/standardized/train.csv'
-        val_csv = f'../../Model_run/MLP_model/LOBO/{model_version}/{basin_code}/standardized/val.csv'
-        holdout_csv = f'../../Model_run/MLP_model/LOBO/{model_version}/{basin_code}/standardized/holdout.csv'
+        train_csv = f'../../Model_run/ANN_model/LOBO/{model_version}/{basin_code}/standardized/train.csv'
+        val_csv = f'../../Model_run/ANN_model/LOBO/{model_version}/{basin_code}/standardized/val.csv'
+        holdout_csv = f'../../Model_run/ANN_model/LOBO/{model_version}/{basin_code}/standardized/holdout.csv'
 
-        model_save_path = f'../../Model_run/DL_model/LOBO/{model_version}/{basin_code}/MLP_model.pth'
-        model_info_save_path = f'../../Model_run/DL_model/LOBO/{model_version}/{basin_code}/MLP_info.pth'
+        model_save_path = f'../../Model_run/DL_model/LOBO/{model_version}/{basin_code}/ANN_model.pth'
+        model_info_save_path = f'../../Model_run/DL_model/LOBO/{model_version}/{basin_code}/ANN_info.pth'
 
         # training model
         trained_model, model_info = main(train_data_csv=train_csv, val_data_csv=val_csv,
@@ -73,7 +73,7 @@ def perform_LOBO(basin_code, model_version, exclude_features_from_training, skip
                                            shuffle=False, features_to_exclude=exclude_features_from_training,
                                            batch_size=batch_size, verbose=False).get_dataloader()
 
-        holdout_results = f'../../Model_run/MLP_model/LOBO/{model_version}/{basin_code}/results/{basin_code}_results.csv'
+        holdout_results = f'../../Model_run/ANN_model/LOBO/{model_version}/{basin_code}/results/{basin_code}_results.csv'
 
         test(model=trained_model, test_loader=holdout_Loader, output_csv=holdout_results)
 
@@ -81,7 +81,7 @@ def perform_LOBO(basin_code, model_version, exclude_features_from_training, skip
         scatter_plot_of_same_vars(Y_pred=holdout_results_df['predicted'], Y_obsv=holdout_results_df['actual'],
                                   x_label='actual pumping (mm/year)', y_label='predicted pumping (mm/year)',
                                   plot_name=f'holdout_scatter_{basin_code}.jpeg',
-                                  savedir=f'../../Model_run/MLP_model/LOBO/{model_version}/{basin_code}/results',
+                                  savedir=f'../../Model_run/ANN_model/LOBO/{model_version}/{basin_code}/results',
                                   alpha=0.5, color_format='o', marker_size=5,
                                   title=f'performance on holdout set: {basin_code}',
                                   tick_interval=100)
@@ -91,14 +91,18 @@ def perform_LOBO(basin_code, model_version, exclude_features_from_training, skip
 
 
 # exclude columns during model training
-exclude_features_from_training = ['lon', 'lat', 'year', 'pixelID', 'stateID']
+exclude_features_from_training = ['year', 'pixelID', 'stateID',
+                                  'shortRad', 'minRH', 'netGW_Irr']
 
 if __name__ == '__main__':
     # # flags
-    model_version = 'v5'
+    model_version = 'v6'
     skip_LOBO_GMD3 = False              ##### GMD3, KS
     skip_LOBO_GMD4 = False              ##### GMD4, KS
     skip_LOBO_RPB = False               ##### Republican Basin, CO
+    skip_LOBO_SPB = False               ##### South Platte River Basin, CO
+    skip_LOBO_AR = False                ##### Arkansas River Basin, CO
+    skip_LOBO_SLV = False               ##### San Luis Valley, CO
     skip_LOBO_HQR = False               ##### Harquahala INA, AZ
     skip_LOBO_DOUG = False              ##### Douglas AMA, AZ
     skip_LOBO_PHX = False               ##### Phoenix AMA, AZ
@@ -115,33 +119,47 @@ if __name__ == '__main__':
                  exclude_features_from_training=exclude_features_from_training,
                  skip_processing=skip_LOBO_GMD4)
 
-    # # RPB, CO
+    # # Republican River Basin, CO
     perform_LOBO(basin_code='RPB', model_version=model_version,
                  exclude_features_from_training=exclude_features_from_training,
                  skip_processing=skip_LOBO_RPB)
 
+    # # South Platte River Basin, CO
+    perform_LOBO(basin_code='SPB', model_version=model_version,
+                 exclude_features_from_training=exclude_features_from_training,
+                 skip_processing=skip_LOBO_SPB)
+
+    # # Arkansas River Basin, CO
+    perform_LOBO(basin_code='AR', model_version=model_version,
+                 exclude_features_from_training=exclude_features_from_training,
+                 skip_processing=skip_LOBO_AR)
+
+    # # San Luis Valley, CO
+    perform_LOBO(basin_code='SLV', model_version=model_version,
+                 exclude_features_from_training=exclude_features_from_training,
+                 skip_processing=skip_LOBO_RPB)
 
     # # Douglas AMA, AZ
     perform_LOBO(basin_code='DOUG', model_version=model_version,
                  exclude_features_from_training=exclude_features_from_training,
                  skip_processing=skip_LOBO_DOUG)
 
-    # # Harquahala, AZ
+    # # Harquahala INA, AZ
     perform_LOBO(basin_code='HQR', model_version=model_version,
                  exclude_features_from_training=exclude_features_from_training,
                  skip_processing=skip_LOBO_HQR)
 
-    # # Phoenix, AZ
+    # # Phoenix AMA, AZ
     perform_LOBO(basin_code='PHX', model_version=model_version,
                  exclude_features_from_training=exclude_features_from_training,
                  skip_processing=skip_LOBO_PHX)
 
-    # # Pinal, AZ
+    # # Pinal AMA, AZ
     perform_LOBO(basin_code='PNL', model_version=model_version,
                  exclude_features_from_training=exclude_features_from_training,
                  skip_processing=skip_LOBO_PNL)
 
-    # # Santa Cruz, AZ
+    # # Santa Cruz AMA, AZ
     perform_LOBO(basin_code='SCRUZ', model_version=model_version,
                  exclude_features_from_training=exclude_features_from_training,
                  skip_processing=skip_LOBO_SCRUZ)

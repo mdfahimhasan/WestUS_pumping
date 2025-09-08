@@ -15,7 +15,7 @@ from Codes.utils.DL_ops import DataLoaderCreator, main, plot_learning_curve, tes
 
 if __name__ == '__main__':
     # # # model version
-    model_version = 'v5'                                ################################################################
+    model_version = 'v6'                                ################################################################
 
     # # # model switches
     # setting 'RUN_MODEL' to False will skip all model running processing
@@ -33,7 +33,7 @@ if __name__ == '__main__':
 
     # # # default variables (from hyperparameter tuning process)
     batch_size = 256
-    n_features = 16
+    n_features = 13
     n_epochs = 70
     lr = 0.001
     lr_scheduler = 'CosineAnnealingLR'
@@ -42,7 +42,8 @@ if __name__ == '__main__':
     start_earlyStopping_at_epoch = 20
     # using optimizer 'AdamW'
 
-    exclude_features_from_training = ['lon', 'lat', 'year', 'pixelID', 'stateID']
+    exclude_features_from_training = ['year', 'pixelID', 'stateID',
+                                      'shortRad', 'minRH', 'netGW_Irr']
 
     # default model architecture
     default_params = {
@@ -52,14 +53,14 @@ if __name__ == '__main__':
     }
 
     # # # directories
-    train_csv = f'../../Model_run/MLP_model/Model_csv/standardized/train.csv'
-    val_csv = f'../../Model_run/MLP_model/Model_csv/standardized/val.csv'
-    test_csv = f'../../Model_run/MLP_model/Model_csv/standardized/test.csv'
+    train_csv = f'../../Model_run/ANN_model/Model_csv/standardized/train.csv'
+    val_csv = f'../../Model_run/ANN_model/Model_csv/standardized/val.csv'
+    test_csv = f'../../Model_run/ANN_model/Model_csv/standardized/test.csv'
 
-    model_save_path = f'../../Model_run/MLP_model/model_{model_version}.pth'
-    model_info_save_path = f'../../Model_run/MLP_model/model_info_{model_version}.pth'
-    hyperparam_importance_plot = f'../../Model_run/MLP_model//hyperparam_imp_{model_version}.jpg'
-    learning_curve_plot = f'../../Model_run/MLP_model/learning_curve_{model_version}.jpg'
+    model_save_path = f'../../Model_run/ANN_model/model_{model_version}.pth'
+    model_info_save_path = f'../../Model_run/ANN_model/model_info_{model_version}.pth'
+    hyperparam_importance_plot = f'../../Model_run/ANN_model/Plots/hyperparam_imp_{model_version}.jpg'
+    learning_curve_plot = f'../../Model_run/ANN_model/Plots/learning_curve_{model_version}.jpg'
 
     if RUN_MODEL:
 
@@ -90,18 +91,18 @@ if __name__ == '__main__':
                                        shuffle=False, features_to_exclude=exclude_features_from_training,
                                        batch_size=batch_size, verbose=False).get_dataloader()
 
-        test_results = f'../../Model_run/MLP_model/output_csv/test_results_{model_version}.csv'
+        test_results = f'../../Model_run/ANN_model/output_csv/test_results_{model_version}.csv'
         test(model=trained_model, test_loader=testLoader, output_csv=test_results)
 
         calc_rangeWise_RMSE(results_csv=test_results, value_ranges=[0, 100, 200, 400, 500, 600, 800, 1400],
-                            output_txt=f'../../Model_run/MLP_model/output_csv/test_results_rangeWise_{model_version}.txt')
+                            output_txt=f'../../Model_run/ANN_model/output_csv/test_results_rangeWise_{model_version}.txt')
 
         print('Validation performance:')
         valLoader = DataLoaderCreator(data_csv=val_csv,
                                        shuffle=False, features_to_exclude=exclude_features_from_training,
                                        batch_size=batch_size, verbose=False).get_dataloader()
 
-        val_results = f'../../Model_run/MLP_model/output_csv/val_results_{model_version}.csv'
+        val_results = f'../../Model_run/ANN_model/output_csv/val_results_{model_version}.csv'
         test(model=trained_model, test_loader=valLoader, output_csv=val_results)
 
         # --------------------------------------------------------------------------------------------------------------
@@ -114,16 +115,16 @@ if __name__ == '__main__':
         test_results_df = pd.read_csv(test_results)
         scatter_plot_of_same_vars(Y_pred=test_results_df['predicted'], Y_obsv=test_results_df['actual'],
                                   x_label='actual pumping (mm/year)', y_label='predicted pumping (mm/year)',
-                                  plot_name=f'test_scatter_{model_version}.jpeg',
-                                  savedir=f'../../Model_run/MLP_model', alpha=0.5,
+                                  plot_name=f'test_scatter_{model_version}.jpg',
+                                  savedir=f'../../Model_run/ANN_model/Plots/', alpha=0.5,
                                   color_format='o', marker_size=5, title='performance on test set',
                                   tick_interval=200)
 
         val_results_df = pd.read_csv(val_results)
         scatter_plot_of_same_vars(Y_pred=val_results_df['predicted'], Y_obsv=val_results_df['actual'],
                                   x_label='actual pumping (mm/year)', y_label='predicted pumping (mm/year)',
-                                  plot_name=f'val_scatter_{model_version}.jpeg',
-                                  savedir=f'../../Model_run/MLP_model', alpha=0.5,
+                                  plot_name=f'val_scatter_{model_version}.jpg',
+                                  savedir=f'../../Model_run/ANN_model/Plots/', alpha=0.5,
                                   color_format='o', marker_size=5, title='performance on validation set',
                                   tick_interval=200)
 
@@ -135,25 +136,27 @@ if __name__ == '__main__':
     plot_shap_summary_plot(trained_model_path=model_save_path, trained_model_info=model_info_save_path,
                            use_samples=2000, data_csv=test_csv,
                            exclude_features=exclude_features_from_training,
-                           save_plot_path=f'../../Model_run/MLP_model/SHAP/SHAP_summary_{model_version}.png',
+                           save_plot_path=f'../../Model_run/ANN_model/SHAP/SHAP_summary_{model_version}.png',
                            skip_processing=skip_SHAP_summary_plot)
 
     # SHAP interaction plot
-    features_to_plot = ['Consumptive groundwater use', 'Effective precipitation', 'Shortwave radiation',
-                        'Irrigated crop fraction', 'ET', 'Reference ET', 'Field capacity',
-                        'Precipitation', 'Surface water irrigation', 'Distance from surface water',
-                        'Irrigation canal density']
+    features_to_plot = ['Effective precipitation', 'Irrigated crop fraction',
+                        'ET', 'Reference ET', 'Field capacity', 'Precipitation',
+                        'Surface water irrigation', 'Distance from canal',
+                        'Canal density']
+
     plot_shap_interaction_plot(model_version=model_version,
                                features_to_plot=features_to_plot, trained_model_path=model_save_path,
                                trained_model_info=model_info_save_path, use_samples=2000, data_csv=test_csv,
-                               save_plot_dir=f'../../Model_run/MLP_model/SHAP',
+                               feature_excluded_in_training=exclude_features_from_training,
+                               save_plot_dir=f'../../Model_run/ANN_model/SHAP',
                                skip_processing=skip_SHAP_interaction_plot)
 
     # ------------------------------------------------------------------------------------------------------------------
     # 5. Annual GW pumping prediction
     # ------------------------------------------------------------------------------------------------------------------
-    annual_standardized_df_dir = f'../../Model_run/MLP_model/Model_csv/annual_csv/standardized'
-    nan_pos_dir = f'../../Model_run/MLP_model/Model_csv/annual_csv'
+    annual_standardized_df_dir = f'../../Model_run/ANN_model/Model_csv/annual_csv/standardized'
+    nan_pos_dir = f'../../Model_run/ANN_model/Model_csv/annual_csv'
     predicted_raster_dir = f'../../Data_main/rasters/pumping_prediction/{model_version}'
     WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
 

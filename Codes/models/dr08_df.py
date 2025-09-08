@@ -68,15 +68,15 @@ def create_train_test_dataframe(years_list, yearly_data_path_dict,
                         variable_dict[var] = list(data_arr)
                         variable_dict['year'] = list([year] * len(list(data_arr)))
 
-                        variable_dict['lon'] = list(lon_arr)
-                        variable_dict['lat'] = list(lat_arr)
+                        # variable_dict['lon'] = list(lon_arr)
+                        # variable_dict['lat'] = list(lat_arr)
 
                     else:
                         variable_dict[var].extend(list(data_arr))
                         variable_dict['year'].extend(list([year] * len(list(data_arr))))
 
-                        variable_dict['lon'].extend(list(lon_arr))
-                        variable_dict['lat'].extend(list(lat_arr))
+                        # variable_dict['lon'].extend(list(lon_arr))
+                        # variable_dict['lat'].extend(list(lat_arr))
 
         # static data compilation
         if static_data_path_dict is not None:
@@ -228,8 +228,8 @@ def calc_scaling_statistics(train_csv, features_to_exclude,
         features_to_exclude.add('stateID')  # exclude 'stateID'
         features_to_exclude.add('pixelID')  # exclude 'pixelID'
         features_to_exclude.add('year')     # exclude 'year'
-        features_to_exclude.add('lon')      # exclude 'lon'
-        features_to_exclude.add('lat')      # exclude 'lat'
+        # features_to_exclude.add('lon')      # exclude 'lon'
+        # features_to_exclude.add('lat')      # exclude 'lat'
 
         valid_features = [i for i in train_df.columns if i not in features_to_exclude]
 
@@ -364,7 +364,7 @@ if __name__ == '__main__':
     static_data_path_dict = {i: j for i, j in data_path_dict.items() if i in static_vars}  # static data paths
 
     # exclude columns during scaling
-    exclude_columns_in_scaling = ['stateID', 'pixelID', 'year', 'lon', 'lat', 'target']
+    exclude_columns_in_scaling = ['stateID', 'pixelID', 'year', 'target']
 
     # training time periods
     years_list = [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
@@ -375,7 +375,7 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
 
     # create dataframe
-    dataframe_parquet_path = f'../../Model_run/MLP_model/Model_csv/dataframe.parquet'
+    dataframe_parquet_path = f'../../Model_run/ANN_model/Model_csv/dataframe.parquet'
 
     create_train_test_dataframe(years_list=years_list,
                                 yearly_data_path_dict=annual_data_path_dict,
@@ -386,7 +386,7 @@ if __name__ == '__main__':
                                 skip_processing=skip_df_creation)
 
     split_train_val_test_set_v2(data_parquet=dataframe_parquet_path,
-                                output_dir=f'../../Model_run/MLP_model/Model_csv',
+                                output_dir=f'../../Model_run/ANN_model/Model_csv',
                                 train_size=0.7, val_size=0.15, test_size=0.15,
                                 random_state=42, skip_processing=skip_train_val_test_split)
 
@@ -394,8 +394,8 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
     # Calculating standardization statistics
     # ------------------------------------------------------------------------------------------------------------------
-    train_csv = f'../../Model_run/MLP_model/Model_csv/train.csv'
-    standardized_output_dir = f'../../Model_run/MLP_model/Model_csv/standardized'
+    train_csv = f'../../Model_run/ANN_model/Model_csv/train.csv'
+    standardized_output_dir = f'../../Model_run/ANN_model/Model_csv/standardized'
 
     mean_dict, std_dict = \
         calc_scaling_statistics(train_csv=train_csv, features_to_exclude=exclude_columns_in_scaling,
@@ -405,10 +405,10 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
     # Standardizing train-val-test
     # ------------------------------------------------------------------------------------------------------------------
-    train_csv = f'../../Model_run/MLP_model/Model_csv/train.csv'
-    val_csv = f'../../Model_run/MLP_model/Model_csv/val.csv'
-    test_csv = f'../../Model_run/MLP_model/Model_csv/test.csv'
-    standardized_output_dir = f'../../Model_run/MLP_model/Model_csv/standardized'
+    train_csv = f'../../Model_run/ANN_model/Model_csv/train.csv'
+    val_csv = f'../../Model_run/ANN_model/Model_csv/val.csv'
+    test_csv = f'../../Model_run/ANN_model/Model_csv/test.csv'
+    standardized_output_dir = f'../../Model_run/ANN_model/Model_csv/standardized'
 
     standardize_train_val_test(split_csv=train_csv, mean_dict=mean_dict, std_dict=std_dict,
                                exclude_features_from_standardizing=exclude_columns_in_scaling,
@@ -437,7 +437,7 @@ if __name__ == '__main__':
     datasets_to_include = list(data_path_dict.keys())  # datasets to include in the main dataframe
     datasets_to_include.remove('target')
 
-    annual_dataframes_dir = f'../../Model_run/MLP_model/Model_csv/annual_csv'
+    annual_dataframes_dir = f'../../Model_run/ANN_model/Model_csv/annual_csv'
 
     create_annual_dataframes_for_pumping_prediction(years_list=list(range(2000, 2020)),
                                                     yearly_data_path_dict=annual_data_path_dict,
@@ -449,7 +449,7 @@ if __name__ == '__main__':
 
     # Standardization
     annual_dataframes = glob(os.path.join(annual_dataframes_dir, '*.csv'))
-    output_dir = f'../../Model_run/MLP_model/Model_csv/annual_csv/standardized'
+    output_dir = f'../../Model_run/ANN_model/Model_csv/annual_csv/standardized'
 
     for csv in annual_dataframes:
         standardize_annual_df(annual_csv=csv, mean_dict=mean_dict, std_dict=std_dict,

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-## running the dr09_mlp.py script on GPU nodes
+## running the dr09_ann.py script on GPU nodes
 
 #SBATCH --partition=smi_all
 #SBATCH --ntasks=30
@@ -10,5 +10,5 @@
 #SBATCH --mail-type=BEGIN,END,FAIL,TIME_LIMIT
 #SBATCH --mail-user=Fahim.Hasan@colostate.edu
 
-python dr09_mlp.py
+python dr09_ann.py
 

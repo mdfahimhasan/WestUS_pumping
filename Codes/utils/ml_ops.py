@@ -749,7 +749,7 @@ def create_pdplots(trained_model, x_train, features_to_include, output_dir, plot
             'minRH': 'Min. relative humidity (%)', 'shortRad': 'Downward shortwave radiation (W/$m^2$)',
             'vpd': 'Vapour pressure deficit (kpa)', 'sunHr': 'Daylight duration (hr)',
             'SW_Irr': 'Surface water irrigation (mm/gs)', 'FC': 'Field capacity',
-            'Canal density': 'Canal density', 'Canal_distances': 'Distance from canals'
+            'Canal_density': 'Canal density', 'Canal_distance': 'Distance from canals'
         }
 
         # Subplot labels
@@ -931,7 +931,7 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
             'sw_huc12': 'Normalized HUC12 Surface water irrigation', 'gw_perc_huc12': 'Groundwater use % at HUC12',
             'climate': 'Climate', 'FC': 'Field capacity', 'spi': 'Standardized precipitation index',
             'spei': 'Standardized precipitation evapotranspiration index', 'eddi': 'Evaporative demand drought index',
-            'Canal density': 'Canal density', 'Canal_distances': 'Distance from canals'
+            'Canal_density': 'Canal density', 'Canal_distance': 'Distance from canals'
         }
 
         importances = importances.rename(columns=feature_name_dict)

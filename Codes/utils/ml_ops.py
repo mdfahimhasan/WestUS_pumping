@@ -100,9 +100,10 @@ def create_train_test_dataframe(years_list, yearly_data_path_dict,
 
                     if (year_count == 0) & (var not in variable_dict.keys()):
                         variable_dict[var] = list(data_arr)
-
+                        variable_dict['year'] = [year] * len(data_arr)
                     else:
                         variable_dict[var].extend(list(data_arr))
+                        variable_dict['year'].extend([year] * len(data_arr))
 
         # static data compilation
         if static_data_path_dict is not None:
@@ -288,6 +289,10 @@ def split_train_val_test_set_v2(data_parquet, pred_attr, exclude_columns, output
 
         y_train = train_df[[pred_attr]]
         y_test = test_df[[pred_attr]]
+
+        # Reindexing for ensuring that columns go into the model in same serial every time
+        x_train = reindex_df(x_train)
+        x_test = reindex_df(x_test)
 
         # saving
         x_train.to_csv(os.path.join(output_dir, f'x_train_{model_version}.csv'), index=False)
@@ -640,7 +645,7 @@ def test_model(trained_model, x_test, y_test, prediction_csv_path, categorical_c
     )
 
     # saving test prediction
-    test_obsv_predict_df = pd.DataFrame({'observed': y_test.values.ravel(),
+    test_obsv_predict_df = pd.DataFrame({'actual': y_test.values.ravel(),
                                          'predicted': y_pred_test})
     test_obsv_predict_df.to_csv(prediction_csv_path, index=False)
 

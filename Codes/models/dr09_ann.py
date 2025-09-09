@@ -26,10 +26,10 @@ if __name__ == '__main__':
     implement_earlyStopping = False                     #################################################################
     plot_hyperparam_importance = True                  #################################################################
 
-    skip_SHAP_summary_plot = False                      ################################################################
-    skip_SHAP_interaction_plot = False                  ################################################################
+    skip_SHAP_summary_plot = True                      ################################################################
+    skip_SHAP_interaction_plot = True                  ################################################################
 
-    skip_create_prediction_rasters = True              ################################################################
+    skip_create_prediction_rasters = False              ################################################################
 
     # # # default variables (from hyperparameter tuning process)
     batch_size = 256
@@ -157,7 +157,7 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
     annual_standardized_df_dir = f'../../Model_run/ANN_model/Model_csv/annual_csv/standardized'
     nan_pos_dir = f'../../Model_run/ANN_model/Model_csv/annual_csv'
-    predicted_raster_dir = f'../../Data_main/rasters/pumping_prediction/{model_version}'
+    predicted_raster_dir = f'../../Data_main/rasters/pumping_prediction/ANN/{model_version}'
     WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
 
     load_model_and_predict_raster(trained_model_path=model_save_path, trained_model_info=model_info_save_path,

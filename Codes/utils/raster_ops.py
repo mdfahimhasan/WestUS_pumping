@@ -4,7 +4,6 @@
 # Fahim.Hasan@colostate.edu
 
 import os
-import subprocess
 import numpy as np
 from glob import glob
 import rasterio as rio
@@ -16,7 +15,6 @@ from rasterio.enums import Resampling
 import astropy.convolution as apc
 from scipy.ndimage import gaussian_filter
 
-from Codes.utils.system_ops import make_gdal_sys_call
 from Codes.utils.system_ops import makedirs
 
 no_data_value = -9999
@@ -194,7 +192,7 @@ def set_nodata_inside_shapefile(input_raster, input_shape, output_dir,
     # opening input shapefile and taking it to a GeoJSON format
     shp_extent = gpd.read_file(input_shape)
     shp_extent = shp_extent.to_crs(crs=raster_file.crs)
-    geoms = [geom.__geo_interface__ for geom in shp_extent.geometry]   #GeoJSON format
+    geoms = [geom.__geo_interface__ for geom in shp_extent.geometry]  # GeoJSON format
 
     # masking
     masked_arr, mask_transform = mask(dataset=raster_file, shapes=geoms, filled=False,
@@ -210,7 +208,7 @@ def set_nodata_inside_shapefile(input_raster, input_shape, output_dir,
                 output_raster,
                 'w',
                 driver='GTiff',
-                height=masked_arr.shape[-2],          # using reverse indexing to handle multiband rasters
+                height=masked_arr.shape[-2],  # using reverse indexing to handle multiband rasters
                 width=masked_arr.shape[-1],
                 dtype=raster_arr.dtype,
                 count=raster_file.count,
@@ -226,7 +224,7 @@ def set_nodata_inside_shapefile(input_raster, input_shape, output_dir,
                 output_raster,
                 'w',
                 driver='GTiff',
-                height=masked_arr.shape[-2],          # using reverse indexing to handle multiband rasters
+                height=masked_arr.shape[-2],  # using reverse indexing to handle multiband rasters
                 width=masked_arr.shape[-1],
                 dtype=raster_arr.dtype,
                 count=raster_file.count,
@@ -240,7 +238,7 @@ def set_nodata_inside_shapefile(input_raster, input_shape, output_dir,
 
 
 def mosaic_rasters_from_directory(input_dir, output_dir, raster_name, ref_raster=WestUS_raster, search_by="*.tif",
-                                  dtype=None, resampling_method='nearest',mosaicing_method='first',
+                                  dtype=None, resampling_method='nearest', mosaicing_method='first',
                                   resolution=None, nodata=no_data_value):
     """
     Mosaics multiple rasters into a single raster from a directory (rasters have to be in the same directory).
@@ -497,23 +495,31 @@ def shapefile_to_raster(input_shape, output_dir, raster_name, burnvalue=None, us
 
     if use_attr:
         if add is not None:  # adds point values in the pixel
-            minx, miny, maxx, maxy = total_bounds
-            layer_name = os.path.basename(input_shape).split('.')[0]
-            args = ['-l', layer_name, '-a', attribute, '-tr', str(resolution), str(resolution), '-te', str(minx),
-                    str(miny), str(maxx), str(maxy), '-init', str(0.0), '-add', '-ot', 'Float32', '-of', 'GTiff',
-                    '-a_nodata', str(no_data_value), input_shape, output_raster]
-            sys_call = make_gdal_sys_call(gdal_command='gdal_rasterize', args=args)
-            subprocess.call(sys_call)
+            raster_options = gdal.RasterizeOptions(format='Gtiff', outputBounds=list(total_bounds),
+                                                   outputType=gdal.GDT_Float32, xRes=resolution, yRes=resolution,
+                                                   noData=no_data_value, attribute=attribute, allTouched=alltouched,
+                                                   initValues=0, add=True)
+            ds = gdal.Rasterize(destNameOrDestDS=output_raster, srcDS=input_shape, options=raster_options,
+                                resolution=resolution)
 
-        else:               # the value of the last point's attribute (in case of overlapping or multiple pts in a pixel)
-                            # will be burned in the raster
+            # the rasterize sets 0 initialization at nodata pixels too
+            # reapplying nodata values
+            band = ds.GetRasterBand(1)
+            arr = band.ReadAsArray()
+            arr[arr == 0] = no_data_value  # careful: this kills *real* zeros too
+            band.WriteArray(arr)
+            band.SetNoDataValue(no_data_value)
+            band.FlushCache()
+
+        else:  # the value of the last point's attribute (in case of overlapping or multiple pts in a pixel)
+            # will be burned in the raster
             raster_options = gdal.RasterizeOptions(format='Gtiff', outputBounds=list(total_bounds),
                                                    outputType=gdal.GDT_Float32, xRes=resolution, yRes=resolution,
                                                    noData=no_data_value, attribute=attribute, allTouched=alltouched)
             gdal.Rasterize(destNameOrDestDS=output_raster, srcDS=input_shape, options=raster_options,
                            resolution=resolution)
 
-    else:                   # will burn a specified value in the pixel
+    else:  # will burn a specified value in the pixel
         raster_options = gdal.RasterizeOptions(format='Gtiff', outputBounds=list(total_bounds),
                                                outputType=gdal.GDT_Float32, xRes=resolution, yRes=resolution,
                                                noData=no_data_value, burnValues=burnvalue,
@@ -761,5 +767,3 @@ def compute_proximity(input_raster, output_raster, target_values=(1,), nodataval
     inras_file, inras_band, dest_ds, dest_band = None, None, None, None
 
     return output_raster
-
-

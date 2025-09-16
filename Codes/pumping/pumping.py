@@ -23,9 +23,11 @@ import geopandas as gpd
 from pyproj import Transformer
 
 from os.path import dirname, abspath
+
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import makedirs
+from Codes.utils.vector_ops import clip_vector
 from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster, shapefile_to_raster
 
 no_data_value = -9999
@@ -194,7 +196,7 @@ def process_KS_pumping_csv(raw_csv, output_pump_csv, output_pump_shp,
     :param kwargs: dict (optional). Additional parameters:
                 - `cols_of_interest` (list of str): Columns to retain from the raw CSV file. Default includes:
                                                     `lat_nad83`, `long_nad83`, `gmd``source`,
-                                                     pumping data for years 2000-2020 (`AF_USED_IRR_*`),
+                                                     pumping data for years 2000-2023 (`AF_USED_*`),
                                                      and irrigated acreage data for years 2000-2020 (`ACRES_*`).
     :return: None.
     """
@@ -208,17 +210,20 @@ def process_KS_pumping_csv(raw_csv, output_pump_csv, output_pump_shp,
         # selecting columns of interest
         # using kwargs so that we can incorporate additional columns if needed
         columns_of_interest = kwargs.get('cols_of_interest',
-                                         ['long_nad83', 'lat_nad83', 'gmd', 'source', 'AF_USED_IRR_2000',
-                                          'AF_USED_IRR_2001', 'AF_USED_IRR_2002', 'AF_USED_IRR_2003', 'AF_USED_IRR_2004',
-                                          'AF_USED_IRR_2005', 'AF_USED_IRR_2006', 'AF_USED_IRR_2007', 'AF_USED_IRR_2008',
-                                          'AF_USED_IRR_2009', 'AF_USED_IRR_2010', 'AF_USED_IRR_2011', 'AF_USED_IRR_2012',
-                                          'AF_USED_IRR_2013', 'AF_USED_IRR_2014', 'AF_USED_IRR_2015', 'AF_USED_IRR_2016',
-                                          'AF_USED_IRR_2017', 'AF_USED_IRR_2018', 'AF_USED_IRR_2019', 'AF_USED_IRR_2020',
+                                         ['long', 'lat', 'gmd', 'source', 'AF_USED_2000',
+                                          'AF_USED_2001', 'AF_USED_2002', 'AF_USED_2003',
+                                          'AF_USED_2004', 'AF_USED_2005', 'AF_USED_2006',
+                                          'AF_USED_2007', 'AF_USED_2008', 'AF_USED_2009',
+                                          'AF_USED_2010', 'AF_USED_2011', 'AF_USED_2012',
+                                          'AF_USED_2013', 'AF_USED_2014', 'AF_USED_2015',
+                                          'AF_USED_2016', 'AF_USED_2017', 'AF_USED_2018',
+                                          'AF_USED_2019', 'AF_USED_2020', 'AF_USED_2021',
+                                          'AF_USED_2022', 'AF_USED_2023', 'AF_USED_2024',
                                           'ACRES_2000', 'ACRES_2001', 'ACRES_2002', 'ACRES_2003', 'ACRES_2004',
                                           'ACRES_2005', 'ACRES_2006', 'ACRES_2007', 'ACRES_2008', 'ACRES_2009',
                                           'ACRES_2010', 'ACRES_2011', 'ACRES_2012', 'ACRES_2013', 'ACRES_2014',
                                           'ACRES_2015', 'ACRES_2016', 'ACRES_2017', 'ACRES_2018', 'ACRES_2019',
-                                          'ACRES_2020'])
+                                          'ACRES_2020', 'ACRES_2021', 'ACRES_2022', 'ACRES_2023', 'ACRES_2024'])
 
         pumping_df = pumping_df[columns_of_interest]
 
@@ -227,7 +232,7 @@ def process_KS_pumping_csv(raw_csv, output_pump_csv, output_pump_shp,
         acres_columns = pumping_df.filter(like='ACRES').columns
 
         # for Acre-ft
-        af_melted = pumping_df.melt(id_vars=['lat_nad83', 'long_nad83', 'gmd', 'source'],
+        af_melted = pumping_df.melt(id_vars=['lat', 'long', 'gmd', 'source'],
                                     value_vars=list(af_columns),
                                     var_name='var1', value_name='AF_pumped')
 
@@ -235,7 +240,7 @@ def process_KS_pumping_csv(raw_csv, output_pump_csv, output_pump_shp,
         af_melted = af_melted.drop(columns=['var1'])
 
         # for Acres
-        acres_melted = pumping_df.melt(id_vars=['lat_nad83', 'long_nad83', 'gmd', 'source'],
+        acres_melted = pumping_df.melt(id_vars=['lat', 'long', 'gmd', 'source'],
                                        value_vars=list(acres_columns),
                                        var_name='var2', value_name='Acres')
 
@@ -243,7 +248,7 @@ def process_KS_pumping_csv(raw_csv, output_pump_csv, output_pump_shp,
         acres_melted = acres_melted.drop(columns=['var2'])
 
         # saving pumping csv and shapefile
-        af_melted = af_melted.rename(columns={'lat_nad83': 'Lat', 'long_nad83': 'Lon'})
+        af_melted = af_melted.rename(columns={'lat': 'Lat', 'long': 'Lon'})
         af_melted.to_csv(output_pump_csv, index=False)
 
         af_melted_gdf = gpd.GeoDataFrame(af_melted,
@@ -253,7 +258,7 @@ def process_KS_pumping_csv(raw_csv, output_pump_csv, output_pump_shp,
         af_melted_gdf.to_file(output_pump_shp)
 
         # saving acres records
-        acres_melted = acres_melted.rename(columns={'lat_nad83': 'Lat', 'long_nad83': 'Lon'})
+        acres_melted = acres_melted.rename(columns={'lat': 'Lat', 'long': 'Lon'})
         acres_melted.to_csv(output_acres_csv, index=False)
 
     else:
@@ -341,9 +346,10 @@ def process_UT_pumping_data(raw_csv, output_pump_shp, skip_process=False, **kwar
         pumping_df = pd.read_csv(raw_csv)
 
         # selecting columns of interest
-        columns_of_interest = kwargs.get('selected_columns_from_csv', ['Lat NAD83', 'Lon NAD83', 'System Name', 'Source Name',
-                                                                       'Source Status', 'Source Type', 'Diversion Type',
-                                                                       'Use Type', 'Method of Measurement', 'Year', 'Total'])
+        columns_of_interest = kwargs.get('selected_columns_from_csv',
+                                         ['Lat NAD83', 'Lon NAD83', 'System Name', 'Source Name',
+                                          'Source Status', 'Source Type', 'Diversion Type',
+                                          'Use Type', 'Method of Measurement', 'Year', 'Total'])
         pumping_df = pumping_df[columns_of_interest]
 
         # applying filter conditions
@@ -473,7 +479,6 @@ def pumping_pts_to_raster_v1(state_code, years, pumping_pts_shp, pumping_attr_AF
                                                           surface_irrig_dir,
                                                           skip_processing=skip_outlier_removal)
 
-
             # filling nan positions (0 values) with -9999 as
             # -9999 is used for discarding no pumping data for tile creation
             pumping_mm_arr[pumping_mm_arr == 0] = -9999
@@ -536,7 +541,7 @@ def filter_out_low_high_pumping_values_v1(year, pumping_arr, ET_dir,
         ET_arr = np.where(ET_arr > 1e-6, ET_arr, np.nan)  # 1e-6 used as threshold to avoid division by very small value
         total_water = np.where(total_water > 0, total_water, np.nan)
 
-        water_frac = np.where(~np.isnan(total_water) & ~np.isnan(ET_arr), total_water/ET_arr, -9999)
+        water_frac = np.where(~np.isnan(total_water) & ~np.isnan(ET_arr), total_water / ET_arr, -9999)
 
         # applying filter to identify valid pumping values
         mask = (water_frac >= low_fraction) & (water_frac <= high_fraction) & (ET_arr != -9999)
@@ -615,7 +620,7 @@ def pumping_pts_to_raster_v2(state_code, years, pumping_pts_shp, pumping_attr_AF
     if not skip_processing:
         print(f'Creating pumping rasters for {state_code}...')
 
-        # creating sub-directories
+        # creating subdirectories
         annual_pump_shp_dir = os.path.join(output_dir, 'annual_pumping_shp')
         pumping_AF_dir = os.path.join(output_dir, 'pumping_AF')
         pumping_mm_dir = os.path.join(output_dir, 'pumping_mm')
@@ -669,18 +674,26 @@ def pumping_pts_to_raster_v2(state_code, years, pumping_pts_shp, pumping_attr_AF
         pass
 
 
-def combine_pumping_rasters(years, KS_dir, CO_dir, AZ_dir, irr_cropland_dir,
-                            output_dir, skip_processing=False):
+def combine_pumping_rasters(years, years_no_data_dict, KS_dir, CO_dir, AZ_dir, irr_cropland_dir,
+                            output_dir, ref_raster=WestUS_raster,
+
+                            skip_processing=False):
     """
     Combines multiple pumping rasters into a final pumping raster by replacing zero values
     in a reference raster with corresponding pumping data. Sets remaining zero values to -9999.
 
     :param years: List/Tuple of years to process data for.
+    :param years_no_data_dict: A dictionary with information of what years of pumping data not available/processed for
+                           KS, CO, and AZ ---
+                           {'KS': list(range(2021, 2024)),
+                           'CO': list(range(2000, 2011)),
+                           'AZ': []}
     :param KS_dir: Annual pumping data directory (rasters) for Kansas.
     :param CO_dir: Annual pumping data directory (rasters) for Colorado.
     :param AZ_dir: Annual pumping data directory (rasters) for Arizona.
     :param irr_cropland_dir: Annual irrigated cropland directory to apply irrigated cropland filter.
     :param output_dir: Path to save the combined pumping rasters.
+    :param ref_raster: Filepath of reference raster.
     :param skip_processing: Set to True to skip this process. Default set to False.
 
     :returns None.
@@ -695,25 +708,39 @@ def combine_pumping_rasters(years, KS_dir, CO_dir, AZ_dir, irr_cropland_dir,
         # processing the output annual pumping raster for each year
         for year in years:
             # reading pumping data for each year for given states
-            KS_data = glob(os.path.join(KS_dir, f'*{year}*.tif'))[0]
-            CO_data = glob(os.path.join(CO_dir, f'*{year}*.tif'))[0]
-            AZ_data = glob(os.path.join(AZ_dir, f'*{year}*.tif'))[0]
+            if year not in years_no_data_dict['KS']:
+                KS_data = glob(os.path.join(KS_dir, f'*{year}*.tif'))[0]
+                KS_arr = read_raster_arr_object(KS_data, get_file=False)
+            else:
+                KS_arr = None
 
-            KS_arr, file = read_raster_arr_object(KS_data)
-            CO_arr = read_raster_arr_object(CO_data, get_file=False)
-            AZ_arr = read_raster_arr_object(AZ_data, get_file=False)
+            if year not in years_no_data_dict['CO']:
+                CO_data = glob(os.path.join(CO_dir, f'*{year}*.tif'))[0]
+                CO_arr = read_raster_arr_object(CO_data, get_file=False)
+            else:
+                CO_arr = None
+
+            if year not in years_no_data_dict['AZ']:
+                AZ_data = glob(os.path.join(AZ_dir, f'*{year}*.tif'))[0]
+                AZ_arr = read_raster_arr_object(AZ_data, get_file=False)
+            else:
+                AZ_arr = None
+
+            # initializing a zero array to store pumping data
+            ref_arr, ref_file = read_raster_arr_object(ref_raster)
+            pump_arr = np.zeros_like(ref_arr)
+
+            # replacing zero value of reference raster with pumping value
+            if KS_arr is not None:
+                pump_arr = np.where(KS_arr > 0, KS_arr, pump_arr)
+            if CO_arr is not None:
+                pump_arr = np.where(CO_arr > 0, CO_arr, pump_arr)
+            if AZ_arr is not None:
+                pump_arr = np.where(AZ_arr > 0, AZ_arr, pump_arr)
 
             # irrigated cropland data for the year
             irr_cropland = glob(os.path.join(irr_cropland_dir, f'*{year}*.tif'))[0]
             irr_arr = read_raster_arr_object(irr_cropland, get_file=False)
-
-            # initializing a zero array to store pumping data
-            pump_arr = np.zeros_like(KS_arr)
-
-            # replacing zero value of reference raster with pumping value
-            pump_arr = np.where(KS_arr > 0, KS_arr, pump_arr)
-            pump_arr = np.where(CO_arr > 0, CO_arr, pump_arr)
-            pump_arr = np.where(AZ_arr > 0, AZ_arr, pump_arr)
 
             # Setting nan value for pixels that are not irrigated per irrigated cropland data
             pump_arr = np.where(np.isnan(irr_arr), -9999, pump_arr)
@@ -723,7 +750,7 @@ def combine_pumping_rasters(years, KS_dir, CO_dir, AZ_dir, irr_cropland_dir,
 
             # saving finalized pumping array as raster
             output_raster = os.path.join(output_dir, f'pumping_{year}.tif')
-            write_array_to_raster(pump_arr, file, file.transform, output_raster)
+            write_array_to_raster(pump_arr, ref_file, ref_file.transform, output_raster)
 
     else:
         pass
@@ -734,24 +761,30 @@ if __name__ == '__main__':
     # Unless specifically required (you want to start from scratch), running these processes is not necessary.
     # Rather use the final rasterized pumping data provided with the model.
 
-    skip_process_AZ_pumping = True  # # caution: the processed files might have been further post-processed. Follow caution in setting this to 'False'.
-    skip_process_KS_pumping = True  # No post-processing performed for this dataset
-    skip_process_CO_pumping = True  # # caution: the processed files might have been further post-processed. Follow caution in setting this to 'False'.
-    skip_process_UT_pumping = True  # # caution: the processed files might have been further post-processed. Follow caution in setting this to 'False'.
+    skip_process_AZ_pumping = True        #######
+    skip_irrig_zone_filter_AZ = True      #######
+    skip_make_AZ_pumping_raster = True    #######
 
-    skip_make_AZ_pumping_raster = False   #######
-    skip_make_KS_pumping_raster = False   #######
-    skip_make_CO_pumping_raster = False   #######
+    skip_process_KS_pumping = True        # No post-processing performed for this dataset
+    skip_make_KS_pumping_raster = True    #######
 
-    skip_combine_pumping_rasters = False  #######
+    skip_process_CO_pumping = True        # # caution: the processed files might have been further post-processed. Follow caution in setting this to 'False'.
+    skip_irrig_zone_filter_CO = True      #######
+    skip_make_CO_pumping_raster = True    #######
 
+    skip_process_UT_pumping = True        # # caution: the processed files might have been further post-processed. Follow caution in setting this to 'False'.
 
+    skip_combine_pumping_rasters = True   #######
+
+    ####################################################################################################################
     # # Arizona
+    ####################################################################################################################
+    # compile from raw data
     process_AZ_pumping_csv(
         raw_csv_dir='../../Data_main/Pumping/Arizona/raw',
         well_reg_shp='../../Data_main/pumping/Arizona/Well_Registry/WellRegistry.shp',
         well_reg_dict='../../Data_main/pumping/Arizona/Well_coords_dict.pkl',
-        output_shp='../../Data_main/pumping/Arizona/Final/pumping_AZ_v0.shp',  # # this is a preliminary version that might have undergone hand filtering/processing
+        output_shp='../../Data_main/pumping/Arizona/Final/pumping_AZ_v0.shp',
         skip_process_Well_registry_file=True,
         skip_process=skip_process_AZ_pumping,
         selected_columns_from_csv=['Well Id', 'AMA INA', 'YEAR', 'Right Type',
@@ -762,24 +795,39 @@ if __name__ == '__main__':
         }
     )
 
-    pumping_pts_to_raster_v2(state_code='AZ', years=list(range(2000, 2020)),  # up to 2019 as Peff data (used for filtering) is available up to 2019
-                             pumping_pts_shp='../../Data_main/pumping/Arizona/Final/pumping_AZ_v1.shp',  # # make sure that this is the final filtered pumping shapefile
+    # clip for major irrigated zones
+    if not skip_irrig_zone_filter_AZ:
+        clip_vector(input_shapefile='../../Data_main/pumping/Arizona/Final/pumping_AZ_v0.shp',
+                    mask_shapefile='../../Data_main/pumping/Arizona/major_irrig_zones/major_irrig_zones_AZ.shp',
+                    output_shapefile='../../Data_main/pumping/Arizona/Final/pumping_AZ_v1.shp',
+                    change_crs=None, create_zero_buffer=False)
+
+    # make 2 km rasters
+    # up to 2023, as Peff data (used for filtering) is available up to 2023
+    pumping_pts_to_raster_v2(state_code='AZ', years=list(range(2000, 2024)),
+                             pumping_pts_shp='../../Data_main/pumping/Arizona/Final/pumping_AZ_v1.shp',
                              pumping_attr_AF='AF_pumped',
                              year_attr='Year',
                              output_dir='../../Data_main/pumping/rasters/Arizona',
-                             lower_outlier_range=0,                        # not setting a low threshold
-                             upper_outlier_range=1500,                      # based on ET and netGW_Irr analysis
+                             lower_outlier_range=0,  # not setting a low threshold
+                             upper_outlier_range=1500,  # based on ET and netGW_Irr analysis
                              ref_raster=WestUS_raster, resolution=model_res,
                              skip_processing=skip_make_AZ_pumping_raster)
 
+    ####################################################################################################################
     # # Kansas
+    ####################################################################################################################
+
+    # # This pumping data didn't have to be filtered due to high quality
     process_KS_pumping_csv(raw_csv='../../Data_main/pumping/Kansas/csv/pumping_KS.csv',
                            output_pump_csv='../../Data_main/pumping/Kansas/Final/pumping_KS.csv',
-                           output_pump_shp='../../Data_main/pumping/Kansas/Final/pumping_KS.shp',  # # This pumping data didn't have to be filtered due to high quality
+                           output_pump_shp='../../Data_main/pumping/Kansas/Final/pumping_KS.shp',
                            output_acres_csv='../../Data_main/pumping/Kansas/pumping_acres_KS.csv',
                            skip_process=skip_process_KS_pumping)
 
-    pumping_pts_to_raster_v1(state_code='KS', years=list(range(2000, 2020)),  # up to 2019 as Peff data (used for filtering) is available up to 2019
+    # make 2 km rasters
+    # up to 2023 as Peff data (used for filtering) is available up to 2023
+    pumping_pts_to_raster_v1(state_code='KS', years=list(range(2000, 2024)),
                              pumping_pts_shp='../../Data_main/pumping/Kansas/Final/pumping_Ks.shp',
                              pumping_attr_AF='AF_pumped',
                              year_attr='Year',
@@ -791,15 +839,33 @@ if __name__ == '__main__':
                              surface_irrig_dir=None,
                              low_fraction=0.7,
                              high_fraction=1.5,
-                             skip_outlier_removal=False)    # implementing low-high pumping value removal in KS
+                             skip_outlier_removal=False)  # implementing low-high pumping value removal in KS
 
+    ####################################################################################################################
     # # Colorado
+    ####################################################################################################################
+    # compile frm raw data (v0)
     process_CO_pumping_data(raw_csv='../../Data_main/pumping/Colorado/raw/pumping_data.csv',
                             output_pump_shp='../../Data_main/Pumping/Colorado/Final/pumping_CO_v0.shp',  # # this is a preliminary version that might have undergone hand filtering/processing
                             skip_process=skip_process_CO_pumping)
 
-    pumping_pts_to_raster_v1(state_code='CO', years=list(range(2000, 2020)),  # up to 2019 as Peff data (used for filtering) is available up to 2019
-                             pumping_pts_shp='../../Data_main/pumping/Colorado/Final/pumping_CO_v2.shp',  # # make sure that this is the final filtered pumping shapefile
+    # hand filtering of data ---> v1
+
+    # clip for major irrigated zones (v2)
+    if not skip_irrig_zone_filter_CO:
+        clip_vector(input_shapefile='../../Data_main/pumping/Colorado/Final/pumping_CO_v1.shp',
+                    mask_shapefile='../../Data_main/pumping/Colorado/major_irrig_zones/major_irrig_zones_CO.shp',
+                    output_shapefile='../../Data_main/pumping/Colorado/Final/pumping_CO_v2.shp',
+                    change_crs=None, create_zero_buffer=False)
+
+    # download and process 2021-2023 pumping data and merge with v2 data ---> v3
+    # check the 'CO_pumping_data_2021_2023_download.ipynb' script
+
+    # make 2 km rasters
+    # from 2011 up to 2023, as Peff data (used for filtering) is available up to 2023
+    # Pumping data for CO before 2010 isn't of good quality
+    pumping_pts_to_raster_v1(state_code='CO', years=list(range(2011, 2024)),
+                             pumping_pts_shp='../../Data_main/pumping/Colorado/Final/pumping_CO_v3.shp',
                              pumping_attr_AF='AF_pumped',
                              year_attr='Year',
                              output_dir='../../Data_main/pumping/rasters/Colorado',
@@ -812,22 +878,28 @@ if __name__ == '__main__':
                              high_fraction=1.5,
                              skip_outlier_removal=False)  # implementing low-high pumping value removal in CO
 
+    ####################################################################################################################
     # # Utah
+    ####################################################################################################################
     process_UT_pumping_data(raw_csv='../../Data_main/pumping/Utah/raw/WaterUse_Utah.csv',
-                            output_pump_shp='../../Data_main/pumping/Utah/Final/pumping_UT_v0.shp',  # # this is a preliminary version that might have undergone hand filtering/processing
+                            output_pump_shp='../../Data_main/pumping/Utah/Final/pumping_UT_v0.shp',
+                            # # this is a preliminary version that might have undergone hand filtering/processing
                             skip_process=skip_process_UT_pumping,
                             selected_columns_from_csv=['Lat NAD83', 'Lon NAD83', 'System Name', 'Source Name',
                                                        'Source Status', 'Source Type', 'Diversion Type',
                                                        'Use Type', 'Method of Measurement', 'Year', 'Total'],
                             filter_conditions={
-                                               'Source Type': 'Well',
-                                               'Diversion Type': 'Withdrawal',
-                                               'Use Type': ['Agricultural', 'irrigation']
-                                            }
+                                'Source Type': 'Well',
+                                'Diversion Type': 'Withdrawal',
+                                'Use Type': ['Agricultural', 'irrigation']
+                            }
                             )
 
     # # Combine states' pumping data into a combined pumping raster for Western US
-    combine_pumping_rasters(years=list(range(2000, 2020)),  # up to 2019 as Peff data (used for filtering) is available up to 2019
+    combine_pumping_rasters(years=list(range(2000, 2024)),
+                            years_no_data_dict={'KS': list(range(2021, 2024)),
+                                                'CO': list(range(2000, 2011)),
+                                                'AZ': []},
                             KS_dir='../../Data_main/pumping/rasters/Kansas/pumping_mm',
                             CO_dir='../../Data_main/pumping/rasters/Colorado/pumping_mm',
                             AZ_dir='../../Data_main/pumping/rasters/Arizona/pumping_mm',

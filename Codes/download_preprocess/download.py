@@ -169,20 +169,6 @@ def get_gee_dict(data_name):
     ee.Initialize(project='ee-fahim', opt_url='https://earthengine-highvolume.googleapis.com')
 
     gee_data_dict = {
-        'Landsat5_NDVI': 'LANDSAT/LT05/C02/T1_L2',
-        'Landsat8_NDVI': 'LANDSAT/LC08/C02/T1_L2',
-        'Landsat5_OSAVI': 'LANDSAT/LT05/C02/T1_L2',
-        'Landsat8_OSAVI': 'LANDSAT/LC08/C02/T1_L2',
-        'Landsat5_NDMI': 'LANDSAT/LT05/C02/T1_L2',
-        'Landsat8_NDMI': 'LANDSAT/LC08/C02/T1_L2',
-        'Landsat5_GCVI': 'LANDSAT/LT05/C02/T1_L2',
-        'Landsat8_GCVI': 'LANDSAT/LC08/C02/T1_L2',
-        'MODIS_Day_LST': 'MODIS/006/MOD11A2',  # check for cloudcover
-        'MODIS_Terra_NDVI': 'MODIS/061/MOD13Q1',  # cloudcover mask added later
-        'MODIS_Terra_EVI': 'MODIS/061/MOD13Q1',  # cloudcover mask added later
-        'MODIS_NDMI': 'MODIS/061/MOD09A1',  # cloudcover mask added later
-        'MODIS_NDVI': 'MODIS/061/MOD09A1',  # cloudcover mask added later
-        'MODIS_LAI': 'MODIS/061/MOD15A2H',
         'GRIDMET_Precip': 'IDAHO_EPSCOR/GRIDMET',
         'GRIDMET_RET': 'IDAHO_EPSCOR/GRIDMET',
         'GRIDMET_Tmax': 'IDAHO_EPSCOR/GRIDMET',
@@ -205,20 +191,6 @@ def get_gee_dict(data_name):
     }
 
     gee_band_dict = {
-        'Landsat5_NDVI': ['SR_B4', 'SR_B3'],    # all_bands for NIR and Red, respectively
-        'Landsat8_NDVI': ['SR_B5', 'SR_B4'],    # all_bands for NIR and Red, respectively
-        'Landsat5_OSAVI': ['SR_B4', 'SR_B3'],   # all_bands for NIR and Red, respectively
-        'Landsat8_OSAVI': ['SR_B5', 'SR_B4'],   # all_bands for NIR and Red, respectively
-        'Landsat5_NDMI': ['SR_B4', 'SR_B5'],    # all_bands for NIR and SWIR1, respectively
-        'Landsat8_NDMI': ['SR_B5', 'SR_B6'],    # all_bands for NIR and SWIR1, respectively
-        'Landsat5_GCVI': ['SR_B4', 'SR_B2'],    # all_bands for NIR and Green, respectively
-        'Landsat8_GCVI': ['SR_B4', 'SR_B2'],    # all_bands for NIR and Green, respectively,
-        'MODIS_Day_LST': 'LST_Day_1km',
-        'MODIS_Terra_NDVI': 'NDVI',
-        'MODIS_Terra_EVI': 'EVI',
-        'MODIS_NDMI': ['sur_refl_b02', 'sur_refl_b06'],  # all_bands for NIR and SWIR, respectively
-        'MODIS_NDVI': ['sur_refl_b02', 'sur_refl_b01'],  # all_bands for NIR and Red, respectively
-        'MODIS_LAI': 'Lai_500m',
         'GRIDMET_Precip': 'pr',  # daily total, unit in mm
         'GRIDMET_RET': 'etr',
         'GRIDMET_Tmax': 'tmmx',  # unit in K
@@ -241,21 +213,6 @@ def get_gee_dict(data_name):
     }
 
     gee_scale_dict = {
-        'Landsat5_NDVI': [0.0000275, -0.2],     # the first factor is multiplied, the second factor is an offset
-        'Landsat8_NDVI': [0.0000275, -0.2],     # the first factor is multiplied, the second factor is an offset
-        'Landsat5_OSAVI': [0.0000275, -0.2],    # the first factor is multiplied, the second factor is an offset
-        'Landsat8_OSAVI': [0.0000275, -0.2],    # the first factor is multiplied, the second factor is an offset
-        'Landsat5_NDMI': [0.0000275, -0.2],     # the first factor is multiplied, the second factor is an offset
-        'Landsat8_NDMI': [0.0000275, -0.2],     # the first factor is multiplied, the second factor is an offset
-        'Landsat5_GCVI': [0.0000275, -0.2],     # the first factor is multiplied, the second factor is an offset
-        'Landsat8_GCVI': [0.0000275, -0.2],     # the first factor is multiplied, the second factor is an offset
-        'MODIS_Day_LST': 0.02,
-        'MODIS_Terra_NDVI': 0.0001,
-        'MODIS_Terra_EVI': 0.0001,
-        'MODIS_NDMI': 0.0001,
-        'MODIS_NDVI': 0.0001,
-        'MODIS_LAI': 0.1,
-        'MODIS_ET': 0.1,
         'GRIDMET_Precip':1,
         'GRIDMET_RET': 1,
         'GRIDMET_Tmax':1,
@@ -279,20 +236,6 @@ def get_gee_dict(data_name):
     }
 
     aggregation_dict = {
-        'Landsat5_NDVI': ee.Reducer.median(),
-        'Landsat8_NDVI': ee.Reducer.median(),
-        'Landsat5_OSAVI': ee.Reducer.median(),
-        'Landsat8_OSAVI': ee.Reducer.median(),
-        'Landsat5_NDMI': ee.Reducer.median(),
-        'Landsat8_NDMI': ee.Reducer.median(),
-        'Landsat5_GCVI': ee.Reducer.median(),
-        'Landsat8_GCVI': ee.Reducer.median(),
-        'MODIS_Day_LST': ee.Reducer.mean(),
-        'MODIS_Terra_NDVI': ee.Reducer.median(),
-        'MODIS_Terra_EVI': ee.Reducer.median(),
-        'MODIS_NDMI': ee.Reducer.median(),
-        'MODIS_NDVI': ee.Reducer.median(),
-        'MODIS_LAI': ee.Reducer.mean(),
         'GRIDMET_Precip': ee.Reducer.sum(),
         'GRIDMET_RET': ee.Reducer.sum(),
         'GRIDMET_Tmax': ee.Reducer.mean(),
@@ -320,21 +263,6 @@ def get_gee_dict(data_name):
     # In most cases the end date is shifted a month later to cover the end month's data
 
     month_start_date_dict = {
-        'Landsat5_NDVI': datetime(1984, 3, 1),
-        'Landsat8_NDVI': datetime(2013, 3, 1),
-        'Landsat5_OSAVI': datetime(1984, 3, 1),
-        'Landsat8_OSAVI': datetime(2013, 3, 1),
-        'Landsat5_NDMI': datetime(1984, 3, 1),
-        'Landsat8_NDMI': datetime(2013, 3, 1),
-        'Landsat5_GCVI': datetime(1984, 3, 1),
-        'Landsat8_GCVI': datetime(2013, 3, 1),
-        'MODIS_Day_LST': datetime(2000, 2, 1),
-        'MODIS_Terra_NDVI': datetime(2000, 2, 1),
-        'MODIS_Terra_EVI': datetime(2000, 2, 1),
-        'MODIS_NDMI': datetime(2000, 2, 1),
-        'MODIS_NDVI': datetime(2000, 2, 1),
-        'MODIS_LAI': datetime(2000, 2, 1),
-        'MODIS_ET': datetime(2001, 1, 1),
         'GRIDMET_Precip': datetime(1979, 1, 1),
         'GRIDMET_RET': datetime(1979, 1, 1),
         'GRIDMET_Tmax': datetime(1979, 1, 1),
@@ -357,29 +285,15 @@ def get_gee_dict(data_name):
     }
 
     month_end_date_dict = {
-        'Landsat5_NDVI': datetime(2012, 5, 1),
-        'Landsat8_NDVI': datetime(2024, 1, 1),
-        'Landsat5_OSAVI': datetime(2012, 5, 1),
-        'Landsat8_OSAVI': datetime(2024, 1, 1),
-        'Landsat5_NDMI': datetime(2012, 5, 1),
-        'Landsat8_NDMI': datetime(2024, 1, 1),
-        'Landsat5_GCVI': datetime(2012, 5, 1),
-        'Landsat8_GCVI': datetime(2024, 1, 1),
-        'MODIS_Day_LST': datetime(2023, 8, 29),
-        'MODIS_Terra_NDVI': datetime(2023, 8, 13),
-        'MODIS_Terra_EVI': datetime(2023, 8, 13),
-        'MODIS_NDMI': datetime(2023, 8, 29),
-        'MODIS_NDVI': datetime(2023, 8, 29),
-        'MODIS_LAI': datetime(2023, 11, 9),
         'GRIDMET_Precip': datetime(2023, 9, 15),
-        'GRIDMET_RET': datetime(2022, 12, 1),
-        'GRIDMET_Tmax': datetime(2022, 12, 1),
-        'GRIDMET_maxRH': datetime(2022, 12, 1),
-        'GRIDMET_minRH': datetime(2022, 12, 1),
-        'GRIDMET_windVel': datetime(2022, 12, 1),
-        'GRIDMET_shortRad': datetime(2022, 12, 1),
-        'GRIDMET_vpd': datetime(2022, 12, 1),
-        'DAYMET_sunHr': datetime(2022, 12, 31),
+        'GRIDMET_RET': datetime(2024, 1, 1),
+        'GRIDMET_Tmax': datetime(2024, 1, 1),
+        'GRIDMET_maxRH': datetime(2024, 1, 1),
+        'GRIDMET_minRH': datetime(2024, 1, 1),
+        'GRIDMET_windVel': datetime(2024, 1, 1),
+        'GRIDMET_shortRad': datetime(2024, 1, 1),
+        'GRIDMET_vpd': datetime(2024, 1, 1),
+        'DAYMET_sunHr': datetime(2024, 1, 1),
         'USDA_CDL': datetime(2022, 1, 1),
         'Field_capacity': None,
         'Bulk_density': None,
@@ -393,20 +307,6 @@ def get_gee_dict(data_name):
     }
 
     year_start_date_dict = {
-        'Landsat5_NDVI': datetime(1984, 1, 1),
-        'Landsat8_NDVI': datetime(2013, 1, 1),
-        'Landsat5_OSAVI': datetime(1984, 1, 1),
-        'Landsat8_OSAVI': datetime(2013, 1, 1),
-        'Landsat5_NDMI': datetime(1984, 1, 1),
-        'Landsat8_NDMI': datetime(2013, 1, 1),
-        'Landsat5_GCVI': datetime(1984, 1, 1),
-        'Landsat8_GCVI': datetime(2013, 1, 1),
-        'MODIS_Day_LST': datetime(2000, 1, 1),
-        'MODIS_Terra_NDVI': datetime(2000, 1, 1),
-        'MODIS_Terra_EVI': datetime(2000, 1, 1),
-        'MODIS_NDMI': datetime(2000, 1, 1),
-        'MODIS_NDVI': datetime(2000, 1, 1),
-        'MODIS_LAI': datetime(2000, 1, 1),
         'GRIDMET_Precip': datetime(1979, 1, 1),
         'GRIDMET_RET': datetime(1979, 1, 1),
         'GRIDMET_Tmax': datetime(1979, 1, 1),
@@ -429,20 +329,6 @@ def get_gee_dict(data_name):
     }
 
     year_end_date_dict = {
-        'Landsat5_NDVI': datetime(2012, 1, 1),
-        'Landsat8_NDVI': datetime(2024, 1, 1),
-        'Landsat5_OSAVI': datetime(2012, 1, 1),
-        'Landsat8_OSAVI': datetime(2024, 1, 1),
-        'Landsat5_NDMI': datetime(2012, 1, 1),
-        'Landsat8_NDMI': datetime(2024, 1, 1),
-        'Landsat5_GCVI': datetime(2012, 1, 1),
-        'Landsat8_GCVI': datetime(2024, 1, 1),
-        'MODIS_Day_LST': datetime(2024, 1, 1),
-        'MODIS_Terra_NDVI': datetime(2024, 1, 1),
-        'MODIS_Terra_EVI': datetime(2024, 1, 1),
-        'MODIS_NDMI': datetime(2024, 1, 1),
-        'MODIS_NDVI': datetime(2024, 1, 1),
-        'MODIS_LAI': datetime(2024, 1, 1),
         'GRIDMET_Precip': datetime(2024, 1, 1),
         'GRIDMET_RET': datetime(2024, 12, 1),
         'GRIDMET_Tmax': datetime(2024, 12, 1),
@@ -451,7 +337,7 @@ def get_gee_dict(data_name):
         'GRIDMET_windVel': datetime(2024, 1, 1),
         'GRIDMET_shortRad': datetime(2024, 1, 1),
         'GRIDMET_vpd': datetime(2024, 12, 1),
-        'DAYMET_sunHr': datetime(2023, 1, 1),
+        'DAYMET_sunHr': datetime(2024, 1, 1),
         'USDA_CDL': datetime(2022, 1, 1),
         'Field_capacity': None,
         'Bulk_density': None,

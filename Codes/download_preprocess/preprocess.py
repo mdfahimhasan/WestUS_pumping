@@ -11,13 +11,15 @@ import numpy as np
 from glob import glob
 from osgeo import gdal
 import rasterio as rio
+from rasterio.warp import reproject, Resampling
 
 from os.path import dirname, abspath
+
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import makedirs
 from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster, \
-    clip_resample_reproject_raster, shapefile_to_raster, apply_gaussian_filter, compute_proximity
+    clip_resample_reproject_raster, shapefile_to_raster, apply_gaussian_filter, compute_proximity, mosaic_rasters_list
 
 no_data_value = -9999
 model_res = 0.01976293625031605786  # in deg, ~2 km
@@ -214,8 +216,10 @@ def dynamic_gs_mean_of_variable(year_list, growing_season_dir, monthly_input_dir
 
             # Count the number of valid months in each pixel's growing season
             valid_month_count = np.sum(kernel_mask, axis=0)
-            valid_month_count = valid_month_count.astype('float')  # converting valid_month_count to float to allow np.nan assignment
-            valid_month_count[valid_month_count == 0] = np.nan  # to avoid division by zero for non-growing season pixels
+            valid_month_count = valid_month_count.astype(
+                'float')  # converting valid_month_count to float to allow np.nan assignment
+            valid_month_count[
+                valid_month_count == 0] = np.nan  # to avoid division by zero for non-growing season pixels
 
             # computing the mean over valid months
             summed_arr = np.sum(arrs_stck * kernel_mask, axis=0)
@@ -265,7 +269,7 @@ def convert_prism_data_to_tif(input_dir, output_dir, keyword='prism_precip'):
 
 def process_prism_data(prism_bil_dir, prism_tif_dir, output_dir_prism_monthly, growing_season_dir, output_dir_prism_gs,
                        year_list=(1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
-                                  2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                                  2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023),
                        keyword='prism_precip', west_US_shape=WestUS_shape,
                        ref_raster=WestUS_raster, resolution=model_res, skip_processing=False):
     """
@@ -338,7 +342,8 @@ def process_prism_data(prism_bil_dir, prism_tif_dir, output_dir_prism_monthly, g
         # # Code-block for summing monthly data for year_list by growing season for the Western US
         #########
         if 'precip' in keyword:
-            dynamic_gs_sum_of_variable(year_list, growing_season_dir=growing_season_dir, monthly_input_dir=output_dir_prism_monthly,
+            dynamic_gs_sum_of_variable(year_list, growing_season_dir=growing_season_dir,
+                                       monthly_input_dir=output_dir_prism_monthly,
                                        gs_output_dir=output_dir_prism_gs,
                                        sum_keyword=keyword, skip_processing=False)
 
@@ -350,6 +355,79 @@ def process_prism_data(prism_bil_dir, prism_tif_dir, output_dir_prism_monthly, g
 
     else:
         pass
+
+
+def paste_and_reproject(src_raster_path, ref_raster_path, nodata):
+    """
+    Reproject a source raster (small extent, possibly different CRS/resolution)
+    into the reference raster grid.
+    Returns a full-size array aligned to reference raster.
+    """
+
+    # opening the referecne raster file and creating an empty array using its shape
+    ref_profile = rio.open(ref_raster_path)
+    out_arr = np.full((ref_profile.height, ref_profile.width), nodata, dtype=ref_profile['dtype'])
+
+    # read the smaller array (src_raster_path)
+    src_profile = rio.open(src_raster_path)
+    src_arr = src_profile.read(1)
+
+    # reproject the src array to the crs and pixel size of the reference raster
+    reproject(
+        source=src_arr,
+        destination=out_arr,
+        src_transform=src_profile.transform,
+        src_crs=src_profile.crs,
+        dst_transform=ref_profile.transform,
+        dst_crs=ref_profile.crs,
+        resampling=Resampling.nearest
+    )
+
+    return out_arr, ref_profile
+
+def merge_GEE_data_patches_IrrMapper_LANID_extents(year_list, input_dir_irrmapper, input_dir_lanid, merged_output_dir,
+                                                   merge_keyword, ref_raster=WestUS_raster,
+                                                   skip_processing=False):
+    """
+    Merge/mosaic downloaded GEE data for IrrMapper and LANID extent.
+
+    :param year_list: Tuple/list of years_list for which data will be processed.
+    :param input_dir_irrmapper: Input directory filepath of datasets at IrrMapper extent.
+    :param input_dir_lanid: Input directory filepath of datasets at LANID extent.
+    :param merged_output_dir: Output directory filepath to save merged data.
+    :param merge_keyword: Keyword to use while merging. Foe example: 'Rainfed_Frac', 'Irrigated_crop_OpenET', etc.
+    :param ref_raster: Reference raster to use in merging. Default set to Western US reference raster.
+    :param skip_processing: Set to True if want to skip merging IrrMapper and LANID extent data patches.
+
+    :return: None.
+    """
+    if not skip_processing:
+        makedirs([merged_output_dir])
+
+    for year in year_list:
+        if year < 2021:
+            search_by = f'*{year}_*.tif'
+
+            # making input raster list by joining rasters of irrmapper extent and rasters of lanid extent
+            irrmapper_raster_list = glob(os.path.join(input_dir_irrmapper, search_by))
+            lanid_raster_list = glob(os.path.join(input_dir_lanid, search_by))
+
+            irrmapper_raster_list.extend(lanid_raster_list)
+
+            total_raster_list = irrmapper_raster_list
+
+            if len(total_raster_list) > 0:  # to only merge for years_list and months when data is available
+                merged_raster_name = f'{merge_keyword}_{year}.tif'
+                mosaic_rasters_list(input_raster_list=total_raster_list, output_dir=merged_output_dir,
+                                    raster_name=merged_raster_name, ref_raster=ref_raster, dtype=None,
+                                    resampling_method='nearest', mosaicing_method='first',
+                                    resolution=model_res, nodata=no_data_value)
+
+                print(f'{merge_keyword} data merged for year {year}')
+
+        else:  # year 2021-2023 only has IrrMapper dataset
+            print('\nIrrigated cropland data for Western US is available after 2021-2023 for only IrrMapper extent.'
+                  'Therefore, we could')
 
 
 def create_stateID_raster(westUS_shp, output_dir, skip_processing=False):
@@ -401,7 +479,6 @@ def create_HUC12_SW_irrigation_rasters(HUC12_SW_shape, output_dir, resolution=mo
         years = list(range(2000, 2020 + 1))  # years from 2000 to 2020
 
         for year in years:
-
             column_to_rasterize = str(year)
 
             interim_raster = shapefile_to_raster(input_shape=HUC12_SW_shape, output_dir=interim_outdir,
@@ -421,7 +498,6 @@ def create_HUC12_SW_irrigation_rasters(HUC12_SW_shape, output_dir, resolution=mo
             output_raster = os.path.join(output_dir, f'HUC12_SW_{year}.tif')
             write_array_to_raster(final_sw_arr, file, file.transform, output_raster)
 
-
             # min-max normalizing data (to represent relative use of surface water irrigation)
             min_sw = np.nanmin(final_sw_arr)
             max_sw = np.nanmax(final_sw_arr)
@@ -429,7 +505,6 @@ def create_HUC12_SW_irrigation_rasters(HUC12_SW_shape, output_dir, resolution=mo
             normalized_sw_arr = np.where(~np.isnan(final_sw_arr), (final_sw_arr - min_sw) / (max_sw - min_sw), -9999)
             output_normal_raster = os.path.join(normalized_dir, f'HUC12_SW_{year}.tif')
             write_array_to_raster(normalized_sw_arr, file, file.transform, output_normal_raster)
-
 
 
 def create_GW_use_perc_rasters(HUC12_GW_perc_shape, output_dir, resolution=model_res,
@@ -457,7 +532,6 @@ def create_GW_use_perc_rasters(HUC12_GW_perc_shape, output_dir, resolution=model
         years = list(range(2000, 2020 + 1))  # years from 2000 to 2020
 
         for year in years:
-
             column_to_rasterize = f'{year}_gw_%'
 
             interim_raster = shapefile_to_raster(input_shape=HUC12_GW_perc_shape,
@@ -516,8 +590,10 @@ def process_and_OneHotEncode_Koppen_Geiger(koppen_geiger_raster, output_dir,
         # reclassifying categories and saving them as a new array (single)
         reclassified_arr = np.full_like(climate_arr, -9999)  # Default to -9999 (or NoData)
         reclassified_arr = np.where(np.isin(climate_arr, classification_map['arid']), 1, reclassified_arr)
-        reclassified_arr = np.where(np.isin(climate_arr, classification_map['temperate_dry_summer']), 2, reclassified_arr)
-        reclassified_arr = np.where(np.isin(climate_arr, classification_map['temperate_no_dry_summer']), 3, reclassified_arr)
+        reclassified_arr = np.where(np.isin(climate_arr, classification_map['temperate_dry_summer']), 2,
+                                    reclassified_arr)
+        reclassified_arr = np.where(np.isin(climate_arr, classification_map['temperate_no_dry_summer']), 3,
+                                    reclassified_arr)
         reclassified_arr = np.where(np.isin(climate_arr, classification_map['cold']), 4, reclassified_arr)
 
         output_reclassified_raster = os.path.join(output_dir, 'reclassified', 'Koppen_Geiger_westUS_classified.tif')
@@ -530,7 +606,7 @@ def process_and_OneHotEncode_Koppen_Geiger(koppen_geiger_raster, output_dir,
         # reclassifying categories and saving them separately for each category
         for category, values in classification_map.items():
             perCategory_arr = np.where(np.isin(climate_arr, values), 1, 0)
-            perCategory_arr[np.isnan(ref_arr)] = -9999           # setting -9999 outside of western Us
+            perCategory_arr[np.isnan(ref_arr)] = -9999  # setting -9999 outside of western Us
 
             output_perCategory_raster = os.path.join(output_dir, f'OneHotEncoded/{category}', f'{category}.tif')
             write_array_to_raster(perCategory_arr, raster_file, raster_file.transform, output_perCategory_raster,
@@ -593,7 +669,7 @@ def create_pixelID_raster(WestUS_refraster, output_dir, skip_processing=False):
 
         # valid pixel count
         valid_count = np.count_nonzero(binary_arr)
-        pixelID = np.arange(1, valid_count+1, 1)
+        pixelID = np.arange(1, valid_count + 1, 1)
 
         # determining valid pixel positions with boolean
         mask_arr = binary_arr.astype(bool).flatten()
@@ -672,8 +748,8 @@ def create_distance_canal_raster(canal_shapefile, output_dir,
 
         # creating an overall canal location raster, where all pixels that have surface water have value 1
         canal_raster = shapefile_to_raster(input_shape=canal_shapefile, output_dir=interim_dir,
-                                        raster_name='Canal_locations.tif', burnvalue=1, use_attr=False, add=None,
-                                        ref_raster=ref_raster, resolution=resolution, alltouched=True)
+                                           raster_name='Canal_locations.tif', burnvalue=1, use_attr=False, add=None,
+                                           ref_raster=ref_raster, resolution=resolution, alltouched=True)
 
         # replacing nan values with zero using reference raster
         canal_arr, file = read_raster_arr_object(canal_raster)
@@ -681,7 +757,7 @@ def create_distance_canal_raster(canal_shapefile, output_dir,
         canal_arr = np.where(np.isnan(canal_arr) & (ref_arr == 0), ref_arr, canal_arr)
 
         canal_raster = write_array_to_raster(canal_arr, file, file.transform,
-                                          os.path.join(output_dir, 'Canal_locations.tif'))
+                                             os.path.join(output_dir, 'Canal_locations.tif'))
 
         # distance from surface water sources
         proximity_raster = \
@@ -707,8 +783,6 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
                           skip_process_GrowSeason_data=False,
                           skip_process_netGW=False,
                           skip_ET_processing=False,
-                          skip_prism_precip_processing=False,
-                          skip_prism_tmax_processing=False,
                           skip_gridmet_RET_processing=False,
                           skip_gridmet_precip_processing=False,
                           skip_gridmet_tmax_processing=False,
@@ -720,7 +794,6 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
                           skip_daymet_sunHr_processing=False,
                           skip_HUC12_SW_processing=False,
                           skip_HUC12_GW_perc_processing=False,
-                          skip_koppen_geiger_processing=False,
                           skip_create_canal_density_raster=False,
                           skip_create_canal_distance_raster=False):
     """
@@ -731,8 +804,6 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     :param skip_process_GrowSeason_data: Set to True to skip processing growing season data.
     :param skip_process_netGW: Set to True to skip consumptive groundwater irrigation dataset processing.
     :param skip_ET_processing: Set to True to skip processing growing season ET data.
-    :param skip_prism_precip_processing: Set True if  you want to skip prism precipitation data preprocessing.
-    :param skip_prism_tmax_processing: Set True if  you want to skip prism temperature data preprocessing.
     :param skip_gridmet_RET_processing: Set to True to skip processing RET growing season data.
     :param skip_gridmet_precip_processing: Set to True to skip processing gridmet precip growing season data.
     :param skip_gridmet_tmax_processing: Set to True to skip processing gridmet max temperature growing season data.
@@ -744,7 +815,6 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     :param skip_daymet_sunHr_processing: Set to True to skip processing daymet sun hour growing season data.
     :param skip_HUC12_SW_processing: Set to True to skip create SW irrigation dataset.
     :param skip_HUC12_GW_perc_processing: Set to True to skip create GW use % dataset.
-    :param skip_koppen_geiger_processing: Set it to False to skip Koppen Geigar climate data processing and One-Hot-Encoding.
     :param skip_create_canal_density_raster: Set to True to skip create canal density raster.
     :param skip_create_canal_distance_raster: Set to True to skip create distance from canal raster.
 
@@ -771,37 +841,17 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
 
     # OpenET ensemble processing
     dynamic_gs_sum_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
-                                          2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                                          2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
+                                          2021, 2022, 2023),
                                growing_season_dir='../../Data_main/rasters/Growing_season',
                                monthly_input_dir='../../Data_main/rasters/OpenET_ensemble/WestUS_monthly',
                                gs_output_dir='../../Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
                                sum_keyword='OpenET', skip_processing=skip_ET_processing)
 
-    # prism precipitation data processing
-    process_prism_data(year_list=(1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
-                                  2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
-                       prism_bil_dir='../../Data_main/rasters/PRISM_Precip/bil_format',
-                       prism_tif_dir='../../Data_main/rasters/PRISM_Precip/tif_format',
-                       output_dir_prism_monthly='../../Data_main/rasters/PRISM_Precip/WestUS_monthly',
-                       growing_season_dir='../../Data_main/rasters/Growing_season',
-                       output_dir_prism_gs='../../Data_main/rasters/PRISM_Precip/WestUS_growing_season',
-                       west_US_shape=WestUS_shape, keyword='prism_precip',
-                       skip_processing=skip_prism_precip_processing)
-
-    # prism maximum temperature data processing
-    process_prism_data(year_list=(1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
-                                  2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
-                       prism_bil_dir='../../Data_main/rasters/PRISM_Tmax/bil_format',
-                       prism_tif_dir='../../Data_main/rasters/PRISM_Tmax/tif_format',
-                       output_dir_prism_monthly='../../Data_main/rasters/PRISM_Tmax/WestUS_monthly',
-                       growing_season_dir='../../Data_main/rasters/Growing_season',
-                       output_dir_prism_gs='../../Data_main/rasters/PRISM_Tmax/WestUS_growing_season',
-                       west_US_shape=WestUS_shape, keyword='prism_tmax',
-                       skip_processing=skip_prism_tmax_processing)
-
     # RET processing
     dynamic_gs_sum_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
-                                          2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                                          2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
+                                          2021, 2022, 2023),
                                growing_season_dir='../../Data_main/rasters/Growing_season',
                                monthly_input_dir='../../Data_main/rasters/RET/WestUS_monthly',
                                gs_output_dir='../../Data_main/rasters/RET/WestUS_growing_season',
@@ -809,7 +859,8 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
 
     # GRIDMET precipitation data processing
     dynamic_gs_sum_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
-                                          2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                                          2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
+                                          2021, 2022, 2023),
                                growing_season_dir='../../Data_main/rasters/Growing_season',
                                monthly_input_dir='../../Data_main/rasters/Precip/WestUS_monthly',
                                gs_output_dir='../../Data_main/rasters/Precip/WestUS_growing_season',
@@ -817,7 +868,8 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
 
     # GRIDMET max temperature data processing
     dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
-                                          2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
+                                           2021, 2022, 2023),
                                 growing_season_dir='../../Data_main/rasters/Growing_season',
                                 monthly_input_dir='../../Data_main/rasters/Tmax/WestUS_monthly',
                                 gs_output_dir='../../Data_main/rasters/Tmax/WestUS_growing_season',
@@ -825,7 +877,8 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
 
     # GRIDMET max relative humidity data processing
     dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
-                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
+                                           2021, 2022, 2023),
                                 growing_season_dir='../../Data_main/rasters/Growing_season',
                                 monthly_input_dir='../../Data_main/rasters/maxRH/WestUS_monthly',
                                 gs_output_dir='../../Data_main/rasters/maxRH/WestUS_growing_season',
@@ -833,7 +886,8 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
 
     # GRIDMET min relative humidity data processing
     dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
-                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
+                                           2021, 2022, 2023),
                                 growing_season_dir='../../Data_main/rasters/Growing_season',
                                 monthly_input_dir='../../Data_main/rasters/minRH/WestUS_monthly',
                                 gs_output_dir='../../Data_main/rasters/minRH/WestUS_growing_season',
@@ -841,7 +895,8 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
 
     # GRIDMET wind velocity data processing
     dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
-                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
+                                           2021, 2022, 2023),
                                 growing_season_dir='../../Data_main/rasters/Growing_season',
                                 monthly_input_dir='../../Data_main/rasters/windVel/WestUS_monthly',
                                 gs_output_dir='../../Data_main/rasters/windVel/WestUS_growing_season',
@@ -849,7 +904,8 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
 
     # GRIDMET shortwave radiation data processing
     dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
-                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
+                                           2021, 2022, 2023),
                                 growing_season_dir='../../Data_main/rasters/Growing_season',
                                 monthly_input_dir='../../Data_main/rasters/shortRad/WestUS_monthly',
                                 gs_output_dir='../../Data_main/rasters/shortRad/WestUS_growing_season',
@@ -857,7 +913,8 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
 
     # GRIDMET vapor pressure deficit data processing
     dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
-                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
+                                           2021, 2022, 2023),
                                 growing_season_dir='../../Data_main/rasters/Growing_season',
                                 monthly_input_dir='../../Data_main/rasters/vpd/WestUS_monthly',
                                 gs_output_dir='../../Data_main/rasters/vpd/WestUS_growing_season',
@@ -865,36 +922,32 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
 
     # DAYMET sun hour data processing
     dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
-                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020),
+                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
+                                           2021, 2022, 2023),
                                 growing_season_dir='../../Data_main/rasters/Growing_season',
                                 monthly_input_dir='../../Data_main/rasters/sunHr/WestUS_monthly',
                                 gs_output_dir='../../Data_main/rasters/sunHr/WestUS_growing_season',
                                 mean_keyword='sunHr', skip_processing=skip_daymet_sunHr_processing)
 
     # HUC12 SW rasterization
-    create_HUC12_SW_irrigation_rasters(HUC12_SW_shape='../../Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_with_Annual_SW.shp',
-                                       output_dir='../../Data_main/rasters/HUC12_SW',
-                                       resolution=model_res, ref_raster=WestUS_raster,
-                                       skip_processing=skip_HUC12_SW_processing)
+    create_HUC12_SW_irrigation_rasters(
+        HUC12_SW_shape='../../Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_with_Annual_SW.shp',
+        output_dir='../../Data_main/rasters/HUC12_SW',
+        resolution=model_res, ref_raster=WestUS_raster,
+        skip_processing=skip_HUC12_SW_processing)
 
     # HUC12 GW use % rasterization
-    create_GW_use_perc_rasters(HUC12_GW_perc_shape='../../Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_with_GW_use_perc.shp',
-                               output_dir='../../Data_main/rasters/HUC12_GW_perc', resolution=model_res,
-                               ref_raster=WestUS_raster, skip_processing=skip_HUC12_GW_perc_processing)
-
-
-    # Koppen_Geiger climate data processing
-    process_and_OneHotEncode_Koppen_Geiger(
-        koppen_geiger_raster='../../Data_main/rasters/Koppen_geiger/1991_2020/koppen_geiger_0p00833333.tif',
-        output_dir='../../Data_main/rasters/Koppen_geiger',
-        skip_processing=skip_koppen_geiger_processing)
-
+    create_GW_use_perc_rasters(
+        HUC12_GW_perc_shape='../../Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_with_GW_use_perc.shp',
+        output_dir='../../Data_main/rasters/HUC12_GW_perc', resolution=model_res,
+        ref_raster=WestUS_raster, skip_processing=skip_HUC12_GW_perc_processing)
 
     # Canal density raster processing
-    create_canal_density_raster(canal_shapefile='../../Data_main/shapefiles/Surface_water_shapes/NHD/NHD_CanalDitch.shp',
-                                output_dir='../../Data_main/rasters/Canal_density',
-                                ref_raster=WestUS_raster, resolution=model_res,
-                                skip_processing=skip_create_canal_density_raster)
+    create_canal_density_raster(
+        canal_shapefile='../../Data_main/shapefiles/Surface_water_shapes/NHD/NHD_CanalDitch.shp',
+        output_dir='../../Data_main/rasters/Canal_density',
+        ref_raster=WestUS_raster, resolution=model_res,
+        skip_processing=skip_create_canal_density_raster)
 
     # Distance from canal raster processing
     create_distance_canal_raster(
@@ -902,4 +955,3 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
         output_dir='../../Data_main/rasters/Canal_distance',
         ref_raster=WestUS_raster, resolution=model_res,
         skip_processing=skip_create_canal_distance_raster)
-

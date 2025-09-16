@@ -43,10 +43,6 @@ if __name__ == '__main__':
         'GRIDMET_shortRad',
         'GRIDMET_vpd',
         'DAYMET_sunHr',
-        'MODIS_Day_LST',
-        'spi',
-        'spei',
-        'eddi'
     ]
 
     openET_data_list = [
@@ -55,9 +51,12 @@ if __name__ == '__main__':
         'Irrigation_Frac_LANID'
     ]
 
-    years = [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
+    years = [
+             2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
              2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015,
-             2016, 2017, 2018, 2019, 2020]
+             2016, 2017, 2018, 2019, 2020,
+             2021, 2022, 2023
+    ]
     months = (1, 12)
 
     # flags
@@ -81,7 +80,7 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
 
     # directories and variables
-    years = list(range(2000, 2019 + 1))  # collecting data from 2000-2019 as growing season Peff is available upto 2019 only
+    years = list(range(2000, 2023 + 1))  # collecting data from 2000-2023 as growing season Peff is available upto 2023 only
 
     # flags
     skip_stateID_raster_creation = True         ############################ this won't run on linux
@@ -89,8 +88,6 @@ if __name__ == '__main__':
     skip_process_GS_data = True                 ########################################################################
     skip_process_netGW = True                   ########################################################################
     skip_ET_processing = True                   ########################################################################
-    skip_prism_precip_processing = True         ########################################################################
-    skip_prism_tmax_processing = True           ########################################################################
     skip_GRIDMET_RET_processing = True          ########################################################################
     skip_GRIDMET_precip_processing = True       ########################################################################
     skip_GRIDMET_tmax_processing = True         ########################################################################
@@ -102,17 +99,14 @@ if __name__ == '__main__':
     skip_daymet_sunHR_processing = True         ########################################################################
     skip_HUC12_SW_processing = True             ########################################################################
     skip_HUC12_GW_perc_processing = True        ########################################################################
-    skip_koppen_geiger_processing = True        ########################################################################
     skip_create_canal_density_raster = True     ########################################################################
-    skip_create_canal_distance_raster = True       ########################################################################
+    skip_create_canal_distance_raster = True    ########################################################################
 
     run_all_preprocessing(skip_stateID_raster_creation=skip_stateID_raster_creation,
                           skip_pixelID_raster_creation=skip_pixelID_raster_creation,
                           skip_process_GrowSeason_data=skip_process_GS_data,
                           skip_process_netGW=skip_process_netGW,
                           skip_ET_processing=skip_ET_processing,
-                          skip_prism_precip_processing=skip_prism_precip_processing,
-                          skip_prism_tmax_processing=skip_prism_tmax_processing,
                           skip_gridmet_RET_processing=skip_GRIDMET_RET_processing,
                           skip_gridmet_precip_processing=skip_GRIDMET_precip_processing,
                           skip_gridmet_tmax_processing=skip_GRIDMET_tmax_processing,
@@ -124,7 +118,6 @@ if __name__ == '__main__':
                           skip_daymet_sunHr_processing=skip_daymet_sunHR_processing,
                           skip_HUC12_SW_processing=skip_HUC12_SW_processing,
                           skip_HUC12_GW_perc_processing=skip_HUC12_GW_perc_processing,
-                          skip_koppen_geiger_processing=skip_koppen_geiger_processing,
                           skip_create_canal_density_raster=skip_create_canal_density_raster,
                           skip_create_canal_distance_raster=skip_create_canal_distance_raster
                           )

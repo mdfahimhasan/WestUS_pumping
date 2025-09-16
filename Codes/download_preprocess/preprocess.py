@@ -366,7 +366,7 @@ def paste_and_reproject(src_raster_path, ref_raster_path, nodata):
 
     # opening the referecne raster file and creating an empty array using its shape
     ref_profile = rio.open(ref_raster_path)
-    out_arr = np.full((ref_profile.height, ref_profile.width), nodata, dtype=ref_profile['dtype'])
+    out_arr = np.full((ref_profile.height, ref_profile.width), nodata, dtype=np.float32)
 
     # read the smaller array (src_raster_path)
     src_profile = rio.open(src_raster_path)
@@ -380,10 +380,12 @@ def paste_and_reproject(src_raster_path, ref_raster_path, nodata):
         src_crs=src_profile.crs,
         dst_transform=ref_profile.transform,
         dst_crs=ref_profile.crs,
-        resampling=Resampling.nearest
+        resampling=Resampling.nearest,
+        dst_nodata=nodata
     )
 
     return out_arr, ref_profile
+
 
 def merge_GEE_data_patches_IrrMapper_LANID_extents(year_list, input_dir_irrmapper, input_dir_lanid, merged_output_dir,
                                                    merge_keyword, ref_raster=WestUS_raster,
@@ -405,6 +407,8 @@ def merge_GEE_data_patches_IrrMapper_LANID_extents(year_list, input_dir_irrmappe
         makedirs([merged_output_dir])
 
     for year in year_list:
+        print(f'Merging IrrMapper and LANID data patches for {year}')
+
         if year < 2021:
             search_by = f'*{year}_*.tif'
 
@@ -426,8 +430,64 @@ def merge_GEE_data_patches_IrrMapper_LANID_extents(year_list, input_dir_irrmappe
                 print(f'{merge_keyword} data merged for year {year}')
 
         else:  # year 2021-2023 only has IrrMapper dataset
-            print('\nIrrigated cropland data for Western US is available after 2021-2023 for only IrrMapper extent.'
-                  'Therefore, we could')
+            search_by = f'*{year}_*.tif'
+            irrmapper_raster_list = glob(os.path.join(input_dir_irrmapper, search_by))
+
+            ref_arr, ref_file = read_raster_arr_object(ref_raster)
+
+            # Opening each data and pasting it on ref raster.
+            # This approach is followed because we want to create a WesternUS-wide raster even if
+            # there is no irrigated cropland data for LANID and AIM-HPA after 2020 for midwest and CONUS-wide
+            for irr_data in irrmapper_raster_list:
+                temp_arr, _ = paste_and_reproject(src_raster_path=irr_data,
+                                                  ref_raster_path=ref_raster,
+                                                  nodata=no_data_value)
+
+                ref_arr = np.where(temp_arr != -9999, temp_arr, ref_arr)
+
+            ref_arr[ref_arr == 0] = no_data_value
+            output_raster = os.path.join(merged_output_dir, f'{merge_keyword}_{year}.tif')
+            write_array_to_raster(ref_arr, ref_file, ref_file.transform, output_raster)
+
+
+def classify_irrigated_cropland(years, irrigated_fraction_dir, irrigated_cropland_output_dir,
+                                skip_processing=False):
+    """
+    Classifies irrigated cropland using irrigated fraction data.
+
+    :param years: List of years to process data for.
+    :param irrigated_fraction_dir: Input directory path for irrigated fraction data.
+    :param irrigated_cropland_output_dir: Output directory path for classified irrigated cropland data.
+    :param skip_processing: Set to True to skip classifying irrigated and rainfed cropland data.
+
+    :return: None
+    """
+    if not skip_processing:
+        makedirs([irrigated_cropland_output_dir])
+
+        # A 2km pixel with >2% irr fraction was used to classify as irrigated
+        irrigated_frac_threshold_for_irrigated_class = 0.02
+
+        for year in years:
+            print(f'Classifying irrigated cropland data for year {year}')
+
+            irrigated_frac_data = os.path.join(irrigated_fraction_dir, f'Irrigated_Frac_{year}.tif')
+
+            irrig_arr, irrig_file = read_raster_arr_object(irrigated_frac_data)
+
+            # classification using defined irrigated fraction. -9999 is no data
+
+            irrigated_cropland = np.where((irrig_arr > irrigated_frac_threshold_for_irrigated_class), 1, -9999)
+
+            # saving classified data
+            output_irrigated_cropland_raster = os.path.join(irrigated_cropland_output_dir,
+                                                            f'Irrigated_cropland_{year}.tif')
+
+            write_array_to_raster(raster_arr=irrigated_cropland, raster_file=irrig_file, transform=irrig_file.transform,
+                                  output_path=output_irrigated_cropland_raster,
+                                  dtype=np.int32)  # linux can't save data properly if dtype isn't np.int32 in this case
+    else:
+        pass
 
 
 def create_stateID_raster(westUS_shp, output_dir, skip_processing=False):
@@ -795,7 +855,9 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
                           skip_HUC12_SW_processing=False,
                           skip_HUC12_GW_perc_processing=False,
                           skip_create_canal_density_raster=False,
-                          skip_create_canal_distance_raster=False):
+                          skip_create_canal_distance_raster=False,
+                          skip_irr_frac_data_processing=False,
+                          skip_irr_cropland_classification=False):
     """
     Run all preprocessing steps.
 
@@ -817,6 +879,10 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     :param skip_HUC12_GW_perc_processing: Set to True to skip create GW use % dataset.
     :param skip_create_canal_density_raster: Set to True to skip create canal density raster.
     :param skip_create_canal_distance_raster: Set to True to skip create distance from canal raster.
+    :param skip_irr_frac_data_processing: Set to True to skip process irrigation fraction data from 2021-2023.
+                                          2000-2020 data was processed in the Peff paper.
+    :param skip_irr_cropland_classification: Set to True to skip irrigation cropland classification from 2021-2023.
+                                             2000-2020 data was processed in the Peff paper.
 
     :return: None.
     """
@@ -955,3 +1021,19 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
         output_dir='../../Data_main/rasters/Canal_distance',
         ref_raster=WestUS_raster, resolution=model_res,
         skip_processing=skip_create_canal_distance_raster)
+
+    # process irrigated fraction data (2021-2023)
+    # 2000-2020 data was processed int he Peff paper
+    merge_GEE_data_patches_IrrMapper_LANID_extents(year_list=[2021, 2022, 2023],
+                                                   input_dir_irrmapper='../../Data_main/rasters/Irrigation_Frac_IrrMapper',
+                                                   input_dir_lanid=None,
+                                                   merged_output_dir='../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac',
+                                                   merge_keyword='Irrigated_Frac', ref_raster=WestUS_raster,
+                                                   skip_processing=skip_irr_frac_data_processing)
+
+    # process irrigated cropland data (2021-2023)
+    # 2000-2020 data was processed int he Peff paper
+    classify_irrigated_cropland(years=[2021, 2022, 2023],
+                                irrigated_fraction_dir='../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac',
+                                irrigated_cropland_output_dir='../../Data_main/rasters/Irrigated_cropland',
+                                skip_processing=skip_irr_cropland_classification)

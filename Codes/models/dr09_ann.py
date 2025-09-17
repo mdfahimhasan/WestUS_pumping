@@ -15,41 +15,41 @@ from Codes.utils.DL_ops import DataLoaderCreator, main, plot_learning_curve, tes
 
 if __name__ == '__main__':
     # # # model version
-    model_version = 'v6'                                ################################################################
+    model_version = 'v7'  ################################################################
 
     # # # model switches
     # setting 'RUN_MODEL' to False will skip all model running processing
     # setting 'skip_create_prediction_rasters' to False will load a trained model to create prediction raster
-    RUN_MODEL = True                                  ################################################################
-    tune_params = False                                ################################################################
-    n_trials_for_tuning = 100                           ################################################################
-    implement_earlyStopping = False                     #################################################################
-    plot_hyperparam_importance = True                  #################################################################
+    RUN_MODEL = True  ################################################################
+    tune_params = False  ################################################################
+    n_trials_for_tuning = 100  ################################################################
+    implement_earlyStopping = False  #################################################################
+    plot_hyperparam_importance = True  #################################################################
 
-    skip_SHAP_summary_plot = True                      ################################################################
-    skip_SHAP_interaction_plot = True                  ################################################################
+    skip_SHAP_summary_plot = False  ################################################################
+    skip_SHAP_interaction_plot = False  ################################################################
 
-    skip_create_prediction_rasters = False              ################################################################
+    skip_create_prediction_rasters = True  ################################################################
 
     # # # default variables (from hyperparameter tuning process)
     batch_size = 256
-    n_features = 13
+    n_features = 12
     n_epochs = 70
     lr = 0.001
     lr_scheduler = 'CosineAnnealingLR'
     activation = 'leakyrelu'
     patience = 10
     start_earlyStopping_at_epoch = 20
-    # using optimizer 'AdamW'
+    # optimizer -----> 'AdamW'
 
     exclude_features_from_training = ['year', 'pixelID', 'stateID',
-                                      'shortRad', 'minRH', 'netGW_Irr']
+                                      'shortRad', 'minRH']
 
     # default model architecture
     default_params = {
-        'fc_units': [128, 64, 32, 16],
-        'weight_decay':  1e-2,
-        'dropout': 0.1
+        'fc_units': [256, 128, 64],
+        'weight_decay': 1e-2,
+        'dropout': 0.5
     }
 
     # # # directories
@@ -63,7 +63,6 @@ if __name__ == '__main__':
     learning_curve_plot = f'../../Model_run/ANN_model/Plots/learning_curve_{model_version}.jpg'
 
     if RUN_MODEL:
-
         # --------------------------------------------------------------------------------------------------------------
         # 1. Training model
         # --------------------------------------------------------------------------------------------------------------
@@ -76,7 +75,8 @@ if __name__ == '__main__':
                                          activation_func=activation,
                                          default_params=default_params,
                                          implement_earlyStopping=implement_earlyStopping,
-                                         patience=patience, start_EarlyStop_count_from_epoch=start_earlyStopping_at_epoch,
+                                         patience=patience,
+                                         start_EarlyStop_count_from_epoch=start_earlyStopping_at_epoch,
                                          tune_parameters=tune_params, n_trials=n_trials_for_tuning,
                                          plot_hyperparams_importance=plot_hyperparam_importance,
                                          hyperparam_importance_plot_path=hyperparam_importance_plot)
@@ -99,8 +99,8 @@ if __name__ == '__main__':
 
         print('Validation performance:')
         valLoader = DataLoaderCreator(data_csv=val_csv,
-                                       shuffle=False, features_to_exclude=exclude_features_from_training,
-                                       batch_size=batch_size, verbose=False).get_dataloader()
+                                      shuffle=False, features_to_exclude=exclude_features_from_training,
+                                      batch_size=batch_size, verbose=False).get_dataloader()
 
         val_results = f'../../Model_run/ANN_model/output_csv/val_results_{model_version}.csv'
         test(model=trained_model, test_loader=valLoader, output_csv=val_results)
@@ -140,10 +140,9 @@ if __name__ == '__main__':
                            skip_processing=skip_SHAP_summary_plot)
 
     # SHAP interaction plot
-    features_to_plot = ['Effective precipitation', 'Irrigated crop fraction',
-                        'ET', 'Reference ET', 'Field capacity', 'Precipitation',
-                        'Surface water irrigation', 'Distance from canal',
-                        'Canal density']
+    features_to_plot = ['Effective precipitation', 'ET', 'Irrigated crop fraction',
+                        'Vapor pressure deficit', 'Field capacity', 'Reference ET', 'Relative humidity (max)',
+                        'Temperature (max)', 'Precipitation', 'Distance from canal', 'Canal density']
 
     plot_shap_interaction_plot(model_version=model_version,
                                features_to_plot=features_to_plot, trained_model_path=model_save_path,

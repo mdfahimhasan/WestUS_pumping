@@ -22,6 +22,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.data import DataLoader, TensorDataset
 
 from os.path import dirname, abspath
+
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 from Codes.utils.system_ops import makedirs
 
@@ -64,7 +65,7 @@ class DataLoaderCreator:
         features_np = x.to_numpy()
         target_np = np.asarray(y)
         pixel_np = np.asarray(pixelID)  # for tracking purpose
-        year_np = np.asarray(year)      # for tracking purpose
+        year_np = np.asarray(year)  # for tracking purpose
 
         # converting to pyTorch tensor
         self.features_tensor = torch.tensor(features_np, dtype=torch.float32)
@@ -203,7 +204,6 @@ class MLPRegression(nn.Module):
         # transfers the model to 'cuda' (GPU)
         self.to(self.device)
 
-
     def _initialize_weights(self):
         """
         Initializes weight for the Neural Network model. For 'relu' and 'leakyrelu', initialization method has been
@@ -220,9 +220,9 @@ class MLPRegression(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Linear):
                 if hasattr(m, 'weight') and m.weight is not None:
-                  nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity=nonlinearity)
+                    nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity=nonlinearity)
                 if hasattr(m, 'bias') and m.bias is not None:
-                 nn.init.constant_(m.bias, 0)
+                    nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
         """
@@ -281,8 +281,8 @@ class MLPRegression(nn.Module):
             return torch.optim.Adagrad(self.parameters(), lr=lr, weight_decay=weight_decay)
 
         else:
-            raise ValueError(f"Unsupported optimizer: {optimizer_name}. Choose from 'adam', 'adamw', 'sgd', or 'adagrad'.")
-
+            raise ValueError(
+                f"Unsupported optimizer: {optimizer_name}. Choose from 'adam', 'adamw', 'sgd', or 'adagrad'.")
 
     @staticmethod
     def configure_LRScheduler(optimizer, scheduler_name, epochs):
@@ -301,10 +301,12 @@ class MLPRegression(nn.Module):
             return lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-5)
 
         elif scheduler_name == 'ExponentialLR':
-            return lr_scheduler.ExponentialLR(optimizer, gamma=0.95)  # (1- gamma) represents the rate of decay per epoch
+            return lr_scheduler.ExponentialLR(optimizer,
+                                              gamma=0.95)  # (1- gamma) represents the rate of decay per epoch
 
         else:
-            raise ValueError(f"Unsupported lr scheduler: {scheduler_name}, Choose from 'CosineAnnealingLR', 'ExponentialLR'")
+            raise ValueError(
+                f"Unsupported lr scheduler: {scheduler_name}, Choose from 'CosineAnnealingLR', 'ExponentialLR'")
 
 
 def calculate_metrics(predictions, targets):
@@ -616,8 +618,10 @@ def run_default_model(train_loader, val_loader,
 
         # printing progress
         if verbose and epoch % 10 == 0:
-            print(f'Train Epoch: {epoch} | Loss: {train_loss:.3f} | RMSE: {train_rmse:.3f} | MAE: {train_mae:.3f} | R²: {train_r2:.3f} | NRMSE: {train_nrmse:.3f} | NMAE: {train_nmae:.3f}')
-            print(f'Val   Epoch: {epoch} | Loss: {val_loss:.3f}   | RMSE: {val_rmse:.3f}   | MAE: {val_mae:.3f}   | R²: {val_r2:.3f}   | NRMSE: {val_nrmse:.3f}   | NMAE: {val_nmae:.3f}')
+            print(
+                f'Train Epoch: {epoch} | Loss: {train_loss:.3f} | RMSE: {train_rmse:.3f} | MAE: {train_mae:.3f} | R²: {train_r2:.3f} | NRMSE: {train_nrmse:.3f} | NMAE: {train_nmae:.3f}')
+            print(
+                f'Val   Epoch: {epoch} | Loss: {val_loss:.3f}   | RMSE: {val_rmse:.3f}   | MAE: {val_mae:.3f}   | R²: {val_r2:.3f}   | NRMSE: {val_nrmse:.3f}   | NMAE: {val_nmae:.3f}')
             print('---------------------------------------------------------------------')
 
         # checking for early stopping
@@ -628,9 +632,13 @@ def run_default_model(train_loader, val_loader,
                 break
 
     # printing final performance (last trained epoch)
-    print(f'Final Train Epoch: {epoch} | Loss: {train_loss:.3f} | RMSE: {train_rmse:.3f} | MAE: {train_mae:.3f} | R²: {train_r2:.3f} | NRMSE: {train_nrmse:.3f} | NMAE: {train_nmae:.3f}')
-    print(f'Final Val   Epoch: {epoch} | Loss: {val_loss:.3f}   | RMSE: {val_rmse:.3f}   | MAE: {val_mae:.3f}   | R²: {val_r2:.3f}   | NRMSE: {val_nrmse:.3f}   | NMAE: {val_nmae:.3f}')
+    print(
+        f'Final Train Epoch: {epoch} | Loss: {train_loss:.3f} | RMSE: {train_rmse:.3f} | MAE: {train_mae:.3f} | R²: {train_r2:.3f} | NRMSE: {train_nrmse:.3f} | NMAE: {train_nmae:.3f}')
+    print(
+        f'Final Val   Epoch: {epoch} | Loss: {val_loss:.3f}   | RMSE: {val_rmse:.3f}   | MAE: {val_mae:.3f}   | R²: {val_r2:.3f}   | NRMSE: {val_nrmse:.3f}   | NMAE: {val_nmae:.3f}')
     print('---------------------------------------------------------------------')
+
+    print('\n*** NOTE: MSE (loss) is averaged per batch, while RMSE/MAE/NRMSE/NMAE/R² are calculated on the entire dataset ***')
 
     # handling val_loss when early stopping is disabled
     if not implement_earlyStopping:
@@ -714,12 +722,13 @@ def run_and_tune_model(trial, train_loader, val_loader,
     train_loss_at_best_val = model_info['train_losses'][model_info['val_losses'].index(best_val_loss)]
 
     alpha = 0.3  # Weight for the penalty term to minimize the gap between train and validation loss
-    objective_value = best_val_loss + alpha * abs(train_loss_at_best_val - best_val_loss)  # param tuning will minimize this value
+    objective_value = best_val_loss + alpha * abs(
+        train_loss_at_best_val - best_val_loss)  # param tuning will minimize this value
 
     # storing additional information for later use
-    best_epoch = model_info['val_losses'].index(best_val_loss)          # best epoch
-    trial.set_user_attr('model_info', model_info)                       # saving model info for the trial
-    trial.set_user_attr('best_epoch', best_epoch)                       # saving best epoch for the trial
+    best_epoch = model_info['val_losses'].index(best_val_loss)  # best epoch
+    trial.set_user_attr('model_info', model_info)  # saving model info for the trial
+    trial.set_user_attr('best_epoch', best_epoch)  # saving best epoch for the trial
 
     return objective_value
 
@@ -830,7 +839,8 @@ def main(train_data_csv, val_data_csv,
             run_default_model(train_loader=train_loader,
                               val_loader=val_loader,
                               n_features=n_features,
-                              fc_units=[best_params[f'fc_units_layer_{i}'] for i in range(best_params['num_fc_layers'])],
+                              fc_units=[best_params[f'fc_units_layer_{i}'] for i in
+                                        range(best_params['num_fc_layers'])],
                               n_epochs=best_epoch,
                               lr=lr, lr_scheduler=lr_scheduler,
                               activation_func=activation_func,
@@ -960,7 +970,8 @@ def calc_rangeWise_RMSE(results_csv, value_ranges, output_txt):
             scores = calculate_metrics(predictions=pred_arr, targets=actual_arr)
             rmse, mae, nrmse, nmae = scores['RMSE'], scores['MAE'], scores['Normalized RMSE'], scores['Normalized MAE']
 
-            results_str = (f'value ranges [{value_ranges[i]}-{value_ranges[i + 1]}]- % of test data {perc_of_test_data:.2f}%\
+            results_str = (
+                f'value ranges [{value_ranges[i]}-{value_ranges[i + 1]}]- % of test data {perc_of_test_data:.2f}%\
                     RMSE:{rmse:.2f}, MAE:{mae:.2f}, NRMSE:{nrmse:.2f}, NMAE:{nmae:.2f}')
 
             f.write(results_str + '\n')
@@ -1025,7 +1036,7 @@ def plot_shap_summary_plot(trained_model_path, trained_model_info, use_samples,
 
         df = pd.read_csv(data_csv)
         df = df.drop(columns=exclude_features)
-        df = df.sample(n=use_samples, random_state=43)         # sampling 'use_samples' of rows for SHAP plotting
+        df = df.sample(n=use_samples, random_state=43)  # sampling 'use_samples' of rows for SHAP plotting
 
         feature_names_dict = {'netGW_Irr': 'Consumptive groundwater use', 'peff': 'Effective precipitation',
                               'SW_Irr': 'Surface water irrigation', 'ret': 'Reference ET', 'precip': 'Precipitation',
@@ -1045,7 +1056,8 @@ def plot_shap_summary_plot(trained_model_path, trained_model_info, use_samples,
         shap_values = explainer(data_tensor)
 
         # converting SHAP values to numpy for plotting
-        shap_values_np = shap_values.values.squeeze(-1)     # Remove singleton third dimension from SHAP array: shape [n, m, 1] → [n, m]
+        shap_values_np = shap_values.values.squeeze(
+            -1)  # Remove singleton third dimension from SHAP array: shape [n, m, 1] → [n, m]
         data_np = data_tensor.cpu().numpy()
 
         # plotting
@@ -1156,7 +1168,8 @@ def plot_shap_interaction_plot(model_version, features_to_plot,
         shap_values = explainer(data_tensor)
 
         # converting SHAP values to numpy for plotting
-        shap_values_np = shap_values.values.squeeze(-1)  # Remove singleton third dimension from SHAP array: shape [n, m, 1] → [n, m]
+        shap_values_np = shap_values.values.squeeze(
+            -1)  # Remove singleton third dimension from SHAP array: shape [n, m, 1] → [n, m]
         data_np = data_tensor.cpu().numpy()
 
         # plotting and saving individual shap dependence plots
@@ -1187,7 +1200,8 @@ def plot_shap_interaction_plot(model_version, features_to_plot,
         # saving plot
         plt.tight_layout(pad=0.1)
         plt.subplots_adjust(wspace=0.05, hspace=0.05)
-        plt.savefig(os.path.join(save_plot_dir, f'SHAP_interaction_all_{model_version}.png'), dpi=150, bbox_inches='tight')
+        plt.savefig(os.path.join(save_plot_dir, f'SHAP_interaction_all_{model_version}.png'), dpi=150,
+                    bbox_inches='tight')
 
     else:
         pass
@@ -1307,11 +1321,11 @@ def load_model_and_predict_raster(trained_model_path, trained_model_info, years_
 
             # # # predicting with trained_model
 
-            predictions = []        # empty list generated for each year to store that year's prediction
+            predictions = []  # empty list generated for each year to store that year's prediction
 
             with torch.no_grad():  # disable gradient computation
-                for (features, ) in dataloader:     # dataLoader returns a tuple
-                    features= features.to(trained_model.device)  # transferring data to 'cuda'
+                for (features,) in dataloader:  # dataLoader returns a tuple
+                    features = features.to(trained_model.device)  # transferring data to 'cuda'
 
                     preds = trained_model(features)
 

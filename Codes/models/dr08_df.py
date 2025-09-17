@@ -312,7 +312,6 @@ def standardize_annual_df(annual_csv, mean_dict, std_dict,
             if col not in exclude_features_from_standardizing:
                 standardized_df[col] = (df[col] - mean_dict[col]) / std_dict[col]
 
-
         # saving standardized data as csv
         output_csv = os.path.join(output_dir, os.path.basename(annual_csv))
         standardized_df.to_csv(output_csv, index=False)
@@ -338,9 +337,9 @@ if __name__ == '__main__':
     # predictor data paths
     data_path_dict = {
         'target': '../../Data_main/pumping/rasters/WestUS_pumping',
-        'netGW_Irr': '../../Data_main/rasters/NetGW_irrigation/WesternUS',
+        # 'netGW_Irr': '../../Data_main/rasters/NetGW_irrigation/WesternUS',
         'peff': '../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
-        'SW_Irr': '../../Data_main/rasters/SW_irrigation',
+        # 'SW_Irr': '../../Data_main/rasters/SW_irrigation',
         'ret': '../../Data_main/rasters/RET/WestUS_growing_season',
         'precip': '../../Data_main/rasters/Precip/WestUS_growing_season',
         'tmax': '../../Data_main/rasters/Tmax/WestUS_growing_season',
@@ -368,7 +367,7 @@ if __name__ == '__main__':
 
     # training time periods
     years_list = [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
-                  2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019]
+                  2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023]
 
     # ------------------------------------------------------------------------------------------------------------------
     # Dataframe creation and train-test split
@@ -389,7 +388,6 @@ if __name__ == '__main__':
                                 output_dir=f'../../Model_run/ANN_model/Model_csv',
                                 train_size=0.7, val_size=0.15, test_size=0.15,
                                 random_state=42, skip_processing=skip_train_val_test_split)
-
 
     # ------------------------------------------------------------------------------------------------------------------
     # Calculating standardization statistics

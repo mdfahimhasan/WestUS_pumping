@@ -1161,7 +1161,7 @@ def predict_annual_pumping_rasters(trained_model, years_list, exclude_columns,
     :param trained_model: Trained ML model object.
     :param years_list: A list of years_list for which data to include in the dataframe.
     :param exclude_columns: List of predictors to exclude from model prediction.
-    :param predictor_csv_and_nan_pos_dir: Filepath of directory holding annual predictor csv and nan
+    :param predictor_csv_and_nan_pos_dir: Filepath of directory holding annual predictor csv and
                                           nan position pkl files.
     :param prediction_name_keyword: A str that will be added before prediction file name.
     :param output_dir: Filepath of output directory to store predicted rasters..

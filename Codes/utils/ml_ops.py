@@ -14,9 +14,11 @@ import pandas as pd
 from glob import glob
 import dask.dataframe as ddf
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 from timeit import default_timer as timer
 
 # import skexplain
+import shap
 import lightgbm as lgb
 from lightgbm import LGBMRegressor
 from sklearn.preprocessing import OneHotEncoder
@@ -27,12 +29,12 @@ from sklearn.inspection import PartialDependenceDisplay as PDisp
 from sklearn.model_selection import train_test_split, cross_val_score
 
 from os.path import dirname, abspath
+
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import makedirs
 from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster
 from Codes.utils.stats_ops import calculate_metrics
-
 
 no_data_value = -9999
 model_res = 0.02000000000000000389  # in deg, 2 km
@@ -164,7 +166,7 @@ def split_train_val_test_set_v1(input_csv, pred_attr, exclude_columns, output_di
         input_df = pd.read_parquet(input_csv)
 
         # stratification column extraction
-        if stratify:   # based on StateID
+        if stratify:  # based on StateID
             stratify_col = input_df['stateID']
         else:
             stratify_col = None
@@ -270,7 +272,7 @@ def split_train_val_test_set_v2(data_parquet, pred_attr, exclude_columns, output
                                                      random_state=random_state)
 
         # assigning dataset labels to full dataset
-        df['split'] = 'test'    # Default to test
+        df['split'] = 'test'  # Default to test
         df.loc[df['pixelID'].isin(train_pixels['pixelID']), 'split'] = 'train'
 
         # splitting into separate DataFrames
@@ -368,7 +370,8 @@ def objective_func_bayes(params, train_set, iteration_csv, n_fold):
     # the try-except block was inserted because of two versions of LIGHTGBM is desktop and server. The server
     # version used keyword 'valid rmse-mean' while the desktop version was using 'rmse-mean'
     try:
-        best_rmse = np.min(cv_results['valid rmse-mean'])  # valid rmse-mean stands for mean RMSE value across all the folds for each boosting round
+        best_rmse = np.min(cv_results[
+                               'valid rmse-mean'])  # valid rmse-mean stands for mean RMSE value across all the folds for each boosting round
 
     except:
         best_rmse = np.min(cv_results['rmse-mean'])
@@ -429,12 +432,12 @@ def bayes_hyperparam_opt(x_train, y_train, iteration_csv, n_fold=10, max_evals=1
         # creating hyperparameter space for LGBM models
         param_space = {'boosting_type': hp.choice('boosting_type',
                                                   [
-                                                   # {'boosting_type': 'gbdt',
-                                                   #  'subsample': hp.uniform('gbdt_subsample', 0.7, 0.9)},
-                                                   {'boosting_type': 'dart',
-                                                    'subsample': hp.uniform('dart_subsample', 0.5, 0.8)},
-                                                   # {'boosting_type': 'goss', 'subsample': 1.0}
-                                                   ]),
+                                                      # {'boosting_type': 'gbdt',
+                                                      #  'subsample': hp.uniform('gbdt_subsample', 0.7, 0.9)},
+                                                      {'boosting_type': 'dart',
+                                                       'subsample': hp.uniform('dart_subsample', 0.5, 0.8)},
+                                                      # {'boosting_type': 'goss', 'subsample': 1.0}
+                                                  ]),
                        'n_estimators': hp.quniform('n_estimators', 200, 600, 25),
                        'max_depth': hp.uniform('max_depth', 4, 8),
                        'learning_rate': hp.loguniform('learning_rate', np.log(0.005), np.log(0.05)),
@@ -443,20 +446,21 @@ def bayes_hyperparam_opt(x_train, y_train, iteration_csv, n_fold=10, max_evals=1
                        'path_smooth': hp.uniform('path_smooth', 0.5, 0.8),
                        'num_leaves': hp.quniform('num_leaves', 15, 50, 5),
                        'min_child_samples': hp.quniform('min_child_samples', 30, 80, 5),
-                       'force_col_wise': True           # set to False to choose between colum/row-wise parallelization
+                       'force_col_wise': True  # set to False to choose between colum/row-wise parallelization
                        }
 
         # optimization algorithm
         tpe_algorithm = tpe.suggest  # stand for Tree-structured Parzen Estimator. A surrogate (probabilistic) model
-                                     # of the objective function, which predicts which hyperparameters are promising
-                                     # instead of directly testing every hyperparameter. The hyperparameter tuning
-                                     # approach, Sequential model-based optimization (SMBO), will try to closely match the
-                                     # surrogate function to the objective function
+        # of the objective function, which predicts which hyperparameters are promising
+        # instead of directly testing every hyperparameter. The hyperparameter tuning
+        # approach, Sequential model-based optimization (SMBO), will try to closely match the
+        # surrogate function to the objective function
 
         # keeping track of results
         bayes_trials = Trials()  # The Trials object will hold everything returned from the objective function in the
-                                 # .results attribute. It also holds other information from the search, but we return
-                                 # everything we need from the objective.
+
+        # .results attribute. It also holds other information from the search, but we return
+        # everything we need from the objective.
 
         # creating a wrapper function to bring all arguments of objective_func_bayes() under a single argument
         def objective_wrapper(params):
@@ -638,8 +642,6 @@ def test_model(trained_model, x_test, y_test, prediction_csv_path, categorical_c
     nmae = metrics_dict['Normalized MAE']
 
     print(
-        f"Test Results:\n"
-        f"---------------------\n"
         f"RMSE: {rmse:.4f}, MAE: {mae:.4f},\n"
         f"NRMSE: {nrmse:.4f}, NMAE: {nmae:.4f}, R²: {r2:.4f}\n"
     )
@@ -727,7 +729,7 @@ def create_pdplots(trained_model, x_train, features_to_include, output_dir, plot
 
         # print(trained_model._Booster.dump_model()['feature_infos']) # prints features info like min-max values
 
-        # creating variables for unit degree and degree celcius
+        # creating variables for unit degree and degree celsius
         deg_unit = r'$^\circ$'
         deg_cel_unit = r'$^\circ$C'
 
@@ -749,8 +751,10 @@ def create_pdplots(trained_model, x_train, features_to_include, output_dir, plot
         # creating a dictionary to rename PDP plot labels
         feature_dict = {
             'netGW_Irr': 'Consumptive groundwater use (mm/gs)', 'peff': 'Effective precipitation (mm/gs)',
-            'ret': 'Reference ET (mm/gs)', 'precip': 'Precipitation (mm/gs)', 'tmax': f'Max. temperature ({deg_cel_unit})',
-            'ET': 'ET (mm/gs)', 'irr_crop_frac': 'Fraction of irrigated cropland', 'maxRH': 'Max. relative humidity (%)',
+            'ret': 'Reference ET (mm/gs)', 'precip': 'Precipitation (mm/gs)',
+            'tmax': f'Max. temperature ({deg_cel_unit})',
+            'ET': 'ET (mm/gs)', 'irr_crop_frac': 'Fraction of irrigated cropland',
+            'maxRH': 'Max. relative humidity (%)',
             'minRH': 'Min. relative humidity (%)', 'shortRad': 'Downward shortwave radiation (W/$m^2$)',
             'vpd': 'Vapour pressure deficit (kpa)', 'sunHr': 'Daylight duration (hr)',
             'SW_Irr': 'Surface water irrigation (mm/gs)', 'FC': 'Field capacity',
@@ -779,7 +783,6 @@ def create_pdplots(trained_model, x_train, features_to_include, output_dir, plot
                     # adjusting size of tick params
                     pdisp.axes_[r][c].tick_params(axis='both', labelsize=30)
 
-
                     feature_idx += 1
                 else:
                     pass
@@ -796,75 +799,6 @@ def create_pdplots(trained_model, x_train, features_to_include, output_dir, plot
 
     else:
         pass
-
-
-# def create_aleplots(trained_model, x_train, y_train, features_to_include,
-#                     output_dir, plot_name, make_CI=True, skip_processing=False):
-#     """
-#     Plot Accumulated Local Effects (ALE) plot.
-#
-#     :param trained_model: Trained model object.
-#     :param x_train: x_train dataframe (if the model was trained with a x_train as dataframe) or array.
-#     :param y_train: y_train dataframe (if the model was trained with a x_train as dataframe) or array.
-#     :param features_to_include: List of features for which ALE plots will be made.
-#                                 If set to 'All', then PDP plot for all input variables will be created.
-#     :param output_dir: Filepath of output directory to save the PDP plot.
-#     :param plot_name: str of plot name. Must include '.jpeg' or 'png'.
-#     :param make_CI: Set to True if want to include CI in the ALE plot. The confidence intervals are simply the uncertainty
-#                in the mean value. This function uses 100 bootstraping to estimate the CIs.
-#     :param skip_processing: Set to True to skip this process.
-#
-#     :return: None.
-#     """
-#     if not skip_processing:
-#         makedirs([output_dir])
-#
-#         # creating variables for unit degree and degree celcius
-#         deg_unit = r'$^\circ$'
-#         deg_cel_unit = r'$^\circ$C'
-#
-#         # plotting
-#         if features_to_include == 'All':  # to plot PDP for all attributes
-#             features_to_include = list(x_train.columns)
-#
-#         # creating a dictionary to rename PDP plot labels
-#         feature_dict = {
-#             'netGW_Irr': 'Consumptive groundwater use (mm/gs)', 'peff': 'Effective precipitation (mm/gs)',
-#             'ret': 'Reference ET (mm/gs)', 'precip': 'Precipitation (mm/gs)', 'tmax': f'Max. temperature ({deg_cel_unit})',
-#             'ET': 'ET (mm/gs)', 'irr_crop_frac': 'Fraction of irrigated cropland', 'maxRH': 'Max. relative humidity (%)',
-#             'minRH': 'Min. relative humidity (%)', 'shortRad': 'Downward shortwave radiation (W/$m^2$)',
-#             'vpd': 'Vapour pressure deficit (kpa)', 'sunHr': 'Daylight duration (hr)',
-#             'sw_huc12': 'Surface water irrigation at HUC12 (MG/year)', 'gw_perc_huc12': 'Groundwater use at HUC12 (%)',
-#             'climate': 'Climate type'
-#         }
-#
-#         plt.rcParams['font.size'] = 8
-#
-#         # creating explainer object and calculating 1d ale
-#         if make_CI:
-#             bootstrap = 100
-#         else:
-#             bootstrap = 1
-#
-#         explainer = skexplain.ExplainToolkit(('LGBMRegressor', trained_model), X=x_train, y=y_train)
-#         ale_1d_ds = explainer.ale(features=features_to_include, n_bootstrap=bootstrap,
-#                                   subsample=20000, n_jobs=10, n_bins=20)
-#
-#         # Create ALE plots
-#         fig, axes = explainer.plot_ale(
-#             ale=ale_1d_ds,
-#             features=features_to_include,  # Important features you want to plot
-#             display_feature_names=feature_dict,  # Feature names
-#             figsize=(10, 8)
-#         )
-#
-#         fig.tight_layout(rect=[0, 0.05, 1, 0.95])
-#         fig.savefig(os.path.join(output_dir, plot_name))
-#
-#         print('ALE plots generated...')
-#
-#     else:
-#         pass
 
 
 def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_name,
@@ -964,6 +898,192 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
     return sorted_imp_vars
 
 
+def plot_shap_summary_plot(trained_model_path, use_samples,
+                           data_csv, exclude_features, save_plot_path,
+                           skip_processing=False):
+    """
+    Generate and save a SHAP summary (beeswarm) plot to visualize feature importance.
+
+    :param trained_model_path: str
+        Path to the `.joblib` file containing the saved model's state_dict.
+
+    :param use_samples: int
+        Number of samples to randomly draw from the dataset for SHAP analysis.
+
+    :param data_csv: str or DataFrame
+        Path to the CSV file containing the input feature data. Or a dataframe of input features.
+
+    :param exclude_features: list
+        List of column names to exclude from the input (e.g., pumping, IDs).
+
+    :param save_plot_path: str
+        File path (with extension) where the SHAP summary plot will be saved.
+
+    :param skip_processing: bool, optional (default=False)
+        If True, skip execution.
+
+    :return: None
+    """
+    if not skip_processing:
+        makedirs([os.path.dirname(save_plot_path)])
+
+        # loading model
+        trained_model = joblib.load(trained_model_path)
+
+        print(trained_model)
+
+        print('\n___________________________________________________________________________')
+        print(f'\nplotting SHAP feature importance...')
+
+        # loading data + random sampling + renaming dataframe features
+        if 'pumping_mm' not in exclude_features:
+            exclude_features = exclude_features + ['pumping_mm']
+
+        if '.csv' in data_csv:
+            df = pd.read_csv(data_csv)
+            df = df.drop(columns=exclude_features)
+
+        elif isinstance(data_csv, pd.DataFrame):
+            df = data_csv.drop(columns=exclude_features, errors="ignore")
+
+        df = df.sample(n=use_samples, random_state=43)  # sampling 'use_samples' of rows for SHAP plotting
+
+        feature_names_dict = {'netGW_Irr': 'Consumptive groundwater use', 'peff': 'Effective precipitation',
+                              'SW_Irr': 'Surface water irrigation', 'ret': 'Reference ET', 'precip': 'Precipitation',
+                              'tmax': 'Temperature (max)', 'ET': 'ET', 'irr_crop_frac': 'Irrigated crop fraction',
+                              'maxRH': 'Relative humidity (max)', 'minRH': 'Relative humidity (min)',
+                              'shortRad': 'Shortwave radiation', 'vpd': 'Vapor pressure deficit',
+                              'sunHr': 'Sun hour', 'FC': 'Field capacity',
+                              'Canal_distance': 'Distance from canal', 'Canal_density': 'Canal density'}
+        df = df.rename(columns=feature_names_dict)
+        feature_names = np.array(df.columns.tolist())
+
+        # using SHAP TreeExplainer to estimate shap values
+        explainer = shap.TreeExplainer(trained_model)
+        shap_values = explainer(df)
+
+        # converting SHAP values to numpy for plotting
+        # shap_values_np = shap_values.values.squeeze(-1)     # Remove singleton third dimension from SHAP array: shape [n, m, 1] → [n, m]
+        # print(shap_values_np.shape)
+        # plotting
+        fig = plt.figure()
+        shap.summary_plot(shap_values, df, feature_names=feature_names)
+
+        fig.savefig(save_plot_path, dpi=200, bbox_inches='tight')
+
+    else:
+        pass
+
+
+def plot_shap_interaction_plot(model_version, trained_model_path, use_samples, features_to_plot,
+                               data_csv, exclude_features_from_df, save_plot_dir,
+                               skip_processing=False):
+    """
+    Generate and save a SHAP summary (beeswarm) plot to visualize feature importance.
+
+    :param model_version: str
+        Model version.
+    :param trained_model_path: str
+        Path to the `.joblib` file containing the saved model's state_dict.
+
+    :param use_samples: int
+        Number of samples to randomly draw from the dataset for SHAP analysis.
+
+    :param features_to_plot: List
+        List of features to include in the interaction plot.
+
+    :param data_csv: str or DataFrame
+        Path to the CSV file containing the input feature data. Or a dataframe of input features.
+
+    :param exclude_features_from_df: list
+        List of column names to exclude from the input (e.g., pumping_mm, IDs).
+
+    :param save_plot_dir: str
+        Directory path where the SHAP interaction plot will be saved.
+
+    :param skip_processing: bool, optional (default=False)
+        If True, skip execution.
+
+    :return: None
+    """
+    if not skip_processing:
+        makedirs([save_plot_dir])
+
+        # loading model
+        trained_model = joblib.load(trained_model_path)
+
+        print(trained_model)
+
+        print('\n___________________________________________________________________________')
+        print(f'\nplotting SHAP interaction plot...')
+
+        # loading data + random sampling + renaming dataframe features
+        if 'pumping_mm' not in exclude_features_from_df:
+            exclude_features_from_df = exclude_features_from_df + ['pumping_mm']
+
+        if '.csv' in data_csv:
+            df = pd.read_csv(data_csv)
+            df = df.drop(columns=exclude_features_from_df)
+
+        elif isinstance(data_csv, pd.DataFrame):
+            df = data_csv.drop(columns=exclude_features_from_df, errors="ignore")
+
+        df = df.sample(n=use_samples, random_state=43)  # sampling 'use_samples' of rows for SHAP plotting
+
+        feature_names_dict = {'netGW_Irr': 'Consumptive groundwater use', 'peff': 'Effective precipitation',
+                              'SW_Irr': 'Surface water irrigation', 'ret': 'Reference ET', 'precip': 'Precipitation',
+                              'tmax': 'Temperature (max)', 'ET': 'ET', 'irr_crop_frac': 'Irrigated crop fraction',
+                              'maxRH': 'Relative humidity (max)', 'minRH': 'Relative humidity (min)',
+                              'shortRad': 'Shortwave radiation', 'vpd': 'Vapor pressure deficit',
+                              'sunHr': 'Sun hour', 'FC': 'Field capacity',
+                              'Canal_distance': 'Distance from canal',
+                              'Canal_density': 'Canal density'}
+
+        df = df.rename(columns=feature_names_dict)
+        feature_names = np.array(df.columns.tolist())
+
+        # using SHAP TreeExplainer to estimate shap values
+        explainer = shap.TreeExplainer(trained_model)
+        shap_values = explainer(df)
+
+        if hasattr(shap_values, "values"):
+            shap_values_np = shap_values.values
+        else:
+            shap_values_np = shap_values
+
+        # plotting and saving individual shap dependence plots
+        for feature in features_to_plot:
+            shap.dependence_plot(feature, shap_values_np, df, feature_names=feature_names,
+                                 interaction_index=None, show=False)
+            plt.gca().set_ylabel('SHAP value')
+            plt.gca().set_xlabel(feature)
+
+            plt.savefig(os.path.join(save_plot_dir, f'{feature}.png'), dpi=200, bbox_inches='tight')
+
+        # compiling individual shap plot in a grid plot
+        n_cols = 3
+        n_rows = (len(features_to_plot) + n_cols - 1) // n_cols
+
+        fig, axs = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 3 * n_rows))
+        axs = axs.flatten()
+
+        for i, feature in enumerate(features_to_plot):
+            img = mpimg.imread(os.path.join(save_plot_dir, f'{feature}.png'))
+            axs[i].imshow(img)
+            axs[i].axis('off')
+
+        # hiding unused axes if any
+        for j in range(i + 1, len(axs)):
+            axs[j].axis('off')
+
+        # saving plot
+        plt.tight_layout(pad=0.1)
+        plt.subplots_adjust(wspace=0.05, hspace=0.05)
+        plt.savefig(os.path.join(save_plot_dir, f'SHAP_interaction_all_{model_version}.png'), dpi=200,
+                    bbox_inches='tight')
+    else:
+        pass
+
 
 def create_annual_dataframes_for_pumping_prediction(years_list, yearly_data_path_dict,
                                                     static_data_path_dict, datasets_to_include,
@@ -988,45 +1108,45 @@ def create_annual_dataframes_for_pumping_prediction(years_list, yearly_data_path
         makedirs([output_dir])
 
         for year in years_list:  # 1st loop controlling years_list
-                print(f'creating dataframe for prediction - year {year}...')
+            print(f'creating dataframe for prediction - year {year}...')
 
-                variable_dict = {}              # empty dict to store data for each variable
+            variable_dict = {}  # empty dict to store data for each variable
 
-                # reading yearly data and storing it in a dictionary
-                for var in yearly_data_path_dict.keys():
+            # reading yearly data and storing it in a dictionary
+            for var in yearly_data_path_dict.keys():
+                if var in datasets_to_include:
+                    yearly_data = glob(os.path.join(yearly_data_path_dict[var], f'*{year}*.tif'))[0]
+                    data_arr = read_raster_arr_object(yearly_data, get_file=False).flatten()
+
+                    data_arr[np.isnan(data_arr)] = 0  # setting nan-position values with 0
+                    variable_dict[var] = list(data_arr)
+
+            # reading static data and storing it in a dictionary
+            if static_data_path_dict is not None:
+                for var in static_data_path_dict.keys():
                     if var in datasets_to_include:
-                        yearly_data = glob(os.path.join(yearly_data_path_dict[var], f'*{year}*.tif'))[0]
-                        data_arr = read_raster_arr_object(yearly_data, get_file=False).flatten()
+                        static_data = glob(os.path.join(static_data_path_dict[var], '*.tif'))[0]
+                        data_arr = read_raster_arr_object(static_data, get_file=False).flatten()
 
+                        # storing data
                         data_arr[np.isnan(data_arr)] = 0  # setting nan-position values with 0
                         variable_dict[var] = list(data_arr)
 
-                # reading static data and storing it in a dictionary
-                if static_data_path_dict is not None:
-                    for var in static_data_path_dict.keys():
-                        if var in datasets_to_include:
-                            static_data = glob(os.path.join(static_data_path_dict[var], '*.tif'))[0]
-                            data_arr = read_raster_arr_object(static_data, get_file=False).flatten()
+            # storing collected data into a dataframe
+            predictor_df = pd.DataFrame(variable_dict)
+            predictor_df = predictor_df.dropna()
 
-                            # storing data
-                            data_arr[np.isnan(data_arr)] = 0  # setting nan-position values with 0
-                            variable_dict[var] = list(data_arr)
+            # saving input predictor csv
+            annual_output_csv = os.path.join(output_dir, f'predictors_{year}.csv')
+            predictor_df.to_csv(annual_output_csv, index=False)
 
-                # storing collected data into a dataframe
-                predictor_df = pd.DataFrame(variable_dict)
-                predictor_df = predictor_df.dropna()
+            # creating nan position dictionary based on irrigated cropland data and saving it
+            irrigated_cropland_raster = glob(os.path.join(irrigated_cropland_dir, f'*{year}.tif'))[0]
+            irr_arr = read_raster_arr_object(irrigated_cropland_raster, get_file=False)
 
-                # saving input predictor csv
-                annual_output_csv = os.path.join(output_dir, f'predictors_{year}.csv')
-                predictor_df.to_csv(annual_output_csv, index=False)
-
-                # creating nan position dictionary based on irrigated cropland data and saving it
-                irrigated_cropland_raster = glob(os.path.join(irrigated_cropland_dir, f'*{year}.tif'))[0]
-                irr_arr = read_raster_arr_object(irrigated_cropland_raster, get_file=False)
-
-                nan_pos_dict = {'irr': np.isnan(irr_arr).flatten()}
-                dict_path = os.path.join(output_dir, f'nan_pos_{year}.pkl')
-                pickle.dump(nan_pos_dict, open(dict_path, mode='wb+'))
+            nan_pos_dict = {'irr': np.isnan(irr_arr).flatten()}
+            dict_path = os.path.join(output_dir, f'nan_pos_{year}.pkl')
+            pickle.dump(nan_pos_dict, open(dict_path, mode='wb+'))
     else:
         pass
 

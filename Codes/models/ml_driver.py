@@ -14,7 +14,8 @@ sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 from Codes.utils.system_ops import makedirs
 from Codes.utils.plots import scatter_plot_of_same_vars
 from Codes.utils.ml_ops import create_train_test_dataframe, split_train_val_test_set_v2, \
-    train_model, test_model, plot_permutation_importance, plot_shap_summary_plot, plot_shap_interaction_plot
+    train_model, test_model, plot_permutation_importance, plot_shap_summary_plot, plot_shap_interaction_plot, \
+    create_annual_dataframes_for_pumping_prediction, predict_annual_pumping_rasters
 
 # model resolution and reference raster/shapefile
 no_data_value = -9999
@@ -67,15 +68,17 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------------------------------------------
     model_version = 'v7'                ######
 
-    skip_df_creation = True            ######
-    skip_train_test_split = True       ######
-    skip_hyperparam_tune = True        ######
-    load_model = False                  ######
-    save_model = True                  ######
-    skip_scatter_plots = False          ######
-    skip_perm_imp_plot = False          ######
-    skip_SHAP_importance = False        ######
-    skip_SHAP_interact_plot = False     ######
+    skip_df_creation = True                ######
+    skip_train_test_split = True           ######
+    skip_hyperparam_tune = True            ######
+    load_model = False                      ######
+    save_model = True                      ######
+    skip_scatter_plots = False              ######
+    skip_perm_imp_plot = False              ######
+    skip_SHAP_importance = False            ######
+    skip_SHAP_interact_plot = False         ######
+    skip_create_df_for_prediction = False   ######
+    skip_create_prediction_raster = False   ######
 
     # --------------------------------------------------------------------------------------------------------------
     # Dataframe creation and train-test split
@@ -210,3 +213,32 @@ if __name__ == '__main__':
                                data_csv=x_train, exclude_features_from_df=exclude_columns_in_training,
                                save_plot_dir=os.path.join(plot_dir, 'SHAP_interation'),
                                skip_processing=skip_SHAP_interact_plot)
+
+    # create prediction rasters
+    # create dataframe and nan position dict
+
+    datasets_to_include = list(datasets_to_include)
+    datasets_to_include.remove('pumping_mm')
+
+    predictor_csv_and_nan_pos_dir = f'../../Model_run/ML_model/Model_csv/annual_df'
+
+    create_annual_dataframes_for_pumping_prediction(years_list=years_list,
+                                                    yearly_data_path_dict=annual_data_path_dict,
+                                                    static_data_path_dict=static_data_path_dict,
+                                                    datasets_to_include=datasets_to_include,
+                                                    irrigated_cropland_dir='../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac',
+                                                    output_dir=predictor_csv_and_nan_pos_dir,
+                                                    skip_processing=skip_create_df_for_prediction)
+
+    # prediction
+    pumping_prediction_output_dir = f'../../Data_main/rasters/pumping_prediction/ML'
+
+    exclude_columns_in_prediction = [i for i in exclude_columns_in_training if i != 'year']
+
+    predict_annual_pumping_rasters(trained_model=lgbm_reg_trained, years_list=years_list,
+                                   exclude_columns=exclude_columns_in_prediction,
+                                   predictor_csv_and_nan_pos_dir=predictor_csv_and_nan_pos_dir,
+                                   prediction_name_keyword='WestUS_pumping',
+                                   output_dir=pumping_prediction_output_dir,
+                                   ref_raster=WestUS_raster,
+                                   skip_processing=skip_create_prediction_raster)

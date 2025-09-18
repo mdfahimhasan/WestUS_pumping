@@ -231,7 +231,7 @@ if __name__ == '__main__':
                                                     skip_processing=skip_create_df_for_prediction)
 
     # prediction
-    pumping_prediction_output_dir = f'../../Data_main/rasters/pumping_prediction/ML'
+    pumping_prediction_output_dir = f'../../Data_main/rasters/pumping_prediction/ML/{model_version}'
 
     exclude_columns_in_prediction = [i for i in exclude_columns_in_training if i != 'year']
 

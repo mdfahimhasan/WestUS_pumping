@@ -37,7 +37,7 @@ def perform_LOBO(basin_code, model_version, exclude_features_from_training, skip
 
         # default variables (from hyperparameter tuning process)
         batch_size = 256
-        n_features = 13
+        n_features = 12
         n_epochs = 70
         activation = 'leakyrelu'
         lr = 0.001
@@ -45,9 +45,9 @@ def perform_LOBO(basin_code, model_version, exclude_features_from_training, skip
 
         # default model architecture
         default_params = {
-            'fc_units': [128, 64, 32, 16],
+            'fc_units': [256, 128, 64],
             'weight_decay': 1e-2,
-            'dropout': 0.1
+            'dropout': 0.5
         }
 
         # directories
@@ -92,7 +92,7 @@ def perform_LOBO(basin_code, model_version, exclude_features_from_training, skip
 
 # exclude columns during model training
 exclude_features_from_training = ['year', 'pixelID', 'stateID',
-                                  'shortRad', 'minRH', 'netGW_Irr']
+                                  'shortRad', 'minRH']
 
 if __name__ == '__main__':
     # # flags

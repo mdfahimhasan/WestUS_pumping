@@ -39,9 +39,12 @@ def perform_LOBO(basin_code, model_version, exclude_features_from_training, skip
         batch_size = 256
         n_features = 12
         n_epochs = 70
-        activation = 'leakyrelu'
         lr = 0.001
         lr_scheduler = 'CosineAnnealingLR'
+        activation = 'leakyrelu'
+        patience = 10
+        start_earlyStopping_at_epoch = 20
+        # optimizer -----> 'AdamW'
 
         # default model architecture
         default_params = {
@@ -49,6 +52,9 @@ def perform_LOBO(basin_code, model_version, exclude_features_from_training, skip
             'weight_decay': 1e-2,
             'dropout': 0.5
         }
+
+        if 'target' not in exclude_features_from_training:
+            exclude_features = exclude_features_from_training + ['target']
 
         # directories
         train_csv = f'../../Model_run/ANN_model/LOBO/{model_version}/{basin_code}/standardized/train.csv'
@@ -92,11 +98,11 @@ def perform_LOBO(basin_code, model_version, exclude_features_from_training, skip
 
 # exclude columns during model training
 exclude_features_from_training = ['year', 'pixelID', 'stateID',
-                                  'shortRad', 'minRH']
+                                  'shortRad', 'minRH', 'target']
 
 if __name__ == '__main__':
     # # flags
-    model_version = 'v6'
+    model_version = 'v7'
     skip_LOBO_GMD3 = False              ##### GMD3, KS
     skip_LOBO_GMD4 = False              ##### GMD4, KS
     skip_LOBO_RPB = False               ##### Republican Basin, CO

@@ -497,7 +497,8 @@ def train_model(x_train, y_train, params_dict,
                 load_model=False, save_model=False,
                 save_folder=None, model_save_name=None,
                 skip_tune_hyperparameters=False,
-                iteration_csv=None, n_fold=10, max_evals=1000):
+                iteration_csv=None, n_fold=10, max_evals=1000,
+                verbose=True):
     """
     Train a LightGBM regressor model with given hyperparameters.
 
@@ -533,6 +534,7 @@ def train_model(x_train, y_train, params_dict,
     :param iteration_csv : Filepath of a csv where hyperparameter iteration step will be stored.
     :param n_fold : Number of folds in K Fold CV. Default set to 10.
     :param max_evals : Maximum number of evaluations during hyperparameter optimization. Default set to 1000.
+    :param verbose : Set to False to skip printing model metrics.
 
     :return: trained LGBM regression model.
     """
@@ -573,12 +575,13 @@ def train_model(x_train, y_train, params_dict,
         nrmse = metrics_dict['Normalized RMSE']
         nmae = metrics_dict['Normalized MAE']
 
-        print(
-            f"Train Results:\n"
-            f"---------------------\n"
-            f"RMSE: {rmse:.4f}, MAE: {mae:.4f},\n"
-            f"NRMSE: {nrmse:.4f}, NMAE: {nmae:.4f}, R²: {r2:.4f}\n"
-        )
+        if verbose:
+            print(
+                f"Train Results:\n"
+                f"---------------------\n"
+                f"RMSE: {rmse:.4f}, MAE: {mae:.4f},\n"
+                f"NRMSE: {nrmse:.4f}, NMAE: {nmae:.4f}, R²: {r2:.4f}\n"
+            )
 
         # save trained model
         if save_model:
@@ -590,23 +593,25 @@ def train_model(x_train, y_train, params_dict,
             joblib.dump(trained_model, save_path, compress=3)
 
         # printing and saving runtime
-        end_time = timeit.default_timer()
-        runtime = (end_time - start_time) / 60
-        run_str = f'model training time {runtime} mins'
-        print('model training time {:.3f} mins'.format(runtime))
+        if verbose:
+            end_time = timeit.default_timer()
+            runtime = (end_time - start_time) / 60
+            run_str = f'model training time {runtime} mins'
+            print('model training time {:.3f} mins'.format(runtime))
 
-        runtime_save = os.path.join(save_folder, model_save_name + '_training_runtime.txt')
-        with open(runtime_save, 'w') as file:
-            file.write(run_str)
+            runtime_save = os.path.join(save_folder, model_save_name + '_training_runtime.txt')
+            with open(runtime_save, 'w') as file:
+                file.write(run_str)
 
     else:
         print('Loading trained model...')
 
-        if '.joblib' not in model_save_name:
-            model_save_name = model_save_name + '.joblib'
-        saved_model_path = os.path.join(save_folder, model_save_name)
-        trained_model = joblib.load(saved_model_path)
-        print('Loaded trained model.')
+        if verbose:
+            if '.joblib' not in model_save_name:
+                model_save_name = model_save_name + '.joblib'
+            saved_model_path = os.path.join(save_folder, model_save_name)
+            trained_model = joblib.load(saved_model_path)
+            print('Loaded trained model.')
 
     return trained_model
 

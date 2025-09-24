@@ -258,7 +258,7 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
                                                         yearly_data_path_dict=annual_data_path_dict,
                                                         static_data_path_dict=static_data_path_dict,
                                                         datasets_to_include=datasets_to_include,
-                                                        irrigated_cropland_dir='../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac',
+                                                        irrigated_cropland_dir='../../Data_main/rasters/Irrigated_cropland',
                                                         output_dir=predictor_csv_and_nan_pos_dir,
                                                         skip_processing=skip_create_df_for_prediction)
 

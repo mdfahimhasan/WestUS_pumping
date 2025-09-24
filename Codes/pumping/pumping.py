@@ -384,11 +384,10 @@ def process_UT_pumping_data(raw_csv, output_pump_shp, skip_process=False, **kwar
 
 def pumping_pts_to_raster_v1(state_code, years, pumping_pts_shp, pumping_attr_AF,
                              year_attr, output_dir,
-                             skip_processing=False,
                              ref_raster=WestUS_raster, resolution=model_res,
                              ET_dir=None, Peff_dir=None,
                              surface_irrig_dir=None, low_fraction=None, high_fraction=None,
-                             skip_outlier_removal=False):
+                             skip_outlier_removal=False, skip_processing=False):
     """
     Convert point scale (shapefile) groundwater pumping estimates to rasters in AF and mm.
     For individual pixels (2km) sums up all the pumping values inside it.
@@ -400,7 +399,6 @@ def pumping_pts_to_raster_v1(state_code, years, pumping_pts_shp, pumping_attr_AF
     :param year_attr: Attribute in the point shapefile with year.
     :param output_dir: Filepath of main output dir. Intermediate directories named 'pumping_AF_raster' and
                         'pumping_mm_raster' will be created automatically.
-    :param skip_processing: Set to True to skip this process.
     :param ref_raster: Filepath of Western US reference raster.
     :param resolution: model resolution.
     :param ET_dir: Directory containing raster files of growing season iET data.
@@ -415,6 +413,7 @@ def pumping_pts_to_raster_v1(state_code, years, pumping_pts_shp, pumping_attr_AF
     :param high_fraction: The maximum threshold for `(total_water / Irr_cropET)` ratio.
     :param skip_outlier_removal: Set to True to skip filtering out pixels with low pumping values.
                                  Default set to False.
+    :param skip_processing: Set to True to skip this process.
 
     :return: Raster directories' path with AF and mm pumping.
     """
@@ -465,6 +464,9 @@ def pumping_pts_to_raster_v1(state_code, years, pumping_pts_shp, pumping_attr_AF
             pumping_mm_arr = np.where(~np.isnan(pumping_AF_arr), pumping_AF_arr * 1233481837548 /
                                       area_mm2_single_pixel, -9999)
 
+            pumping_mm_raster = os.path.join(pumping_mm_dir, 'original', f'pumping_mm_{year}.tif')
+            write_array_to_raster(pumping_mm_arr, file, file.transform, pumping_mm_raster)
+
             # remove pumping values that are too low or to high
             if not skip_outlier_removal:
                 if ET_dir is None or Peff_dir is None:
@@ -479,12 +481,11 @@ def pumping_pts_to_raster_v1(state_code, years, pumping_pts_shp, pumping_attr_AF
                                                           surface_irrig_dir,
                                                           skip_processing=skip_outlier_removal)
 
-            # filling nan positions (0 values) with -9999 as
-            # -9999 is used for discarding no pumping data for tile creation
-            pumping_mm_arr[pumping_mm_arr == 0] = -9999
+                # filling nan positions (0 values) with -9999
+                pumping_mm_arr[pumping_mm_arr == 0] = -9999
 
-            pumping_mm_raster = os.path.join(pumping_mm_dir, f'pumping_mm_{year}.tif')
-            write_array_to_raster(pumping_mm_arr, file, file.transform, pumping_mm_raster)
+                pumping_mm_raster = os.path.join(pumping_mm_dir, f'pumping_mm_{year}.tif')
+                write_array_to_raster(pumping_mm_arr, file, file.transform, pumping_mm_raster)
     else:
         pass
 
@@ -553,50 +554,10 @@ def filter_out_low_high_pumping_values_v1(year, pumping_arr, ET_dir,
         pass
 
 
-# def filter_out_low_high_pumping_values_v2(year, pumping_arr, netGW_dir,
-#                                           low_fraction, high_fraction,
-#                                           skip_processing=False):
-#     """
-#     Filters out high and low in-situ pumping values.
-#
-#     This function processes annual pumping data by filtering out values that do not meet specific
-#     conditions based on the ratio of pumping to consumptive groundwater use.
-#     Invalid pumping values are set to zero in the returned array.
-#
-#
-#     :param year: The year for which the data is being processed.
-#     :param pumping_arr: The array of pumping values to filter.
-#     :param netGW_dir: Directory containing raster files of growing season consumptive groundwater use data.
-#     :param low_fraction: The minimum threshold for `(total_water / ET)` ratio.
-#     :param high_fraction: The maximum threshold for `(total_water / ET)` ratio.
-#     :param skip_processing: If True, skip processing. Default is False.
-#
-#     :return: Filtered pumping array with invalid values set to zero.
-#     """
-#     if not skip_processing:
-#         # reading growing season netGW data
-#         netGW_data = glob(os.path.join(netGW_dir, f'*{year}*.tif'))[0]
-#         netGW_arr = read_raster_arr_object(netGW_data, get_file=False)
-#
-#         # fraction of pumping / netGW (following Ott et al. (2024))
-#         netGW_arr = np.where(netGW_arr > 1e-6, netGW_arr, np.nan)  # 1e-6 used as threshold to avoid division by very small value
-#
-#         water_frac = np.where(~np.isnan(pumping_arr) & ~np.isnan(netGW_arr), pumping_arr/netGW_arr, -9999)
-#
-#         # applying filter to identify valid pumping values
-#         mask = (water_frac >= low_fraction) & (water_frac <= high_fraction) & (netGW_arr != -9999)
-#         pumping_arr = pumping_arr * mask  # invalid values are set to 0
-#
-#         return pumping_arr
-#
-#     else:
-#         pass
-
-
 def pumping_pts_to_raster_v2(state_code, years, pumping_pts_shp, pumping_attr_AF,
                              year_attr, output_dir, lower_outlier_range, upper_outlier_range,
                              ref_raster=WestUS_raster, resolution=model_res,
-                             skip_processing=False):
+                             skip_outlier_removal=False, skip_processing=False):
     """
     Convert point scale (shapefile) groundwater pumping estimates to rasters in AF and mm.
     For individual pixels (2km) sums up all the pumping values inside it. This is an alternate function of
@@ -614,6 +575,9 @@ def pumping_pts_to_raster_v2(state_code, years, pumping_pts_shp, pumping_attr_AF
     :param skip_processing: Set to True to skip this process.
     :param ref_raster: Filepath of Western US reference raster.
     :param resolution: model resolution.
+    :param skip_outlier_removal: Set to True to skip filtering out pixels with low pumping values.
+                                 Default set to False.
+    :param skip_processing: Set to True to skip this process.
 
     :return: Raster directories' path with AF and mm pumping.
     """
@@ -655,8 +619,8 @@ def pumping_pts_to_raster_v2(state_code, years, pumping_pts_shp, pumping_attr_AF
 
             # area of a 2 km pixel
             # 2199 meter is the pixel size in latitude direction. 1746 is the pixel size in longitude direction.
-            # For longitudinal dimension calculation, a average latitude of 37.42 deg was considered for the Western US.
-            # Distance of 1 deg Longitude at equator is = 111,320 m
+            # For longitudinal dimension calculation, an average latitude of 37.42 deg was considered for the Western US.
+            # Distance of 1 deg Longitude at the equator is = 111,320 m
             # 0.01976293625031605786 deg * 111320 * cos(37.42 * pi / 180) = 1746.53 m
             # 0.01976293625031605786 deg * 111320 = 2199.59 m
             area_mm2_single_pixel = (2199.59 * 1000) * (1746.53 * 1000)  # unit in mm2
@@ -664,19 +628,24 @@ def pumping_pts_to_raster_v2(state_code, years, pumping_pts_shp, pumping_attr_AF
             pumping_mm_arr = np.where(~np.isnan(pumping_AF_arr), pumping_AF_arr * 1233481837548 /
                                       area_mm2_single_pixel, -9999)
 
-            # remove pumping values that are too low or to high
-            pumping_mm_arr = np.where((pumping_mm_arr >= lower_outlier_range) & (pumping_mm_arr <= upper_outlier_range),
-                                      pumping_mm_arr, -9999)
-
-            pumping_mm_raster = os.path.join(pumping_mm_dir, f'pumping_mm_{year}.tif')
+            pumping_mm_raster = os.path.join(pumping_mm_dir, 'Original', f'pumping_mm_{year}.tif')
             write_array_to_raster(pumping_mm_arr, file, file.transform, pumping_mm_raster)
+
+            # remove pumping values that are too low or to high
+            if not skip_outlier_removal:
+                pumping_mm_arr = np.where((pumping_mm_arr >= lower_outlier_range) & (pumping_mm_arr <= upper_outlier_range),
+                                           pumping_mm_arr, -9999)
+
+                pumping_mm_raster = os.path.join(pumping_mm_dir, f'pumping_mm_{year}.tif')
+                write_array_to_raster(pumping_mm_arr, file, file.transform, pumping_mm_raster)
     else:
         pass
 
 
-def combine_pumping_rasters(years, years_no_data_dict, KS_dir, CO_dir, AZ_dir, irr_cropland_dir,
-                            output_dir, ref_raster=WestUS_raster,
-
+def combine_pumping_rasters(years, years_no_data_dict, KS_dir, CO_dir, AZ_dir,
+                            output_dir,
+                            irr_cropland_dir=None,
+                            ref_raster=WestUS_raster,
                             skip_processing=False):
     """
     Combines multiple pumping rasters into a final pumping raster by replacing zero values
@@ -692,11 +661,12 @@ def combine_pumping_rasters(years, years_no_data_dict, KS_dir, CO_dir, AZ_dir, i
     :param CO_dir: Annual pumping data directory (rasters) for Colorado.
     :param AZ_dir: Annual pumping data directory (rasters) for Arizona.
     :param irr_cropland_dir: Annual irrigated cropland directory to apply irrigated cropland filter.
+                             Default set to None to skip filtering by irrigated cropland raster.
     :param output_dir: Path to save the combined pumping rasters.
     :param ref_raster: Filepath of reference raster.
     :param skip_processing: Set to True to skip this process. Default set to False.
 
-    :returns None.
+    :return: None.
     """
     if not skip_processing:
         print("\nCombining states' pumping data to create Western US-wide pumping raster... \n"
@@ -738,12 +708,13 @@ def combine_pumping_rasters(years, years_no_data_dict, KS_dir, CO_dir, AZ_dir, i
             if AZ_arr is not None:
                 pump_arr = np.where(AZ_arr > 0, AZ_arr, pump_arr)
 
-            # irrigated cropland data for the year
-            irr_cropland = glob(os.path.join(irr_cropland_dir, f'*{year}*.tif'))[0]
-            irr_arr = read_raster_arr_object(irr_cropland, get_file=False)
+            if irr_cropland_dir is not None:
+                # irrigated cropland data for the year
+                irr_cropland = glob(os.path.join(irr_cropland_dir, f'*{year}*.tif'))[0]
+                irr_arr = read_raster_arr_object(irr_cropland, get_file=False)
 
-            # Setting nan value for pixels that are not irrigated per irrigated cropland data
-            pump_arr = np.where(np.isnan(irr_arr), -9999, pump_arr)
+                # Setting nan value for pixels that are not irrigated per irrigated cropland data
+                pump_arr = np.where(np.isnan(irr_arr), -9999, pump_arr)
 
             # setting all zero values to -9999 (where there is no pumping value)
             pump_arr = np.where(pump_arr == 0, -9999, pump_arr)
@@ -763,14 +734,14 @@ if __name__ == '__main__':
 
     skip_process_AZ_pumping = True        #######
     skip_irrig_zone_filter_AZ = True      #######
-    skip_make_AZ_pumping_raster = False    #######
+    skip_make_AZ_pumping_raster = True    #######
 
     skip_process_KS_pumping = True        # No post-processing performed for this dataset
-    skip_make_KS_pumping_raster = False    #######
+    skip_make_KS_pumping_raster = True    #######
 
     skip_process_CO_pumping = True        # # caution: the processed files might have been further post-processed. Follow caution in setting this to 'False'.
     skip_irrig_zone_filter_CO = True      #######
-    skip_make_CO_pumping_raster = False    #######
+    skip_make_CO_pumping_raster = True    #######
 
     skip_process_UT_pumping = True        # # caution: the processed files might have been further post-processed. Follow caution in setting this to 'False'.
 
@@ -809,8 +780,8 @@ if __name__ == '__main__':
                              pumping_attr_AF='AF_pumped',
                              year_attr='Year',
                              output_dir='../../Data_main/pumping/rasters/Arizona',
-                             lower_outlier_range=0,     # not setting a low threshold
-                             upper_outlier_range=1500,  # setting a hgh threshold ######################
+                             lower_outlier_range=0,  # not setting a low threshold
+                             upper_outlier_range=1500,  # based on ET and netGW_Irr analysis
                              ref_raster=WestUS_raster, resolution=model_res,
                              skip_processing=skip_make_AZ_pumping_raster)
 
@@ -827,15 +798,19 @@ if __name__ == '__main__':
 
     # make 2 km rasters
     # up to 2023 as Peff data (used for filtering) is available up to 2023
-    pumping_pts_to_raster_v2(state_code='KS', years=list(range(2000, 2024)),
+    pumping_pts_to_raster_v1(state_code='KS', years=list(range(2000, 2024)),
                              pumping_pts_shp='../../Data_main/pumping/Kansas/Final/pumping_Ks.shp',
                              pumping_attr_AF='AF_pumped',
                              year_attr='Year',
                              output_dir='../../Data_main/pumping/rasters/Kansas',
-                             lower_outlier_range=0,     # not setting a low threshold
-                             upper_outlier_range=5000,  # not setting a high threshold. 5000 is a very high value
                              ref_raster=WestUS_raster, resolution=model_res,
-                             skip_processing=skip_make_KS_pumping_raster)
+                             skip_processing=skip_make_KS_pumping_raster,
+                             ET_dir='../../Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
+                             Peff_dir='../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
+                             surface_irrig_dir=None,
+                             low_fraction=0.7,
+                             high_fraction=1.5,
+                             skip_outlier_removal=False)  # implementing low-high pumping value removal in KS
 
     ####################################################################################################################
     # # Colorado
@@ -860,15 +835,19 @@ if __name__ == '__main__':
     # make 2 km rasters
     # from 2011 up to 2023, as Peff data (used for filtering) is available up to 2023
     # Pumping data for CO before 2010 isn't of good quality
-    pumping_pts_to_raster_v2(state_code='CO', years=list(range(2011, 2024)),
+    pumping_pts_to_raster_v1(state_code='CO', years=list(range(2011, 2024)),
                              pumping_pts_shp='../../Data_main/pumping/Colorado/Final/pumping_CO_v3.shp',
                              pumping_attr_AF='AF_pumped',
                              year_attr='Year',
                              output_dir='../../Data_main/pumping/rasters/Colorado',
-                             lower_outlier_range=0,     # not setting a low threshold
-                             upper_outlier_range=5000,  # not setting a high threshold. 5000 is a very high value
                              ref_raster=WestUS_raster, resolution=model_res,
-                             skip_processing=skip_make_CO_pumping_raster)
+                             skip_processing=skip_make_CO_pumping_raster,
+                             ET_dir='../../Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
+                             Peff_dir='../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
+                             surface_irrig_dir=None,
+                             low_fraction=0.7,
+                             high_fraction=1.5,
+                             skip_outlier_removal=False)  # implementing low-high pumping value removal in CO
 
     ####################################################################################################################
     # # Utah
@@ -888,6 +867,22 @@ if __name__ == '__main__':
                             )
 
     # # Combine states' pumping data into a combined pumping raster for Western US
+
+    # combine the original pumping rasters where filtering through threshold wasn't applied.
+    # useful for basin scale comparison with model outputs.
+    combine_pumping_rasters(years=list(range(2000, 2024)),
+                            years_no_data_dict={'KS': list(range(2021, 2024)),
+                                                'CO': list(range(2000, 2011)),
+                                                'AZ': []},
+                            KS_dir='../../Data_main/pumping/rasters/Kansas/pumping_mm/Original',
+                            CO_dir='../../Data_main/pumping/rasters/Colorado/pumping_mm/Original',
+                            AZ_dir='../../Data_main/pumping/rasters/Arizona/pumping_mm/Original',
+                            irr_cropland_dir=None,
+                            output_dir='../../Data_main/pumping/rasters/WestUS_pumping//Original',
+                            skip_processing=skip_combine_pumping_rasters)
+
+    # combine the filtered pumping rasters where filtering through threshold was applied.
+    # will be used for model training.
     combine_pumping_rasters(years=list(range(2000, 2024)),
                             years_no_data_dict={'KS': list(range(2021, 2024)),
                                                 'CO': list(range(2000, 2011)),

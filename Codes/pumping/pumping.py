@@ -763,18 +763,18 @@ if __name__ == '__main__':
 
     skip_process_AZ_pumping = True        #######
     skip_irrig_zone_filter_AZ = True      #######
-    skip_make_AZ_pumping_raster = True    #######
+    skip_make_AZ_pumping_raster = False    #######
 
     skip_process_KS_pumping = True        # No post-processing performed for this dataset
-    skip_make_KS_pumping_raster = True    #######
+    skip_make_KS_pumping_raster = False    #######
 
     skip_process_CO_pumping = True        # # caution: the processed files might have been further post-processed. Follow caution in setting this to 'False'.
     skip_irrig_zone_filter_CO = True      #######
-    skip_make_CO_pumping_raster = True    #######
+    skip_make_CO_pumping_raster = False    #######
 
     skip_process_UT_pumping = True        # # caution: the processed files might have been further post-processed. Follow caution in setting this to 'False'.
 
-    skip_combine_pumping_rasters = True   #######
+    skip_combine_pumping_rasters = False   #######
 
     ####################################################################################################################
     # # Arizona
@@ -809,8 +809,8 @@ if __name__ == '__main__':
                              pumping_attr_AF='AF_pumped',
                              year_attr='Year',
                              output_dir='../../Data_main/pumping/rasters/Arizona',
-                             lower_outlier_range=0,  # not setting a low threshold
-                             upper_outlier_range=1500,  # based on ET and netGW_Irr analysis
+                             lower_outlier_range=0,     # not setting a low threshold
+                             upper_outlier_range=1500,  # setting a hgh threshold ######################
                              ref_raster=WestUS_raster, resolution=model_res,
                              skip_processing=skip_make_AZ_pumping_raster)
 
@@ -827,19 +827,15 @@ if __name__ == '__main__':
 
     # make 2 km rasters
     # up to 2023 as Peff data (used for filtering) is available up to 2023
-    pumping_pts_to_raster_v1(state_code='KS', years=list(range(2000, 2024)),
+    pumping_pts_to_raster_v2(state_code='KS', years=list(range(2000, 2024)),
                              pumping_pts_shp='../../Data_main/pumping/Kansas/Final/pumping_Ks.shp',
                              pumping_attr_AF='AF_pumped',
                              year_attr='Year',
                              output_dir='../../Data_main/pumping/rasters/Kansas',
+                             lower_outlier_range=0,     # not setting a low threshold
+                             upper_outlier_range=5000,  # not setting a high threshold. 5000 is a very high value
                              ref_raster=WestUS_raster, resolution=model_res,
-                             skip_processing=skip_make_KS_pumping_raster,
-                             ET_dir='../../Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
-                             Peff_dir='../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
-                             surface_irrig_dir=None,
-                             low_fraction=0.7,
-                             high_fraction=1.5,
-                             skip_outlier_removal=False)  # implementing low-high pumping value removal in KS
+                             skip_processing=skip_make_KS_pumping_raster)
 
     ####################################################################################################################
     # # Colorado
@@ -864,19 +860,15 @@ if __name__ == '__main__':
     # make 2 km rasters
     # from 2011 up to 2023, as Peff data (used for filtering) is available up to 2023
     # Pumping data for CO before 2010 isn't of good quality
-    pumping_pts_to_raster_v1(state_code='CO', years=list(range(2011, 2024)),
+    pumping_pts_to_raster_v2(state_code='CO', years=list(range(2011, 2024)),
                              pumping_pts_shp='../../Data_main/pumping/Colorado/Final/pumping_CO_v3.shp',
                              pumping_attr_AF='AF_pumped',
                              year_attr='Year',
                              output_dir='../../Data_main/pumping/rasters/Colorado',
+                             lower_outlier_range=0,     # not setting a low threshold
+                             upper_outlier_range=5000,  # not setting a high threshold. 5000 is a very high value
                              ref_raster=WestUS_raster, resolution=model_res,
-                             skip_processing=skip_make_CO_pumping_raster,
-                             ET_dir='../../Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
-                             Peff_dir='../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
-                             surface_irrig_dir=None,
-                             low_fraction=0.7,
-                             high_fraction=1.5,
-                             skip_outlier_removal=False)  # implementing low-high pumping value removal in CO
+                             skip_processing=skip_make_CO_pumping_raster)
 
     ####################################################################################################################
     # # Utah

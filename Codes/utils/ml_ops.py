@@ -122,6 +122,10 @@ def create_train_test_dataframe(years_list, yearly_data_path_dict,
         train_test_ddf = ddf.from_dict(variable_dict, npartitions=n_partitions)
         train_test_ddf = train_test_ddf.dropna()
 
+        # applying irrigated cropland filter
+        if 'irr_crop_frac' in train_test_ddf.columns:
+            train_test_ddf = train_test_ddf[train_test_ddf['irr_crop_frac'] >= 0.02]
+
         if '.parquet' in output_parquet:
             train_test_ddf.to_parquet(output_parquet, write_index=False)
 

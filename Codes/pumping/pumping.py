@@ -761,7 +761,8 @@ if __name__ == '__main__':
         selected_columns_from_csv=['Well Id', 'AMA INA', 'YEAR', 'Right Type',
                                    'AF Pumped', 'Water Type'],
         filter_conditions={
-            'Right Type': ['IRRIGATION USE', 'IRRIGATION DISTRICT (GW ONLY)'],
+            'Right Type': ['IRRIGATION USE', 'IRRIGATION DISTRICT (GW ONLY)',
+                           'IRRIGATION DISTRICT (SW & GW)', 'BEST MANAGEMENT PRACTICES FARM UNIT'],
             'Water Type': 'GROUNDWATER'
         }
     )

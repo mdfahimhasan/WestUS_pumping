@@ -532,11 +532,19 @@ def filter_out_low_high_pumping_values_v1(year, pumping_arr, ET_dir,
             total_water = peff_arr + pumping_arr
 
         else:
-            # reading annual surface water irrigation data (distributed using USGS HUC12 dataset)
-            surf_irr = glob(os.path.join(surface_irrig_dir, f'*{year}*.tif'))[0]
-            surf_irr_arr = read_raster_arr_object(surf_irr, get_file=False)
+            # Here we add surface water consumptive use to the filtering process.
+            # Surface water irrigation (consumptive use) data is available up to 2020.
+            # We can only use this filter from 2000 to 2020, for years after 2020, we skip using this filter
 
-            total_water = peff_arr + pumping_arr + surf_irr_arr
+            if year < 2020:
+                # reading annual surface water irrigation data (distributed using USGS HUC12 dataset)
+                surf_irr = glob(os.path.join(surface_irrig_dir, f'*{year}*.tif'))[0]
+                surf_irr_arr = read_raster_arr_object(surf_irr, get_file=False)
+
+                total_water = peff_arr + pumping_arr + surf_irr_arr
+
+            else:  # years after 2020
+                total_water = peff_arr + pumping_arr
 
         # fraction of total_water / ET_arr (modified after Ott et al. (2024))
         ET_arr = np.where(ET_arr > 1e-6, ET_arr, np.nan)  # 1e-6 used as threshold to avoid division by very small value
@@ -845,7 +853,7 @@ if __name__ == '__main__':
                              skip_processing=skip_make_CO_pumping_raster,
                              ET_dir='../../Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
                              Peff_dir='../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
-                             surface_irrig_dir=None,
+                             surface_irrig_dir='../../Data_main/rasters/SW_irrigation',
                              low_fraction=0.7,
                              high_fraction=1.5,
                              skip_outlier_removal=False)  # implementing low-high pumping value removal in CO

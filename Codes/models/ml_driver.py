@@ -70,7 +70,7 @@ if __name__ == '__main__':
 
     skip_df_creation = True                ######
     skip_train_test_split = True           ######
-    skip_hyperparam_tune = True            ######
+    skip_hyperparam_tune = False            ######
     load_model = False                      ######
     save_model = True                      ######
     skip_scatter_plots = False              ######
@@ -111,22 +111,22 @@ if __name__ == '__main__':
     # model training  (if hyperparameter tuning is on, the default parameter dictionary will be disregarded)
     print('\n########## Model training')
     lgbm_param_dict = {'boosting_type': 'dart',
-                       'colsample_bynode': 0.9429030834499261,
-                       'colsample_bytree': 0.7084157250145205,
+                       'colsample_bynode': 0.9438426279911594,
+                       'colsample_bytree': 0.844434547212633,
                        'data_sample_strategy': 'bagging',
-                       'learning_rate': 0.04985719923634188,
+                       'learning_rate': 0.04988948209733723,
                        'max_depth': 7,
                        'min_child_samples': 35,
-                       'n_estimators': 550,
+                       'n_estimators': 575,
                        'num_leaves': 50,
-                       'path_smooth': 0.7240592809864574,
-                       'subsample': 0.7561523593619698,
+                       'path_smooth': 0.6465083017089871,
+                       'subsample': 0.6422658373062207,
                        'force_col_wise': True
                        }
 
     save_model_to_dir = f'../../Model_run/ML_model/Model_trained'
     model_name = f'westus_pumping_{model_version}.joblib'
-    param_iteration_csv = f'../../Model_run/ML_model/Model_trained/hyperparam_iteration_{model_version}.csv'
+    param_iteration_csv = f'../../Model_run/ML_model/Model_trained/hyperparam_iteraction_{model_version}.csv'
     makedirs([save_model_to_dir])
 
     lgbm_reg_trained = train_model(x_train=x_train, y_train=y_train, params_dict=lgbm_param_dict,
@@ -211,7 +211,7 @@ if __name__ == '__main__':
                                trained_model_path=os.path.join(save_model_to_dir, model_name),
                                use_samples=2000, features_to_plot=features_to_plot,
                                data_csv=x_train, exclude_features_from_df=exclude_columns_in_training,
-                               save_plot_dir=os.path.join(plot_dir, 'SHAP_interation'),
+                               save_plot_dir=os.path.join(plot_dir, 'SHAP_interaction'),
                                skip_processing=skip_SHAP_interact_plot)
 
     # create prediction rasters

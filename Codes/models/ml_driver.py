@@ -13,9 +13,10 @@ sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import makedirs
 from Codes.utils.plots import scatter_plot_of_same_vars
-from Codes.utils.ml_ops import create_train_test_dataframe, split_train_val_test_set_v2, \
-    train_model, test_model, plot_permutation_importance, plot_shap_summary_plot, plot_shap_interaction_plot, \
-    create_annual_dataframes_for_pumping_prediction, predict_annual_pumping_rasters
+from Codes.utils.ml_ops import (create_train_test_dataframe, split_train_val_test_set_v2, \
+    train_model, test_model, plot_permutation_importance, \
+    cross_val_performance, plot_shap_summary_plot, plot_shap_interaction_plot, \
+    create_annual_dataframes_for_pumping_prediction, predict_annual_pumping_rasters)
 
 # model resolution and reference raster/shapefile
 no_data_value = -9999
@@ -70,10 +71,11 @@ if __name__ == '__main__':
 
     skip_df_creation = True                ######
     skip_train_test_split = True           ######
-    skip_hyperparam_tune = False            ######
+    skip_hyperparam_tune = True            ######
     load_model = False                      ######
     save_model = True                      ######
     skip_scatter_plots = False              ######
+    skip_cross_val = False                  ######
     skip_perm_imp_plot = False              ######
     skip_SHAP_importance = False            ######
     skip_SHAP_interact_plot = False         ######
@@ -161,6 +163,12 @@ if __name__ == '__main__':
     test_model(trained_model=lgbm_reg_trained, x_test=x_test, y_test=y_test,
                prediction_csv_path=test_prediction_csv_path,
                categorical_columns=None)
+
+    # cross validation performance
+    cross_val_performance(trained_model_path=os.path.join(save_model_to_dir, model_name),
+                          x_train_df=x_train, y_train_df=y_train, k_fold=10,
+                          categorical_columns=None,
+                          verbose=False, skip_processing=skip_cross_val)
 
     # --------------------------------------------------------------------------------------------------------------
     # Plotting scatters + permutation importance + PDP

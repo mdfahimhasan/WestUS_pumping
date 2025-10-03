@@ -19,7 +19,8 @@ sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import makedirs
 from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster, \
-    clip_resample_reproject_raster, shapefile_to_raster, apply_gaussian_filter, compute_proximity, mosaic_rasters_list
+    clip_resample_reproject_raster, shapefile_to_raster, apply_gaussian_filter, compute_proximity, \
+    mosaic_rasters_list, rasterize_shape_to_match
 
 no_data_value = -9999
 model_res = 0.01976293625031605786  # in deg, ~2 km
@@ -406,51 +407,55 @@ def merge_GEE_data_patches_IrrMapper_LANID_extents(year_list, input_dir_irrmappe
     if not skip_processing:
         makedirs([merged_output_dir])
 
-    for year in year_list:
-        print(f'Merging IrrMapper and LANID data patches for {year}')
+        for year in year_list:
+            print(f'Merging IrrMapper and LANID data patches for {year}')
 
-        if year < 2021:
-            search_by = f'*{year}_*.tif'
+            if year < 2021:
+                search_by = f'*{year}_*.tif'
 
-            # making input raster list by joining rasters of irrmapper extent and rasters of lanid extent
-            irrmapper_raster_list = glob(os.path.join(input_dir_irrmapper, search_by))
-            lanid_raster_list = glob(os.path.join(input_dir_lanid, search_by))
+                # making input raster list by joining rasters of irrmapper extent and rasters of lanid extent
+                irrmapper_raster_list = glob(os.path.join(input_dir_irrmapper, search_by))
+                lanid_raster_list = glob(os.path.join(input_dir_lanid, search_by))
 
-            irrmapper_raster_list.extend(lanid_raster_list)
+                irrmapper_raster_list.extend(lanid_raster_list)
 
-            total_raster_list = irrmapper_raster_list
+                total_raster_list = irrmapper_raster_list
 
-            if len(total_raster_list) > 0:  # to only merge for years_list and months when data is available
-                merged_raster_name = f'{merge_keyword}_{year}.tif'
-                mosaic_rasters_list(input_raster_list=total_raster_list, output_dir=merged_output_dir,
-                                    raster_name=merged_raster_name, ref_raster=ref_raster, dtype=None,
-                                    resampling_method='nearest', mosaicing_method='first',
-                                    resolution=model_res, nodata=no_data_value)
+                if len(total_raster_list) > 0:  # to only merge for years_list and months when data is available
+                    merged_raster_name = f'{merge_keyword}_{year}.tif'
+                    mosaic_rasters_list(input_raster_list=total_raster_list, output_dir=merged_output_dir,
+                                        raster_name=merged_raster_name, ref_raster=ref_raster, dtype=None,
+                                        resampling_method='nearest', mosaicing_method='first',
+                                        resolution=model_res, nodata=no_data_value)
 
-                print(f'{merge_keyword} data merged for year {year}')
+                    print(f'{merge_keyword} data merged for year {year}')
 
-        else:  # year 2021-2023 only has IrrMapper dataset
-            search_by = f'*{year}_*.tif'
-            irrmapper_raster_list = glob(os.path.join(input_dir_irrmapper, search_by))
+            else:  # year 2021-2023 only has IrrMapper dataset
+                search_by = f'*{year}_*.tif'
+                irrmapper_raster_list = glob(os.path.join(input_dir_irrmapper, search_by))
 
-            ref_arr, ref_file = read_raster_arr_object(ref_raster)
+                ref_arr, ref_file = read_raster_arr_object(ref_raster)
 
-            # Opening each data and pasting it on ref raster.
-            # This approach is followed because we want to create a WesternUS-wide raster even if
-            # there is no irrigated cropland data for LANID and AIM-HPA after 2020 for midwest and CONUS-wide
-            for irr_data in irrmapper_raster_list:
-                temp_arr, _ = paste_and_reproject(src_raster_path=irr_data,
-                                                  ref_raster_path=ref_raster,
-                                                  nodata=no_data_value)
+                # Opening each data and pasting it on ref raster.
+                # This approach is followed because we want to create a WesternUS-wide raster even if
+                # there is no irrigated cropland data for LANID and AIM-HPA after 2020 for midwest and CONUS-wide
+                for irr_data in irrmapper_raster_list:
+                    temp_arr, _ = paste_and_reproject(src_raster_path=irr_data,
+                                                      ref_raster_path=ref_raster,
+                                                      nodata=no_data_value)
 
-                ref_arr = np.where(temp_arr != -9999, temp_arr, ref_arr)
+                    ref_arr = np.where(temp_arr != -9999, temp_arr, ref_arr)
 
-            ref_arr[ref_arr == 0] = no_data_value
-            output_raster = os.path.join(merged_output_dir, f'{merge_keyword}_{year}.tif')
-            write_array_to_raster(ref_arr, ref_file, ref_file.transform, output_raster)
+                ref_arr[ref_arr == 0] = no_data_value
+                output_raster = os.path.join(merged_output_dir, f'{merge_keyword}_{year}.tif')
+                write_array_to_raster(ref_arr, ref_file, ref_file.transform, output_raster)
 
 
-def classify_irrigated_cropland(years, irrigated_fraction_dir, irrigated_cropland_output_dir,
+def classify_irrigated_cropland(years, irrigated_fraction_dir,
+                                irrigated_cropland_output_dir,
+                                irr_fraction_threshold_others,
+                                irr_fraction_threshold_BasinRange,
+                                basin_range_shp,
                                 skip_processing=False):
     """
     Classifies irrigated cropland using irrigated fraction data.
@@ -458,15 +463,17 @@ def classify_irrigated_cropland(years, irrigated_fraction_dir, irrigated_croplan
     :param years: List of years to process data for.
     :param irrigated_fraction_dir: Input directory path for irrigated fraction data.
     :param irrigated_cropland_output_dir: Output directory path for classified irrigated cropland data.
+    :param irr_fraction_threshold_others: Minimum threshold (float) to consider a pixel irrigated in
+                                          regions outside basin and range-fill region.
+    :param irr_fraction_threshold_BasinRange: Minimum threshold (float) to consider a pixel irrigated in
+                                              regions inside basin and range-fill region.
+    :param basin_range_shp: Basin and range-fill region shapefile.
     :param skip_processing: Set to True to skip classifying irrigated and rainfed cropland data.
 
     :return: None
     """
     if not skip_processing:
         makedirs([irrigated_cropland_output_dir])
-
-        # A 2km pixel with >2% irr fraction was used to classify as irrigated
-        irrigated_frac_threshold_for_irrigated_class = 0.02
 
         for year in years:
             print(f'Classifying irrigated cropland data for year {year}')
@@ -475,9 +482,19 @@ def classify_irrigated_cropland(years, irrigated_fraction_dir, irrigated_croplan
 
             irrig_arr, irrig_file = read_raster_arr_object(irrigated_frac_data)
 
-            # classification using defined irrigated fraction. -9999 is no data
+            # create mask raster for Basin & Range shapefile extent
+            basin_range_mask = rasterize_shape_to_match(input_shape=basin_range_shp,
+                                                        ref_raster=irrigated_frac_data,
+                                                        burn_value=1, fill_value=0)
 
-            irrigated_cropland = np.where((irrig_arr > irrigated_frac_threshold_for_irrigated_class), 1, -9999)
+            # empty array to store cropland classification
+            irrigated_cropland = np.full_like(irrig_arr, -9999, dtype=np.int32)
+
+            # classify irrigated cropland for basin and range.  -9999 is no data
+            irrigated_cropland = np.where((basin_range_mask == 1) & (irrig_arr > irr_fraction_threshold_BasinRange), 1, irrigated_cropland)
+
+            # classification using defined irrigated fraction. -9999 is no data
+            irrigated_cropland = np.where((basin_range_mask == 0) & (irrig_arr > irr_fraction_threshold_others), 1, irrigated_cropland)
 
             # saving classified data
             output_irrigated_cropland_raster = os.path.join(irrigated_cropland_output_dir,
@@ -1024,16 +1041,19 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
 
     # process irrigated fraction data (2021-2023)
     # 2000-2020 data was processed int he Peff paper
-    merge_GEE_data_patches_IrrMapper_LANID_extents(year_list=[2021, 2022, 2023],
+    merge_GEE_data_patches_IrrMapper_LANID_extents(year_list=list(range(2021, 2024)),
                                                    input_dir_irrmapper='../../Data_main/rasters/Irrigation_Frac_IrrMapper',
-                                                   input_dir_lanid=None,
+                                                   input_dir_lanid=None,   # LANID not available after 2020
                                                    merged_output_dir='../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac',
                                                    merge_keyword='Irrigated_Frac', ref_raster=WestUS_raster,
                                                    skip_processing=skip_irr_frac_data_processing)
 
-    # process irrigated cropland data (2021-2023)
+    # process irrigated cropland data (2000-2023)
     # 2000-2020 data was processed int he Peff paper
-    classify_irrigated_cropland(years=[2021, 2022, 2023],
+    classify_irrigated_cropland(years=list(range(2000, 2024)),
                                 irrigated_fraction_dir='../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac',
                                 irrigated_cropland_output_dir='../../Data_main/rasters/Irrigated_cropland',
+                                irr_fraction_threshold_others=0.13,         # 13%
+                                irr_fraction_threshold_BasinRange=0.01,     # 1%
+                                basin_range_shp='../../Data_main/shapefiles/Basin_Range_aquifer/Basin_RangeFill_extent.shp',
                                 skip_processing=skip_irr_cropland_classification)

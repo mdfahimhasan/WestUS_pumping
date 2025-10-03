@@ -9,6 +9,7 @@ from glob import glob
 import rasterio as rio
 from osgeo import gdal
 import geopandas as gpd
+from rasterio import features
 from rasterio.mask import mask
 from rasterio.merge import merge
 from rasterio.enums import Resampling
@@ -767,3 +768,45 @@ def compute_proximity(input_raster, output_raster, target_values=(1,), nodataval
     inras_file, inras_band, dest_ds, dest_band = None, None, None, None
 
     return output_raster
+
+
+def rasterize_shape_to_match(input_shape, ref_raster, burn_value=1, fill_value=0):
+    """
+    Rasterizes a shapefile to match a reference raster.
+
+    Parameters
+    ----------
+    input_shape : str
+        Path to shapefile (e.g., Basin & Range extent).
+    ref_raster : str
+        Path to reference raster file to match grid (same resolution, extent, CRS).
+    burn_value : int, optional
+        Value assigned to pixels inside the shape (default=1).
+    fill_value : int, optional
+        Value assigned to pixels outside the shape (default=0).
+
+    Returns
+    -------
+    numpy.ndarray
+        2D array mask aligned with ref_raster.
+    """
+
+    # open shapefile and reference raster
+    gdf = gpd.read_file(input_shape)
+
+    ref_arr, ref_file = read_raster_arr_object(ref_raster)
+
+    # reproject shapefile if needed
+    if gdf.crs != ref_file.crs:
+        gdf = gdf.to_crs(ref_file.crs)
+
+    # rasterize
+    mask_arr = features.rasterize(
+                [(geom, burn_value) for geom in gdf.geometry],
+                out_shape=ref_arr.shape,
+                transform=ref_file.transform,
+                fill=fill_value,
+                dtype=np.uint8
+            )
+
+    return mask_arr

@@ -736,8 +736,7 @@ def create_pod_pumping_DV(
         pod_shp: str,
         output_dir: str,
         year_col: str = 'year',
-        pumping_col: str = 'pumping_mm',
-        area_col: str = 'area_m2',
+        pumping_col: str = 'pumping_AF',
         pod_col_csv: str = 'all_app',
         pod_col_shp: str = 'app',
         skip_processing=False):
@@ -750,7 +749,6 @@ def create_pod_pumping_DV(
         output_dir (str): Directory to save the output files.
         year_col (str): Column name for the year in the pumping data.
         pumping_col (str): Column name for the pumping values in the pumping data csv.
-        area_col (str): Column name for area in the pumping data csv.
         pod_col_csv (str): Column name for the POD identifier in the pumping data csv.
         pod_col_shp (str): Column name for the POD identifier in the POD shapefile.
         skip_processing: Set to True to skip this process.
@@ -766,10 +764,8 @@ def create_pod_pumping_DV(
         for _, row in pumping_df.iterrows():
             pod_list = row[pod_col_csv].split('_')
 
-            # Pumping in DRI dataset is recorded as mm. Converting that to m3 using actual irrigated area (m2).
-            # Then, converting from m3 to AF, as we will need AF to create area averaged pumping raster (unit mm).
-            pumping_vol = row[pumping_col] * row[area_col] * 1e-3 / 1233.48  # in Acre-ft
-            pumping_vol_per_pod = pumping_vol / len(pod_list)  # distribute equally among PODs
+            # distribute pumping volume equally among multiple PODs
+            pumping_vol_per_pod = row[pumping_col] / len(pod_list)
 
             for pod in pod_list:
                 temp_df = pd.DataFrame({
@@ -1045,7 +1041,6 @@ if __name__ == '__main__':
         output_dir='../../Data_main/pumping/Nevada/Final',
         year_col='year',
         pumping_col='pumping_mm',
-        area_col='area_m2',
         pod_col_csv='all_app',
         pod_col_shp='app',
         skip_processing=skip_dist_pumping_to_pod)

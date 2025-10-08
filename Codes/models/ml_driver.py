@@ -13,7 +13,7 @@ sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import makedirs
 from Codes.utils.plots import scatter_plot_of_same_vars
-from Codes.utils.ml_ops import (create_train_test_dataframe, split_train_val_test_set_v2, \
+from Codes.utils.ML_ops import (create_train_test_dataframe, split_train_val_test_set_v2, \
                                 train_model, test_model, plot_permutation_importance, \
                                 cross_val_performance, plot_shap_summary_plot, plot_shap_interaction_plot, \
                                 create_annual_dataframes_for_pumping_prediction, predict_annual_pumping_rasters)

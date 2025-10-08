@@ -16,7 +16,7 @@ from os.path import dirname, abspath
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import makedirs
-from Codes.utils.ml_ops import create_annual_dataframes_for_pumping_prediction
+from Codes.utils.ML_ops import create_annual_dataframes_for_pumping_prediction
 from Codes.utils.raster_ops import read_raster_arr_object, make_lat_lon_array_from_raster
 
 

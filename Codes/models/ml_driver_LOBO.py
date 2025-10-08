@@ -43,11 +43,20 @@ def predict_LOBO_basin(trained_model, predictor_array, target_array, year_series
         for col in categorical_columns:
             predictor_array[col] = predictor_array[col].astype('category')
 
-    # testing model performance
+    # creating and saving dataframe
+    # only considering pixels where both actual and predicted pumping values exist
     y_pred_test = trained_model.predict(predictor_array)
+    test_obsv_predict_df = pd.DataFrame({'actual': target_array.values.ravel(),
+                                         'predicted': y_pred_test})
+    test_obsv_predict_df['year'] = year_series
+
+    test_obsv_predict_df = test_obsv_predict_df[(test_obsv_predict_df['predicted'] > 0) & (test_obsv_predict_df['actual'] > 0)]
+
+    test_obsv_predict_df.to_csv(prediction_csv_path, index=False)
 
     # performance/error metrics
-    metrics_dict = calculate_metrics(predictions=y_pred_test, targets=target_array.values.ravel())
+    metrics_dict = calculate_metrics(predictions=test_obsv_predict_df['predicted'],
+                                     targets=test_obsv_predict_df['actual'])
 
     rmse = metrics_dict['RMSE']
     mae = metrics_dict['MAE']
@@ -59,14 +68,7 @@ def predict_LOBO_basin(trained_model, predictor_array, target_array, year_series
         f"Test Results:\n"
         f"---------------------\n"
         f"RMSE: {rmse:.4f}, MAE: {mae:.4f},\n"
-        f"NRMSE: {nrmse:.4f}, NMAE: {nmae:.4f}, R²: {r2:.4f}\n"
-    )
-
-    # saving test prediction
-    test_obsv_predict_df = pd.DataFrame({'actual': target_array.values.ravel(),
-                                         'predicted': y_pred_test})
-    test_obsv_predict_df['year'] = year_series
-    test_obsv_predict_df.to_csv(prediction_csv_path, index=False)
+        f"NRMSE: {nrmse:.4f}, NMAE: {nmae:.4f}, R²: {r2:.4f}\n")
 
 
 def perform_LOBO(years_list, years_no_pumping_data_dict,
@@ -103,8 +105,8 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
     :return: None.
     """
     if not skip_processing:
-        print('---------------------------------------------------------')
-        print(f'\nRunning Leave-One-Basin-Out test for {basin_code}...')
+        print('\n---------------------------------------------------------')
+        print(f'Running Leave-One-Basin-Out test for {basin_code}...')
         print('---------------------------------------------------------')
 
         # --------------------------------------------------------------------------------------------------------------
@@ -124,7 +126,7 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
         # during testing, the holdout will only have pumping data from inside the basin
         # --------------------------------------------------------------------------------------------------------------
         if not skip_process_pumping_data:
-            westUS_pumping_dir = f'../../Data_main/pumping/rasters/WestUS_pumping'  # this is the WestUS-scale pumping data
+            westUS_pumping_dir = f'../../Data_main/pumping/rasters/WestUS_pumping'  # this is the WestUS-scale filtered pumping data
             westUS_pumping_rasters = glob(os.path.join(westUS_pumping_dir, '*.tif'))
 
             # pumping data extraction for fitting (training) and holdout
@@ -287,6 +289,13 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
 
 
 if __name__ == '__main__':
+    print(
+        "# **** Note: The 'actual' (reference) values here are the filtered pumping rasters.\n"
+        "For LOBO evaluation, we also use the respective basin’s filtered pixels, since unfiltered pixels\n"
+        "violate physical constraints or contain data issues. Moreover, the model itself was trained on\n"
+        "filtered pixels, so using filtered pumping ensures an apples-to-apples comparison of model performance.\n"
+    )
+
     skip_LOBO_GMD3 = False      ##### GMD3, KS
     skip_LOBO_GMD4 = False      ##### GMD4, KS
     skip_LOBO_RPB = False       ##### Republican Basin, CO
@@ -298,14 +307,16 @@ if __name__ == '__main__':
     skip_LOBO_PHX = False       ##### Phoenix AMA, AZ
     skip_LOBO_PNL = False       ##### Pinal AMA, AZ
     skip_LOBO_SCRUZ = False     ##### Santa Cruz AMA, AZ
+    skip_LOBO_DV = False        ##### Diamond Valley, NV
 
     # time period
     years = list(range(2000, 2024))
 
     years_no_data_dict = {
-        'KS': list(range(2021, 2024)),  # applies to GMD3, GMD4
-        'CO': list(range(2000, 2011)),  # applies to RPB, SPB, AR, SLV
-        'AZ': []  # applies to HQR, DOUG, PHX, PNL, SCRUZ
+        'KS': list(range(2021, 2024)),                  # applies to GMD3, GMD4 (Kansas)
+        'CO': list(range(2000, 2011)),                  # applies to RPB, SPB, AR, SLV (Colorado)
+        'AZ': [],                                       # applies to HQR, DOUG, PHX, PNL, SCRUZ (Arizona)
+        'NV': list(range(2000, 2018)) + [2023]          # applies to DV (Nevada)
     }
 
     # exclude columns during training
@@ -314,18 +325,22 @@ if __name__ == '__main__':
 
     # hyperparameters from tuned model
     lgbm_param_dict = {'boosting_type': 'dart',
-                       'colsample_bynode': 0.9429030834499261,
-                       'colsample_bytree': 0.7084157250145205,
+                       'subsample': 0.7215192839260514,
+                       'drop_rate': 0.15335949282061498,
+                       'max_drop': 45,
+                       'skip_drop': 0.6871741200895095,
+                       'colsample_bynode': 0.7629040369343447,
+                       'colsample_bytree': 0.6784146853360562,
                        'data_sample_strategy': 'bagging',
-                       'learning_rate': 0.04985719923634188,
+                       'learning_rate': 0.01992490055801005,
                        'max_depth': 7,
-                       'min_child_samples': 35,
-                       'n_estimators': 550,
-                       'num_leaves': 50,
-                       'path_smooth': 0.7240592809864574,
-                       'subsample': 0.7561523593619698,
+                       'min_child_samples': 75,
+                       'n_estimators': 375,
+                       'num_leaves': 45,
+                       'path_smooth': 0.5645643559288485,
                        'force_col_wise': True
                        }
+
     # datasets
     data_path_dict = {
         # 'netGW_Irr': '../../Data_main/rasters/NetGW_irrigation/WesternUS',
@@ -357,7 +372,7 @@ if __name__ == '__main__':
 
     prediction_df_output_dir = f'../../Data_main/rasters/ML_LOBO/dataframes_for_prediction'
 
-    model_version = 'v7'
+    model_version = 'v9'
 
     # GMD3, KS
     perform_LOBO(years_list=years, years_no_pumping_data_dict=years_no_data_dict,
@@ -458,4 +473,11 @@ if __name__ == '__main__':
                  predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
                  skip_processing=skip_LOBO_SCRUZ)
 
-
+    # Diamond Valley, NV
+    perform_LOBO(years_list=years, years_no_pumping_data_dict=years_no_data_dict,
+                 model_version=f'{model_version}', basin_code='DV', state_code='NV',
+                 model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
+                 annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
+                 basin_shape='../../Data_main/shapefiles/Basins_of_interest/Diamond_Valley_Basin.shp',
+                 predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
+                 skip_processing=skip_LOBO_DV)

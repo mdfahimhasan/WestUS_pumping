@@ -7,7 +7,6 @@ import os
 import sys
 import random
 import pickle
-import joblib
 import numpy as np
 import pandas as pd
 from glob import glob
@@ -934,6 +933,7 @@ def plot_learning_curve(train_loss, val_loss, plot_save_path):
     plt.yticks(fontsize=12)
 
     # saving the plot as an image file
+    plt.tight_layout()
     plt.savefig(plot_save_path, dpi=200)
     plt.close()
     print(f'\nLoss plot saved...')
@@ -1073,31 +1073,45 @@ def plot_shap_summary_plot(trained_model_path, trained_model_info, use_samples,
         pass
 
 
-def plot_shap_interaction_plot(model_version, trained_model_path, use_samples, features_to_plot,
-                               data_csv, exclude_features_from_df, save_plot_dir,
+def plot_shap_interaction_plot(model_version, features_to_plot,
+                               trained_model_path, trained_model_info,
+                               feature_excluded_in_training, use_samples,
+                               data_csv, save_plot_dir,
                                skip_processing=False):
     """
-    Generate and save a SHAP summary (beeswarm) plot to visualize feature importance.
+    Generate individual SHAP dependence plots for selected features and compile them into a grid image.
 
     :param model_version: str
-        Model version.
+        Model version. Used to save and track corresponding SHAP plots for respective model.
+
+    :param features_to_plot: list
+        Human-readable feature names to generate SHAP dependence plots for.
+        Must match the renamed columns after feature mapping.
+
+        Select from this list-
+         ['Consumptive groundwater use', 'Effective precipitation',
+         'Surface water irrigation', 'Reference ET', 'Precipitation',
+         'Temperature (max)', 'ET', 'Irrigated crop fraction',
+         'Relative humidity (max)', 'Relative humidity (min)',
+         'Shortwave radiation', 'Vapor pressure deficit',
+         'Sun hour', 'Field capacity']
+
     :param trained_model_path: str
-        Path to the `.joblib` file containing the saved model's state_dict.
+        Path to the `.pth` file containing the saved model's state_dict.
+
+    :param trained_model_info: str
+        Path to the `.pkl` file with model configuration and metadata.
+
+    :param feature_excluded_in_training: List of features excluded in trainined model.
 
     :param use_samples: int
         Number of samples to randomly draw from the dataset for SHAP analysis.
 
-    :param features_to_plot: List
-        List of features to include in the interaction plot.
-
-    :param data_csv: str or DataFrame
-        Path to the CSV file containing the input feature data. Or a dataframe of input features.
-
-    :param exclude_features_from_df: list
-        List of column names to exclude from the input (e.g., pumping_mm, IDs).
+    :param data_csv: str
+        Path to the CSV file containing input features.
 
     :param save_plot_dir: str
-        Directory path where the SHAP interaction plot will be saved.
+        Directory where individual dependence plots and the compiled grid image will be saved.
 
     :param skip_processing: bool, optional (default=False)
         If True, skip execution.
@@ -1108,24 +1122,33 @@ def plot_shap_interaction_plot(model_version, trained_model_path, use_samples, f
         makedirs([save_plot_dir])
 
         # loading model
-        trained_model = joblib.load(trained_model_path)
+        trained_model_info = pickle.load(open(trained_model_info, 'rb'))
+        trained_model = MLPRegression(
+            n_features=trained_model_info['params']['n_features'],
+            fc_layers=trained_model_info['params']['fc_units'],
+            activation_func=trained_model_info['params']['activation_func'],
+            dropout_rate=trained_model_info['params']['dropout_rate']
+        )
+
+        # loading state_dict of the trained model
+        trained_model.load_state_dict(torch.load(f=trained_model_path, weights_only=True))
 
         print(trained_model)
 
+        # model set to evaluation mode
+        trained_model = trained_model.to('cuda')
+        trained_model.eval()
+
         print('\n___________________________________________________________________________')
-        print(f'\nplotting SHAP interaction plot...')
+        print(f'\nplotting SHAP feature importance...')
 
         # loading data + random sampling + renaming dataframe features
-        if 'pumping_mm' not in exclude_features_from_df:
-            exclude_features_from_df = exclude_features_from_df + ['pumping_mm']
 
-        if '.csv' in data_csv:
-            df = pd.read_csv(data_csv)
-            df = df.drop(columns=exclude_features_from_df)
+        if 'target' not in feature_excluded_in_training:
+            feature_excluded_in_training = feature_excluded_in_training + ['target']
 
-        elif isinstance(data_csv, pd.DataFrame):
-            df = data_csv.drop(columns=exclude_features_from_df, errors="ignore")
-
+        df = pd.read_csv(data_csv)
+        df = df.drop(columns=feature_excluded_in_training)
         df = df.sample(n=use_samples, random_state=43)  # sampling 'use_samples' of rows for SHAP plotting
 
         feature_names_dict = {'netGW_Irr': 'Consumptive groundwater use', 'peff': 'Effective precipitation',
@@ -1140,25 +1163,26 @@ def plot_shap_interaction_plot(model_version, trained_model_path, use_samples, f
         df = df.rename(columns=feature_names_dict)
         feature_names = np.array(df.columns.tolist())
 
-        # using SHAP TreeExplainer to estimate shap values
-        explainer = shap.TreeExplainer(trained_model)
-        shap_values = explainer(df)
+        # converting to numpy to convert to torch tensor
+        data_tensor = torch.tensor(df.values, dtype=torch.float32).to('cuda')
 
-        if hasattr(shap_values, "values"):
-            shap_values_np = shap_values.values
-        else:
-            shap_values_np = shap_values
+        # using SHAP GradientExplainer designed for PyTorch/TensorFlow (DeepExplainer doesn't work for some reasons)
+        explainer = shap.GradientExplainer(trained_model, data_tensor)
+        shap_values = explainer(data_tensor)
+
+        # converting SHAP values to numpy for plotting
+        shap_values_np = shap_values.values.squeeze(
+            -1)  # Remove singleton third dimension from SHAP array: shape [n, m, 1] → [n, m]
+        data_np = data_tensor.cpu().numpy()
 
         # plotting and saving individual shap dependence plots
         for feature in features_to_plot:
-            shap.dependence_plot(feature, shap_values_np, df, feature_names=feature_names,
+            shap.dependence_plot(feature, shap_values_np, data_np, feature_names=feature_names,
                                  interaction_index=None, show=False)
-            plt.gca().set_ylabel('SHAP value', fontsize=14)
-            plt.gca().set_xlabel(feature, fontsize=14)
-            plt.xticks(fontsize=12)
-            plt.yticks(fontsize=12)
+            plt.gca().set_ylabel('SHAP value')
+            plt.gca().set_xlabel(feature)
 
-            plt.savefig(os.path.join(save_plot_dir, f'{feature}.png'), dpi=400, bbox_inches='tight')
+            plt.savefig(os.path.join(save_plot_dir, f'{feature}.png'), dpi=200, bbox_inches='tight')
 
         # compiling individual shap plot in a grid plot
         n_cols = 3
@@ -1181,6 +1205,7 @@ def plot_shap_interaction_plot(model_version, trained_model_path, use_samples, f
         plt.subplots_adjust(wspace=0.05, hspace=0.05)
         plt.savefig(os.path.join(save_plot_dir, f'SHAP_interaction_all_{model_version}.png'), dpi=200,
                     bbox_inches='tight')
+
     else:
         pass
 

@@ -15,7 +15,7 @@ from Codes.utils.DL_ops import DataLoaderCreator, main, plot_learning_curve, tes
 
 if __name__ == '__main__':
     # # # model version
-    model_version = 'v7'  ################################################################
+    model_version = 'v9'  ################################################################
 
     # # # model switches
     # setting 'RUN_MODEL' to False will skip all model running processing
@@ -29,27 +29,27 @@ if __name__ == '__main__':
     skip_SHAP_summary_plot = False  ################################################################
     skip_SHAP_interaction_plot = False  ################################################################
 
-    skip_create_prediction_rasters = True  ################################################################
+    skip_create_prediction_rasters = False  ################################################################
 
     # # # default variables (from hyperparameter tuning process)
     batch_size = 256
     n_features = 12
-    n_epochs = 70
+    n_epochs = 150
     lr = 0.001
     lr_scheduler = 'CosineAnnealingLR'
     activation = 'leakyrelu'
     patience = 10
     start_earlyStopping_at_epoch = 20
-    # optimizer -----> 'AdamW'
+    # optimizer -----> 'Adam'
 
     exclude_features_from_training = ['year', 'pixelID', 'stateID',
                                       'shortRad', 'minRH']
 
     # default model architecture
     default_params = {
-        'fc_units': [256, 128, 64],
+        'fc_units': [128, 64, 32, 16],
         'weight_decay': 1e-2,
-        'dropout': 0.5
+        'dropout': 0.2
     }
 
     # # # directories
@@ -86,6 +86,14 @@ if __name__ == '__main__':
         # --------------------------------------------------------------------------------------------------------------
         print('\n############## Model performance on test data ###############\n')
 
+        print('Train performance:')
+        trainLoader = DataLoaderCreator(data_csv=train_csv,
+                                       shuffle=False, features_to_exclude=exclude_features_from_training,
+                                       batch_size=batch_size, verbose=False).get_dataloader()
+
+        train_results = f'../../Model_run/ANN_model/output_csv/train_results_{model_version}.csv'
+        test(model=trained_model, test_loader=trainLoader, output_csv=train_results)
+
         print('Test performance:')
         testLoader = DataLoaderCreator(data_csv=test_csv,
                                        shuffle=False, features_to_exclude=exclude_features_from_training,
@@ -112,12 +120,22 @@ if __name__ == '__main__':
                             val_loss=model_info['val_losses'],
                             plot_save_path=learning_curve_plot)
 
+        train_results_df = pd.read_csv(train_results)
+        scatter_plot_of_same_vars(Y_pred=train_results_df['predicted'], Y_obsv=train_results_df['actual'],
+                                  x_label='actual pumping (mm/year)', y_label='predicted pumping (mm/year)',
+                                  plot_name=f'train_scatter_{model_version}.jpg',
+                                  savedir=f'../../Model_run/ANN_model/Plots/', alpha=0.5,
+                                  marker_size=5, axis_lim=(0, 1500),
+                                  title='performance on train set',
+                                  tick_interval=200)
+
         test_results_df = pd.read_csv(test_results)
         scatter_plot_of_same_vars(Y_pred=test_results_df['predicted'], Y_obsv=test_results_df['actual'],
                                   x_label='actual pumping (mm/year)', y_label='predicted pumping (mm/year)',
                                   plot_name=f'test_scatter_{model_version}.jpg',
                                   savedir=f'../../Model_run/ANN_model/Plots/', alpha=0.5,
-                                  color_format='o', marker_size=5, title='performance on test set',
+                                  marker_size=5, axis_lim=(0, 1500),
+                                  title='performance on test set',
                                   tick_interval=200)
 
         val_results_df = pd.read_csv(val_results)
@@ -125,7 +143,8 @@ if __name__ == '__main__':
                                   x_label='actual pumping (mm/year)', y_label='predicted pumping (mm/year)',
                                   plot_name=f'val_scatter_{model_version}.jpg',
                                   savedir=f'../../Model_run/ANN_model/Plots/', alpha=0.5,
-                                  color_format='o', marker_size=5, title='performance on validation set',
+                                  marker_size=5, axis_lim=(0, 1500),
+                                  title='performance on validation set',
                                   tick_interval=200)
 
     # --------------------------------------------------------------------------------------------------------------
@@ -160,9 +179,8 @@ if __name__ == '__main__':
     WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
 
     load_model_and_predict_raster(trained_model_path=model_save_path, trained_model_info=model_info_save_path,
-                                  years_list=list(range(2000, 2020)),
+                                  years_list=list(range(2000, 2024)),
                                   predictor_csv_dir=annual_standardized_df_dir, nan_pos_dir=nan_pos_dir,
                                   batch_size=batch_size, exclude_features_in_model=exclude_features_from_training,
                                   output_dir=predicted_raster_dir, ref_raster=WestUS_raster,
-                                  irrig_fraction_dir=f'../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac',
                                   verbose=False, skip_processing=skip_create_prediction_rasters)

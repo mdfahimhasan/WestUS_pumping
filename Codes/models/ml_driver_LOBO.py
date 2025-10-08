@@ -16,7 +16,7 @@ from Codes.utils.system_ops import makedirs
 from Codes.utils.stats_ops import calculate_metrics
 from Codes.utils.plots import scatter_plot_of_same_vars
 from Codes.utils.raster_ops import mask_raster_by_shape, set_nodata_inside_shapefile
-from Codes.utils.ml_ops import reindex_df, create_train_test_dataframe, split_train_val_test_set_v2, \
+from Codes.utils.ML_ops import reindex_df, create_train_test_dataframe, split_train_val_test_set_v2, \
     train_model, create_annual_dataframes_for_pumping_prediction, predict_annual_pumping_rasters
 
 WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'

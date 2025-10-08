@@ -177,8 +177,6 @@ def scatter_plot(X, Y, x_label, y_label, plot_name, savedir, alpha=0.1,
     :param marker_size: (float or int) Marker size.
     :param color_format: Color and plot type format. For example, for 'bo' 'b' means blue color and 'o' means dot plot.
     :param title: Str of title. Default set to None.
-    :param axis_lim: A list of minimum and maximum values of x and y axis.
-                     Default set to None (will calculate and set xlim, ylim itself)
 
     :return: A scatter plot of model prediction vs observed data.
     """

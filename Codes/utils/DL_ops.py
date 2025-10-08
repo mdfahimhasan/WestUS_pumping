@@ -922,15 +922,18 @@ def plot_learning_curve(train_loss, val_loss, plot_save_path):
     :return: None. The function saves the plot to disk.
     """
     # plotting losses
-    plt.figure(figsize=(6, 4))
-    plt.plot(train_loss, label='train')
-    plt.plot(val_loss, label='validation')
-    plt.xlabel('Epoch', fontsize=14)
-    plt.ylabel('Loss (mean squared error)', fontsize=14)
+    fig, ax = plt.subplots(figsize=(6, 4))
 
-    plt.legend(fontsize=12)
-    plt.xticks(fontsize=12)
-    plt.yticks(fontsize=12)
+    ax.plot(train_loss, label='train')
+    ax.plot(val_loss, label='validation')
+    ax.set_xlabel('Epoch', fontsize=14)
+    ax.set_ylabel('Loss (mean squared error)', fontsize=14)
+    ax.legend(fontsize=12)
+    ax.tick_params(labelsize=12)
+
+    # Hide only top & right spines
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
 
     # saving the plot as an image file
     plt.tight_layout()

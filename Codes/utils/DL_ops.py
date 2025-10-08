@@ -7,6 +7,7 @@ import os
 import sys
 import random
 import pickle
+import joblib
 import numpy as np
 import pandas as pd
 from glob import glob
@@ -472,7 +473,6 @@ def test(model, test_loader, output_csv):
 
     :param model: The model to validate.
     :param test_loader: DataLoader for test data. The dataset should already be standardized/normalized.
-    :param data_type: str. Type of data passed to the DataLoader class.
     :param output_csv: str. File path to save the test results CSV with actual and predicted values.
 
     :return: Average loss and additional metrics.
@@ -923,15 +923,18 @@ def plot_learning_curve(train_loss, val_loss, plot_save_path):
     :return: None. The function saves the plot to disk.
     """
     # plotting losses
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(6, 4))
     plt.plot(train_loss, label='train')
     plt.plot(val_loss, label='validation')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss (mean squared error)')
-    plt.legend()
+    plt.xlabel('Epoch', fontsize=14)
+    plt.ylabel('Loss (mean squared error)', fontsize=14)
+
+    plt.legend(fontsize=12)
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
 
     # saving the plot as an image file
-    plt.savefig(plot_save_path)
+    plt.savefig(plot_save_path, dpi=200)
     plt.close()
     print(f'\nLoss plot saved...')
 
@@ -1070,45 +1073,31 @@ def plot_shap_summary_plot(trained_model_path, trained_model_info, use_samples,
         pass
 
 
-def plot_shap_interaction_plot(model_version, features_to_plot,
-                               trained_model_path, trained_model_info,
-                               feature_excluded_in_training, use_samples,
-                               data_csv, save_plot_dir,
+def plot_shap_interaction_plot(model_version, trained_model_path, use_samples, features_to_plot,
+                               data_csv, exclude_features_from_df, save_plot_dir,
                                skip_processing=False):
     """
-    Generate individual SHAP dependence plots for selected features and compile them into a grid image.
+    Generate and save a SHAP summary (beeswarm) plot to visualize feature importance.
 
     :param model_version: str
-        Model version. Used to save and track corresponding SHAP plots for respective model.
-
-    :param features_to_plot: list
-        Human-readable feature names to generate SHAP dependence plots for.
-        Must match the renamed columns after feature mapping.
-
-        Select from this list-
-         ['Consumptive groundwater use', 'Effective precipitation',
-         'Surface water irrigation', 'Reference ET', 'Precipitation',
-         'Temperature (max)', 'ET', 'Irrigated crop fraction',
-         'Relative humidity (max)', 'Relative humidity (min)',
-         'Shortwave radiation', 'Vapor pressure deficit',
-         'Sun hour', ''Field capacity']
-
+        Model version.
     :param trained_model_path: str
-        Path to the `.pth` file containing the saved model's state_dict.
-
-    :param trained_model_info: str
-        Path to the `.pkl` file with model configuration and metadata.
-
-    :param feature_excluded_in_training: List of features excluded in trainined model.
+        Path to the `.joblib` file containing the saved model's state_dict.
 
     :param use_samples: int
         Number of samples to randomly draw from the dataset for SHAP analysis.
 
-    :param data_csv: str
-        Path to the CSV file containing input features.
+    :param features_to_plot: List
+        List of features to include in the interaction plot.
+
+    :param data_csv: str or DataFrame
+        Path to the CSV file containing the input feature data. Or a dataframe of input features.
+
+    :param exclude_features_from_df: list
+        List of column names to exclude from the input (e.g., pumping_mm, IDs).
 
     :param save_plot_dir: str
-        Directory where individual dependence plots and the compiled grid image will be saved.
+        Directory path where the SHAP interaction plot will be saved.
 
     :param skip_processing: bool, optional (default=False)
         If True, skip execution.
@@ -1119,33 +1108,24 @@ def plot_shap_interaction_plot(model_version, features_to_plot,
         makedirs([save_plot_dir])
 
         # loading model
-        trained_model_info = pickle.load(open(trained_model_info, 'rb'))
-        trained_model = MLPRegression(
-            n_features=trained_model_info['params']['n_features'],
-            fc_layers=trained_model_info['params']['fc_units'],
-            activation_func=trained_model_info['params']['activation_func'],
-            dropout_rate=trained_model_info['params']['dropout_rate']
-        )
-
-        # loading state_dict of the trained model
-        trained_model.load_state_dict(torch.load(f=trained_model_path, weights_only=True))
+        trained_model = joblib.load(trained_model_path)
 
         print(trained_model)
 
-        # model set to evaluation mode
-        trained_model = trained_model.to('cuda')
-        trained_model.eval()
-
         print('\n___________________________________________________________________________')
-        print(f'\nplotting SHAP feature importance...')
+        print(f'\nplotting SHAP interaction plot...')
 
         # loading data + random sampling + renaming dataframe features
+        if 'pumping_mm' not in exclude_features_from_df:
+            exclude_features_from_df = exclude_features_from_df + ['pumping_mm']
 
-        if 'target' not in feature_excluded_in_training:
-            feature_excluded_in_training = feature_excluded_in_training + ['target']
+        if '.csv' in data_csv:
+            df = pd.read_csv(data_csv)
+            df = df.drop(columns=exclude_features_from_df)
 
-        df = pd.read_csv(data_csv)
-        df = df.drop(columns=feature_excluded_in_training)
+        elif isinstance(data_csv, pd.DataFrame):
+            df = data_csv.drop(columns=exclude_features_from_df, errors="ignore")
+
         df = df.sample(n=use_samples, random_state=43)  # sampling 'use_samples' of rows for SHAP plotting
 
         feature_names_dict = {'netGW_Irr': 'Consumptive groundwater use', 'peff': 'Effective precipitation',
@@ -1160,26 +1140,25 @@ def plot_shap_interaction_plot(model_version, features_to_plot,
         df = df.rename(columns=feature_names_dict)
         feature_names = np.array(df.columns.tolist())
 
-        # converting to numpy to convert to torch tensor
-        data_tensor = torch.tensor(df.values, dtype=torch.float32).to('cuda')
+        # using SHAP TreeExplainer to estimate shap values
+        explainer = shap.TreeExplainer(trained_model)
+        shap_values = explainer(df)
 
-        # using SHAP GradientExplainer designed for PyTorch/TensorFlow (DeepExplainer doesn't work for some reasons)
-        explainer = shap.GradientExplainer(trained_model, data_tensor)
-        shap_values = explainer(data_tensor)
-
-        # converting SHAP values to numpy for plotting
-        shap_values_np = shap_values.values.squeeze(
-            -1)  # Remove singleton third dimension from SHAP array: shape [n, m, 1] → [n, m]
-        data_np = data_tensor.cpu().numpy()
+        if hasattr(shap_values, "values"):
+            shap_values_np = shap_values.values
+        else:
+            shap_values_np = shap_values
 
         # plotting and saving individual shap dependence plots
         for feature in features_to_plot:
-            shap.dependence_plot(feature, shap_values_np, data_np, feature_names=feature_names,
+            shap.dependence_plot(feature, shap_values_np, df, feature_names=feature_names,
                                  interaction_index=None, show=False)
-            plt.gca().set_ylabel('SHAP value')
-            plt.gca().set_xlabel(feature)
+            plt.gca().set_ylabel('SHAP value', fontsize=14)
+            plt.gca().set_xlabel(feature, fontsize=14)
+            plt.xticks(fontsize=12)
+            plt.yticks(fontsize=12)
 
-            plt.savefig(os.path.join(save_plot_dir, f'{feature}.png'), dpi=200, bbox_inches='tight')
+            plt.savefig(os.path.join(save_plot_dir, f'{feature}.png'), dpi=400, bbox_inches='tight')
 
         # compiling individual shap plot in a grid plot
         n_cols = 3
@@ -1200,9 +1179,8 @@ def plot_shap_interaction_plot(model_version, features_to_plot,
         # saving plot
         plt.tight_layout(pad=0.1)
         plt.subplots_adjust(wspace=0.05, hspace=0.05)
-        plt.savefig(os.path.join(save_plot_dir, f'SHAP_interaction_all_{model_version}.png'), dpi=150,
+        plt.savefig(os.path.join(save_plot_dir, f'SHAP_interaction_all_{model_version}.png'), dpi=200,
                     bbox_inches='tight')
-
     else:
         pass
 
@@ -1250,8 +1228,9 @@ def write_array_to_raster(raster_arr, raster_file, transform, output_path, dtype
 
 def load_model_and_predict_raster(trained_model_path, trained_model_info, years_list,
                                   predictor_csv_dir, nan_pos_dir, batch_size, exclude_features_in_model,
-                                  output_dir, ref_raster, irrig_fraction_dir,
-                                  verbose=False, skip_processing=False):
+                                  output_dir, ref_raster,
+                                  verbose=False,
+                                  skip_processing=False):
     """
     Loads a trained MLP model and make prediction raster.
 
@@ -1264,8 +1243,6 @@ def load_model_and_predict_raster(trained_model_path, trained_model_info, years_
     :param exclude_features_in_model: list. List of feature column names to exclude from the input data.
     :param output_dir: str. Path to the output directory where predicted rasters will be saved.
     :param ref_raster: Western US reference raster for reshaping prediction raster's shape.
-    :param irrig_fraction_dir: Directory path of irrigation fraction rasters.
-    :param peff_dir: Directory path of growing season effective precipitation rasters.
     :param verbose: Set to True to print the loaded trained model.
     :param skip_processing: bool. Set to True to skip this code run.
 
@@ -1345,13 +1322,6 @@ def load_model_and_predict_raster(trained_model_path, trained_model_info, years_
             ref_file = rio.open(ref_raster)
             ref_arr = ref_file.read(1)
             pred_arr = pred_arr.reshape(ref_arr.shape)
-
-            # # # filter out predictions for <2% irrigated fraction
-            # the training data only has pixels with > 2% irrigated fraction
-            irrig_frac_data = glob(os.path.join(irrig_fraction_dir, f'*{year}.tif'))[0]
-            irrig_frac_arr = rio.open(irrig_frac_data).read(1)
-
-            pred_arr[irrig_frac_arr < 0.02] = -9999
 
             # # # saving
             output_prediction_raster = os.path.join(output_dir, f'pumping_{year}.tif')

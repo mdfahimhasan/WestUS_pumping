@@ -9,8 +9,9 @@ from Codes.utils.system_ops import makedirs
 from Codes.utils.stats_ops import calculate_r2
 
 
-def scatter_plot_of_same_vars(Y_pred, Y_obsv, x_label, y_label, plot_name, savedir, alpha=0.1,
-                              color_format='o', marker_size=0.5, title=None,
+def scatter_plot_of_same_vars(Y_pred, Y_obsv, x_label, y_label, plot_name,
+                              savedir, alpha=0.1,
+                              marker_size=0.5, title=None,
                               axis_lim=None, tick_interval=50):
     """
     Makes scatter plot of model prediction vs observed data.
@@ -23,7 +24,6 @@ def scatter_plot_of_same_vars(Y_pred, Y_obsv, x_label, y_label, plot_name, saved
     :param savedir: filepath to save the plot.
     :param alpha: plot/scatter dots transparency level.
     :param marker_size: (float or int) Marker size.
-    :param color_format: Color and plot type format. For example, for 'bo' 'b' means blue color and 'o' means dot plot.
     :param title: Str of title. Default set to None.
     :param axis_lim: A list of minimum and maximum values of x and y axis.
                      Default set to None (will calculate and set xlim, ylim itself)

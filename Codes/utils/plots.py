@@ -44,7 +44,7 @@ def scatter_plot_of_same_vars(Y_pred, Y_obsv, x_label, y_label, plot_name, saved
     fig, ax = plt.subplots(figsize=(8, 6))
     fig.set_facecolor('none')
 
-    ax.plot(Y_obsv, Y_pred, color_format, alpha=alpha, markersize=marker_size)
+    ax.scatter(Y_obsv, Y_pred, edgecolor='tab:blue', facecolor='none', alpha=alpha, s=marker_size)
     ax.plot([min_value, max_value], [min_value, max_value], '--r', linewidth=1)
     ax.set_xlabel(x_label)  # 'Observed'
     ax.set_ylabel(y_label)  # 'Predicted'
@@ -57,6 +57,10 @@ def scatter_plot_of_same_vars(Y_pred, Y_obsv, x_label, y_label, plot_name, saved
         ax.set_ylim([min_value, max_value])
         ax.set_xticks(np.arange(0, max_value, tick_interval))
         ax.set_yticks(np.arange(0, max_value, tick_interval))
+
+    # Hide only the top and right spines (keep bottom and left axes visible)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
 
     if title is not None:
         ax.set_title(title)

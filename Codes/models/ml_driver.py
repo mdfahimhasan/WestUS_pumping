@@ -14,9 +14,9 @@ sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 from Codes.utils.system_ops import makedirs
 from Codes.utils.plots import scatter_plot_of_same_vars
 from Codes.utils.ml_ops import (create_train_test_dataframe, split_train_val_test_set_v2, \
-    train_model, test_model, plot_permutation_importance, \
-    cross_val_performance, plot_shap_summary_plot, plot_shap_interaction_plot, \
-    create_annual_dataframes_for_pumping_prediction, predict_annual_pumping_rasters)
+                                train_model, test_model, plot_permutation_importance, \
+                                cross_val_performance, plot_shap_summary_plot, plot_shap_interaction_plot, \
+                                create_annual_dataframes_for_pumping_prediction, predict_annual_pumping_rasters)
 
 # model resolution and reference raster/shapefile
 no_data_value = -9999
@@ -67,20 +67,20 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------------------------------------------
     # flags
     # --------------------------------------------------------------------------------------------------------------
-    model_version = 'v7'                ######
+    model_version = 'v9'  ######
 
-    skip_df_creation = True                ######
-    skip_train_test_split = True           ######
-    skip_hyperparam_tune = True            ######
-    load_model = False                      ######
-    save_model = True                      ######
-    skip_scatter_plots = False              ######
-    skip_cross_val = False                  ######
-    skip_perm_imp_plot = False              ######
-    skip_SHAP_importance = False            ######
-    skip_SHAP_interact_plot = False         ######
-    skip_create_df_for_prediction = False   ######
-    skip_create_prediction_raster = False   ######
+    skip_df_creation = True  ######
+    skip_train_test_split = True  ######
+    skip_hyperparam_tune = True  ######
+    load_model = False  ######
+    save_model = True  ######
+    skip_scatter_plots = False  ######
+    skip_cross_val = False  ######
+    skip_perm_imp_plot = False  ######
+    skip_SHAP_importance = False  ######
+    skip_SHAP_interact_plot = False  ######
+    skip_create_df_for_prediction = True  ######
+    skip_create_prediction_raster = False  ######
 
     # --------------------------------------------------------------------------------------------------------------
     # Dataframe creation and train-test split
@@ -113,22 +113,25 @@ if __name__ == '__main__':
     # model training  (if hyperparameter tuning is on, the default parameter dictionary will be disregarded)
     print('\n########## Model training')
     lgbm_param_dict = {'boosting_type': 'dart',
-                       'colsample_bynode': 0.9438426279911594,
-                       'colsample_bytree': 0.844434547212633,
+                       'subsample': 0.7215192839260514,
+                       'drop_rate': 0.15335949282061498,
+                       'max_drop': 45,
+                       'skip_drop': 0.6871741200895095,
+                       'colsample_bynode': 0.7629040369343447,
+                       'colsample_bytree': 0.6784146853360562,
                        'data_sample_strategy': 'bagging',
-                       'learning_rate': 0.04988948209733723,
+                       'learning_rate': 0.01992490055801005,
                        'max_depth': 7,
-                       'min_child_samples': 35,
-                       'n_estimators': 575,
-                       'num_leaves': 50,
-                       'path_smooth': 0.6465083017089871,
-                       'subsample': 0.6422658373062207,
+                       'min_child_samples': 75,
+                       'n_estimators': 375,
+                       'num_leaves': 45,
+                       'path_smooth': 0.5645643559288485,
                        'force_col_wise': True
                        }
 
     save_model_to_dir = f'../../Model_run/ML_model/Model_trained'
     model_name = f'westus_pumping_{model_version}.joblib'
-    param_iteration_csv = f'../../Model_run/ML_model/Model_trained/hyperparam_iteraction_{model_version}.csv'
+    param_iteration_csv = f'../../Model_run/ML_model/Model_trained/hyperparam_iteration_{model_version}.csv'
     makedirs([save_model_to_dir])
 
     lgbm_reg_trained = train_model(x_train=x_train, y_train=y_train, params_dict=lgbm_param_dict,

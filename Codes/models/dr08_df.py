@@ -437,7 +437,7 @@ if __name__ == '__main__':
 
     annual_dataframes_dir = f'../../Model_run/ANN_model/Model_csv/annual_csv'
 
-    create_annual_dataframes_for_pumping_prediction(years_list=list(range(2000, 2020)),
+    create_annual_dataframes_for_pumping_prediction(years_list=list(range(2000, 2024)),
                                                     yearly_data_path_dict=annual_data_path_dict,
                                                     static_data_path_dict=static_data_path_dict,
                                                     datasets_to_include=datasets_to_include,

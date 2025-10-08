@@ -351,7 +351,7 @@ def objective_func_bayes(params, train_set, iteration_csv, n_fold):
         params['data_sample_strategy'] = 'goss'
 
     # ensure integer type for integer hyperparameters
-    for parameter_name in ['n_estimators', 'num_leaves', 'min_child_samples', 'max_depth']:
+    for parameter_name in ['n_estimators', 'num_leaves', 'min_child_samples', 'max_depth', 'max_drop']:
         params[parameter_name] = int(params[parameter_name])
 
     # callbacks
@@ -436,20 +436,22 @@ def bayes_hyperparam_opt(x_train, y_train, iteration_csv, n_fold=10, max_evals=1
         # creating hyperparameter space for LGBM models
         param_space = {'boosting_type': hp.choice('boosting_type',
                                                   [
-                                                      # {'boosting_type': 'gbdt',
-                                                      #  'subsample': hp.uniform('gbdt_subsample', 0.7, 0.9)},
-                                                      {'boosting_type': 'dart',
-                                                       'subsample': hp.uniform('dart_subsample', 0.5, 0.8)},
-                                                      # {'boosting_type': 'goss', 'subsample': 1.0}
+                                                      {
+                                                          'boosting_type': 'dart',
+                                                          'subsample': hp.uniform('dart_subsample', 0.5, 0.8)
+                                                      },
                                                   ]),
-                       'n_estimators': hp.quniform('n_estimators', 200, 600, 25),
+                       'drop_rate': hp.uniform('drop_rate', 0.05, 0.3),  # 5–30% dropout rate
+                       'max_drop': hp.quniform('max_drop', 10, 80, 5),  # number of trees that can be dropped
+                       'skip_drop': hp.uniform('skip_drop', 0.4, 0.7),  # probability to skip dropout in an iteration
+                       'n_estimators': hp.quniform('n_estimators', 200, 400, 25),
                        'max_depth': hp.uniform('max_depth', 4, 8),
-                       'learning_rate': hp.loguniform('learning_rate', np.log(0.005), np.log(0.05)),
-                       'colsample_bytree': hp.uniform('colsample_bytree', 0.6, 1.0),
-                       'colsample_bynode': hp.uniform('colsample_bynode', 0.6, 1.0),
+                       'learning_rate': hp.loguniform('learning_rate', np.log(0.005), np.log(0.02)),
+                       'colsample_bytree': hp.uniform('colsample_bytree', 0.6, 0.8),
+                       'colsample_bynode': hp.uniform('colsample_bynode', 0.6, 0.8),
                        'path_smooth': hp.uniform('path_smooth', 0.5, 0.8),
                        'num_leaves': hp.quniform('num_leaves', 15, 50, 5),
-                       'min_child_samples': hp.quniform('min_child_samples', 30, 80, 5),
+                       'min_child_samples': hp.quniform('min_child_samples', 50, 100, 5),
                        'force_col_wise': True  # set to False to choose between colum/row-wise parallelization
                        }
 
@@ -520,6 +522,10 @@ def train_model(x_train, y_train, params_dict,
                   **** when tuning hyperparameters set params_dict=None.
                     For LGBM the dictionary should be like the following with user defined values-
                     param_dict = {'boosting_type': 'gbdt',
+                                  'subsample': 0.7,
+                                  'drop_rate': 0.2,
+                                  'max_drop': 50,
+                                  'skip_drop': 0.4,
                                   'colsample_bynode': 0.7,
                                   'colsample_bytree': 0.8,
                                   'learning_rate': 0.05,
@@ -528,7 +534,7 @@ def train_model(x_train, y_train, params_dict,
                                   'n_estimators': 250,
                                   'num_leaves': 70,
                                   'path_smooth': 0.2,
-                                  'subsample': 0.7}
+                                  }
     :param categorical_columns: List of categorical column names to convert to 'category' dtype. Default set to None.
     :param load_model : Set to True if want to load saved model. Default set to False.
     :param save_model : Set to True if want to save model. Default set to False.
@@ -1064,10 +1070,12 @@ def plot_shap_interaction_plot(model_version, trained_model_path, use_samples, f
         for feature in features_to_plot:
             shap.dependence_plot(feature, shap_values_np, df, feature_names=feature_names,
                                  interaction_index=None, show=False)
-            plt.gca().set_ylabel('SHAP value')
-            plt.gca().set_xlabel(feature)
+            plt.gca().set_ylabel('SHAP value', fontsize=14)
+            plt.gca().set_xlabel(feature, fontsize=14)
+            plt.xticks(fontsize=12)
+            plt.yticks(fontsize=12)
 
-            plt.savefig(os.path.join(save_plot_dir, f'{feature}.png'), dpi=200, bbox_inches='tight')
+            plt.savefig(os.path.join(save_plot_dir, f'{feature}.png'), dpi=400, bbox_inches='tight')
 
         # compiling individual shap plot in a grid plot
         n_cols = 3

@@ -185,7 +185,7 @@ if __name__ == '__main__':
         scatter_plot_of_same_vars(Y_pred=y_train_df['predicted'], Y_obsv=y_train_df['actual'],
                                   x_label='Actual pumping (mm/year)', y_label='Predicted pumping (mm/year)',
                                   plot_name=f'train_scatter_{model_version}.jpg', savedir=plot_dir, alpha=0.5,
-                                  color_format='o', marker_size=5, title='Performance on train set',
+                                  marker_size=5, title='Performance on train set',
                                   axis_lim=None, tick_interval=200)
 
         # plotting test scatters
@@ -193,7 +193,7 @@ if __name__ == '__main__':
         scatter_plot_of_same_vars(Y_pred=y_test_df['predicted'], Y_obsv=y_test_df['actual'],
                                   x_label='Actual pumping (mm/year)', y_label='Predicted pumping (mm/year)',
                                   plot_name=f'test_scatter_{model_version}.jpg', savedir=plot_dir, alpha=0.5,
-                                  color_format='o', marker_size=5, title='Performance on test set',
+                                  marker_size=5, title='Performance on test set',
                                   axis_lim=None, tick_interval=200)
 
     # permutation importance

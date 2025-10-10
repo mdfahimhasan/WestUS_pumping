@@ -97,7 +97,8 @@ def write_array_to_raster(raster_arr, raster_file, transform, output_path, dtype
 
 
 def mask_raster_by_shape(input_raster, input_shape, output_dir,
-                         raster_name, band_names=None, crop=True,
+                         raster_name, band_names=None,
+                         crop=True, filled=True, invert=False,
                          nodata=no_data_value):
     """
     Crop/mask a raster with a given shapefile/raster's extent.
@@ -111,6 +112,11 @@ def mask_raster_by_shape(input_raster, input_shape, output_dir,
                  and the row and column size will be the same as input raster.
                  Default set to True. The pixels outside the shape will be discarded totally and row and column values
                  will change.
+    :param invert : If False (default) pixels outside shapes will be masked.  If True,
+                    pixels inside shape will be masked.
+    :param filled : If True, the pixels outside the features will be set to nodata.
+                    If False, the output array will contain the original pixel data,
+                    and only the mask will be based on shapes.  Defaults to True.
     :param nodata: No data value. Default set to -9999.
 
     :return: Filepath of cropped raster.
@@ -127,8 +133,8 @@ def mask_raster_by_shape(input_raster, input_shape, output_dir,
     geoms = [geom.__geo_interface__ for geom in shp_extent.geometry]  # GeoJSON format
 
     # masking
-    masked_arr, mask_transform = mask(dataset=raster_file, shapes=geoms, filled=True,
-                                      crop=crop, invert=False, all_touched=False)
+    masked_arr, mask_transform = mask(dataset=raster_file, shapes=geoms, filled=filled,
+                                      crop=crop, invert=invert, all_touched=False)
 
     # naming output file
     makedirs([output_dir])

@@ -74,39 +74,6 @@ def clip_vector(input_shapefile, mask_shapefile, output_shapefile, change_crs=No
     return output_shapefile
 
 
-def add_attr_to_county_fromCSV(input_shapefile, attr_csv_df_data, output_shapefile, year_filter,
-                               columns_to_keep=None):
-    """
-    Add attribute information to county shapefile.
-
-    :param input_shapefile: Filepath of input shapefile.
-    :param attr_csv_df_data: Filepath of attribute data for each county at csv/dataframe format.
-    :param output_shapefile: Filepath of output shapefile.
-    :param year_filter: int. Year to filter csv data.
-    :param columns_to_keep: Tuple of columns to keep in the final shapefile. Default set to None.
-
-    :return: A new shapefile with added attribute information.
-    """
-    if '.csv' in attr_csv_df_data:
-        df = pd.read_csv(attr_csv_df_data)
-    else:
-        df = attr_csv_df_data
-
-    df = df[df['Year'] == year_filter]
-
-    county_gdf = gpd.read_file(input_shapefile)
-    county_gdf = county_gdf.merge(df, on='fips', how='left')
-
-    if columns_to_keep is not None:  # this block filters in certain columns if columns_to_keep is given
-        keep_columns = list(columns_to_keep)
-        keep_columns.append('geometry')
-        county_gdf = county_gdf[keep_columns]
-
-    county_gdf.to_file(output_shapefile)
-
-    return output_shapefile
-
-
 def create_pixel_multipoly_shapefile(refraster, interim_output_raster, output_file):
     """
     Creates a shapefile of polygon each having a width of the input raster's pixel size.
@@ -152,49 +119,6 @@ def create_pixel_multipoly_shapefile(refraster, interim_output_raster, output_fi
 
     raster = None
 
-###########
-# # # This function isn't optimized and need major change/modification.
-
-
-def raster_to_shapefile(input_raster, output_shapefile, shapefile_crs=None):
-    """
-    Convert a raster to shapefile.
-    * This code is fitted to convert raster with binary data, e.g., 0 and 1.
-
-    :param input_raster: Filepath of input raster.
-    :param output_shapefile: Filepath of output polygon shapefile.
-    :param shapefile_crs: The output shapefile crs in EPSG format, e.g., 'EPSG:4269'.
-                          Default set to None to set projection from the input_raster.
-
-    :return: A polygon shapefile.
-    """
-    # opening raster
-    raster = gdal.Open(input_raster)
-    band = raster.GetRasterBand(1)
-
-    # Projection
-    if shapefile_crs is None:
-        proj = raster.GetProjection()
-        shp_proj = osr.SpatialReference()
-        shp_proj.ImportFromWkt(proj)
-    else:
-        proj = CRS.from_string(shapefile_crs)
-        shp_proj = osr.SpatialReference()
-        shp_proj.ImportFromWkt(proj)
-
-    # Creating Polygon shapefile holder
-    call_drive = ogr.GetDriverByName('ESRI Shapefile')
-    create_shp = call_drive.CreateDataSource(output_shapefile)
-    shp_layer = create_shp.CreateLayer('layername', srs=shp_proj)
-    new_field = ogr.FieldDefn(str('ID'), ogr.OFTInteger)
-    shp_layer.CreateField(new_field)
-
-    # Polygonize
-    gdal.Polygonize(band, None, shp_layer, 0, [], callback=None)
-    create_shp.Destroy()
-
-    raster = None
-
 
 def create_fishnets_from_shapefile(input_shape, num_cols, num_rows, output_shape, crs=None):
     """
@@ -218,10 +142,11 @@ def create_fishnets_from_shapefile(input_shape, num_cols, num_rows, output_shape
     lons = list(np.arange(ymin, (ymax + grid_y_size), grid_y_size))
 
     poly_geoms = []
-    for i in range(len(lats)-1):
-        for j in range(len(lons)-1):
-            bounds = Polygon([(lats[i], lons[j]), (lats[i], lons[j+1]), (lats[i+1], lons[j+1]), (lats[i+1], lons[j]),
-                             (lats[i], lons[j])])
+    for i in range(len(lats) - 1):
+        for j in range(len(lons) - 1):
+            bounds = Polygon(
+                [(lats[i], lons[j]), (lats[i], lons[j + 1]), (lats[i + 1], lons[j + 1]), (lats[i + 1], lons[j]),
+                 (lats[i], lons[j])])
             poly_geoms.append(bounds)
 
     if crs is None:

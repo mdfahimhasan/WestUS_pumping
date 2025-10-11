@@ -15,21 +15,21 @@ from Codes.utils.DL_ops import DataLoaderCreator, main, plot_learning_curve, tes
 
 if __name__ == '__main__':
     # # # model version
-    model_version = 'v9'  ################################################################
+    model_version = 'v10'                    #########################
 
     # # # model switches
     # setting 'RUN_MODEL' to False will skip all model running processing
     # setting 'skip_create_prediction_rasters' to False will load a trained model to create prediction raster
-    RUN_MODEL = True  ################################################################
-    tune_params = False  ################################################################
-    n_trials_for_tuning = 100  ################################################################
-    implement_earlyStopping = False  #################################################################
-    plot_hyperparam_importance = True  #################################################################
+    RUN_MODEL = True                        #########################
+    tune_params = False                      #########################
+    n_trials_for_tuning = 100                #########################
+    implement_earlyStopping = False          ##########################
+    plot_hyperparam_importance = True       ###########################
 
-    skip_SHAP_summary_plot = False  ################################################################
-    skip_SHAP_interaction_plot = False  ################################################################
+    skip_SHAP_summary_plot = False           ##########################
+    skip_SHAP_interaction_plot = False       ##########################
 
-    skip_create_prediction_rasters = False  ################################################################
+    skip_create_prediction_rasters = False   ##########################
 
     # # # default variables (from hyperparameter tuning process)
     batch_size = 256

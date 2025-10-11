@@ -1064,16 +1064,12 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     if not skip_process_USGS_GW_perc:
         years_of_usgs = list(range(2000, 2024))
 
-        for year in years_of_usgs:
-            if year < 2021:
-                shapefile_to_raster(input_shape='../../Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_with_GW_use_perc.shp',
-                                    output_dir='../../Data_main/rasters/USGS_GW_%',
-                                    raster_name=f'GW_perc_{year}.tif', use_attr=True,
-                                    attribute=f'{year}_gw_%')
+        print('\nRasterizing HUC12 GW use % data from USGS...')
 
-            elif year >= 2021:
-                shapefile_to_raster(
-                    input_shape='../../Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_Avg_GW_use_perc.shp',
-                    output_dir='../../Data_main/rasters/USGS_GW_%',
-                    raster_name=f'GW_perc_{year}.tif', use_attr=True,
-                    attribute=f'avg_gw_%')
+        for year in years_of_usgs:
+
+            shapefile_to_raster(
+                input_shape='../../Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_Avg_GW_use_perc.shp',
+                output_dir='../../Data_main/rasters/USGS_GW_%',
+                raster_name=f'GW_perc_{year}.tif', use_attr=True,
+                attribute=f'avg_gw_%')

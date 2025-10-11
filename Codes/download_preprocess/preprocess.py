@@ -491,10 +491,12 @@ def classify_irrigated_cropland(years, irrigated_fraction_dir,
             irrigated_cropland = np.full_like(irrig_arr, -9999, dtype=np.int32)
 
             # classify irrigated cropland for basin and range.  -9999 is no data
-            irrigated_cropland = np.where((basin_range_mask == 1) & (irrig_arr > irr_fraction_threshold_BasinRange), 1, irrigated_cropland)
+            irrigated_cropland = np.where((basin_range_mask == 1) & (irrig_arr > irr_fraction_threshold_BasinRange), 1,
+                                          irrigated_cropland)
 
             # classification using defined irrigated fraction. -9999 is no data
-            irrigated_cropland = np.where((basin_range_mask == 0) & (irrig_arr > irr_fraction_threshold_others), 1, irrigated_cropland)
+            irrigated_cropland = np.where((basin_range_mask == 0) & (irrig_arr > irr_fraction_threshold_others), 1,
+                                          irrigated_cropland)
 
             # saving classified data
             output_irrigated_cropland_raster = os.path.join(irrigated_cropland_output_dir,
@@ -1045,7 +1047,7 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     # 2000-2020 data was processed int he Peff paper
     merge_GEE_data_patches_IrrMapper_LANID_extents(year_list=list(range(2021, 2024)),
                                                    input_dir_irrmapper='../../Data_main/rasters/Irrigation_Frac_IrrMapper',
-                                                   input_dir_lanid=None,   # LANID not available after 2020
+                                                   input_dir_lanid=None,  # LANID not available after 2020
                                                    merged_output_dir='../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac',
                                                    merge_keyword='Irrigated_Frac', ref_raster=WestUS_raster,
                                                    skip_processing=skip_irr_frac_data_processing)
@@ -1055,8 +1057,8 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     classify_irrigated_cropland(years=list(range(2000, 2024)),
                                 irrigated_fraction_dir='../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac',
                                 irrigated_cropland_output_dir='../../Data_main/rasters/Irrigated_cropland',
-                                irr_fraction_threshold_others=0.13,         # 13%
-                                irr_fraction_threshold_BasinRange=0.01,     # 1%
+                                irr_fraction_threshold_others=0.13,  # 13%
+                                irr_fraction_threshold_BasinRange=0.01,  # 1%
                                 basin_range_shp='../../Data_main/shapefiles/Basin_Range_aquifer/Basin_RangeFill_extent.shp',
                                 skip_processing=skip_irr_cropland_classification)
 
@@ -1067,7 +1069,6 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
         print('\nRasterizing HUC12 GW use % data from USGS...')
 
         for year in years_of_usgs:
-
             shapefile_to_raster(
                 input_shape='../../Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_Avg_GW_use_perc.shp',
                 output_dir='../../Data_main/rasters/USGS_GW_%',

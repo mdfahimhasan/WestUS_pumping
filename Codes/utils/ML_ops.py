@@ -1223,3 +1223,40 @@ def predict_annual_pumping_rasters(trained_model, years_list, exclude_columns,
                                   output_path=output_prediction_raster)
     else:
         pass
+
+
+def postprocess_prediction(predicted_pumping_dir, output_dir, USGS_GW_perc_dir, skip_processing=False):
+    """
+    Post-processes predicted groundwater pumping rasters by applying groundwater percentage (USGS) scaling
+    and saving the scaled results for each year.
+
+    :param predicted_pumping_dir: Path to the directory containing predicted pumping raster files.
+                                  Each file should be named with a year identifier (e.g., '*2000.tif').
+
+    :param output_dir: Path to the directory where processed rasters will be saved.
+                       The function creates the directory if it does not exist.
+
+    :param USGS_GW_perc_dir: Path to the directory containing annual USGS groundwater percentage rasters.
+                             Each file should correspond to the same year as the predicted pumping file.
+
+    :param skip_processing: If True, the function skips processing and exits without performing any operations.
+                            Default is False.
+
+    :return: None. The function writes scaled raster files named as
+             'WestUS_pumping_<year>.tif' in the output directory.
+    """
+    if not skip_processing:
+        makedirs([output_dir])
+
+        print('\nScaled predicted pumping with USGS HUC12-scale GW use % data....')
+
+        for year in list(range(2000, 2024)):
+            predicted_arr, file = read_raster_arr_object(glob(os.path.join(predicted_pumping_dir, f'*{year}.tif'))[0])
+            gw_perc = read_raster_arr_object(glob(os.path.join(USGS_GW_perc_dir, f'*{year}.tif'))[0], get_file=False)
+
+            # applying scaling
+            scaled_arr = np.where(~np.isnan(predicted_arr), predicted_arr * gw_perc / 100, -9999)
+
+            # save
+            write_array_to_raster(scaled_arr, file, file.transform,
+                                  os.path.join(output_dir, f'WestUS_pumping_{year}.tif'))

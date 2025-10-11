@@ -16,7 +16,8 @@ from Codes.utils.plots import scatter_plot_of_same_vars
 from Codes.utils.ML_ops import (create_train_test_dataframe, split_train_val_test_set_v2, \
                                 train_model, test_model, plot_permutation_importance, \
                                 cross_val_performance, plot_shap_summary_plot, plot_shap_interaction_plot, \
-                                create_annual_dataframes_for_pumping_prediction, predict_annual_pumping_rasters)
+                                create_annual_dataframes_for_pumping_prediction, predict_annual_pumping_rasters,\
+                                postprocess_prediction)
 
 # model resolution and reference raster/shapefile
 no_data_value = -9999
@@ -30,9 +31,7 @@ WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
 # predictor data paths
 data_path_dict = {
     'pumping_mm': '../../Data_main/pumping/rasters/WestUS_pumping',
-    # 'netGW_Irr': '../../Data_main/rasters/NetGW_irrigation/WesternUS',
     'peff': '../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
-    # 'SW_Irr': '../../Data_main/rasters/SW_irrigation',
     'ret': '../../Data_main/rasters/RET/WestUS_growing_season',
     'precip': '../../Data_main/rasters/Precip/WestUS_growing_season',
     'tmax': '../../Data_main/rasters/Tmax/WestUS_growing_season',
@@ -67,20 +66,21 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------------------------------------------
     # flags
     # --------------------------------------------------------------------------------------------------------------
-    model_version = 'v9'  ######
+    model_version = 'v10'                  ######
 
-    skip_df_creation = True  ######
-    skip_train_test_split = True  ######
-    skip_hyperparam_tune = True  ######
-    load_model = False  ######
-    save_model = True  ######
-    skip_scatter_plots = False  ######
-    skip_cross_val = False  ######
-    skip_perm_imp_plot = False  ######
-    skip_SHAP_importance = False  ######
-    skip_SHAP_interact_plot = False  ######
+    skip_df_creation = True               ######
+    skip_train_test_split = True          ######
+    skip_hyperparam_tune = True            ######
+    load_model = False                     ######
+    save_model = True                     ######
+    skip_scatter_plots = False             ######
+    skip_cross_val = False                 ######
+    skip_perm_imp_plot = False             ######
+    skip_SHAP_importance = False           ######
+    skip_SHAP_interact_plot = False        ######
     skip_create_df_for_prediction = True  ######
     skip_create_prediction_raster = False  ######
+    skip_scale_with_USGS_GW_use = False    ######
 
     # --------------------------------------------------------------------------------------------------------------
     # Dataframe creation and train-test split
@@ -113,19 +113,19 @@ if __name__ == '__main__':
     # model training  (if hyperparameter tuning is on, the default parameter dictionary will be disregarded)
     print('\n########## Model training')
     lgbm_param_dict = {'boosting_type': 'dart',
-                       'subsample': 0.7215192839260514,
-                       'drop_rate': 0.15335949282061498,
-                       'max_drop': 45,
-                       'skip_drop': 0.6871741200895095,
-                       'colsample_bynode': 0.7629040369343447,
-                       'colsample_bytree': 0.6784146853360562,
+                       'subsample': 0.6829215227612229,
+                       'drop_rate': 0.053580380609203414,
+                       'max_drop': 65,
+                       'skip_drop': 0.6942593565581209,
+                       'colsample_bynode': 0.629698628885302,
+                       'colsample_bytree': 0.7802877213579982,
                        'data_sample_strategy': 'bagging',
-                       'learning_rate': 0.01992490055801005,
+                       'learning_rate': 0.01858192379183022,
                        'max_depth': 7,
-                       'min_child_samples': 75,
-                       'n_estimators': 375,
-                       'num_leaves': 45,
-                       'path_smooth': 0.5645643559288485,
+                       'min_child_samples': 60,
+                       'n_estimators': 400,
+                       'num_leaves': 50,
+                       'path_smooth': 0.6928805760535238,
                        'force_col_wise': True
                        }
 
@@ -253,3 +253,14 @@ if __name__ == '__main__':
                                    output_dir=pumping_prediction_output_dir,
                                    ref_raster=WestUS_raster,
                                    skip_processing=skip_create_prediction_raster)
+
+    # scale conjunctive GW-SW basins' prediction with USGS GW use % data
+    # Note - this postprocessing only applies to conjunctive water use basins
+    scaled_output_dir = f'../../Data_main/rasters/pumping_prediction/ML/{model_version}/scaled_by_gw_perc'
+    usgs_data_dir = '../../Data_main/rasters/USGS_GW_%'
+
+    postprocess_prediction(predicted_pumping_dir=pumping_prediction_output_dir,
+                           output_dir=scaled_output_dir,
+                           USGS_GW_perc_dir=usgs_data_dir,
+                           skip_processing=skip_scale_with_USGS_GW_use)
+

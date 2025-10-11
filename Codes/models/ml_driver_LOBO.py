@@ -248,7 +248,7 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
                                   x_label='Actual pumping (mm/year)', y_label='Predicted pumping (mm/year)',
                                   plot_name=f'{basin_code}_LOBO.jpg',
                                   savedir=plot_dir, alpha=0.2,
-                                  color_format='o', marker_size=4, title=None,
+                                  marker_size=4, title=None,
                                   axis_lim=None, tick_interval=500)
 
         # --------------------------------------------------------------------------------------------------------------
@@ -299,13 +299,12 @@ if __name__ == '__main__':
     skip_LOBO_GMD3 = False      ##### GMD3, KS
     skip_LOBO_GMD4 = False      ##### GMD4, KS
     skip_LOBO_RPB = False       ##### Republican Basin, CO
-    skip_LOBO_SPB = False       ##### South Platte River Basin, CO
-    skip_LOBO_AR = False        ##### Arkansas River Basin, CO
+    # skip_LOBO_SPB = False       ##### South Platte River Basin, CO
+    # skip_LOBO_AR = False        ##### Arkansas River Basin, CO
     skip_LOBO_SLV = False       ##### San Luis Valley, CO
     skip_LOBO_HQR = False       ##### Harquahala INA, AZ
     skip_LOBO_DOUG = False      ##### Douglas AMA, AZ
-    skip_LOBO_PHX = False       ##### Phoenix AMA, AZ
-    skip_LOBO_PNL = False       ##### Pinal AMA, AZ
+    # skip_LOBO_PNL = False       ##### Pinal AMA, AZ
     skip_LOBO_SCRUZ = False     ##### Santa Cruz AMA, AZ
     skip_LOBO_DV = False        ##### Diamond Valley, NV
 
@@ -325,27 +324,25 @@ if __name__ == '__main__':
 
     # hyperparameters from tuned model
     lgbm_param_dict = {'boosting_type': 'dart',
-                       'subsample': 0.7215192839260514,
-                       'drop_rate': 0.15335949282061498,
-                       'max_drop': 45,
-                       'skip_drop': 0.6871741200895095,
-                       'colsample_bynode': 0.7629040369343447,
-                       'colsample_bytree': 0.6784146853360562,
+                       'subsample': 0.6829215227612229,
+                       'drop_rate': 0.053580380609203414,
+                       'max_drop': 65,
+                       'skip_drop': 0.6942593565581209,
+                       'colsample_bynode': 0.629698628885302,
+                       'colsample_bytree': 0.7802877213579982,
                        'data_sample_strategy': 'bagging',
-                       'learning_rate': 0.01992490055801005,
+                       'learning_rate': 0.01858192379183022,
                        'max_depth': 7,
-                       'min_child_samples': 75,
-                       'n_estimators': 375,
-                       'num_leaves': 45,
-                       'path_smooth': 0.5645643559288485,
+                       'min_child_samples': 60,
+                       'n_estimators': 400,
+                       'num_leaves': 50,
+                       'path_smooth': 0.6928805760535238,
                        'force_col_wise': True
                        }
 
     # datasets
     data_path_dict = {
-        # 'netGW_Irr': '../../Data_main/rasters/NetGW_irrigation/WesternUS',
         'peff': '../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
-        # 'SW_Irr': '../../Data_main/rasters/SW_irrigation',
         'ret': '../../Data_main/rasters/RET/WestUS_growing_season',
         'precip': '../../Data_main/rasters/Precip/WestUS_growing_season',
         'tmax': '../../Data_main/rasters/Tmax/WestUS_growing_season',
@@ -372,7 +369,7 @@ if __name__ == '__main__':
 
     prediction_df_output_dir = f'../../Data_main/rasters/ML_LOBO/dataframes_for_prediction'
 
-    model_version = 'v9'
+    model_version = 'v10'
 
     # GMD3, KS
     perform_LOBO(years_list=years, years_no_pumping_data_dict=years_no_data_dict,
@@ -401,23 +398,23 @@ if __name__ == '__main__':
                  predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
                  skip_processing=skip_LOBO_RPB)
 
-    # South Platte River Basin, CO
-    perform_LOBO(years_list=years, years_no_pumping_data_dict=years_no_data_dict,
-                 model_version=f'{model_version}', basin_code='SPB', state_code='CO',
-                 model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
-                 annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
-                 basin_shape='../../Data_main/shapefiles/Basins_of_interest/South_Platte_Basin.shp',
-                 predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
-                 skip_processing=skip_LOBO_SPB)
-
-    # Arkansas River Basin, CO
-    perform_LOBO(years_list=years, years_no_pumping_data_dict=years_no_data_dict,
-                 model_version=f'{model_version}', basin_code='AR', state_code='CO',
-                 model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
-                 annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
-                 basin_shape='../../Data_main/shapefiles/Basins_of_interest/Arkansas_Basin.shp',
-                 predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
-                 skip_processing=skip_LOBO_AR)
+    # # South Platte River Basin, CO
+    # perform_LOBO(years_list=years, years_no_pumping_data_dict=years_no_data_dict,
+    #              model_version=f'{model_version}', basin_code='SPB', state_code='CO',
+    #              model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
+    #              annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
+    #              basin_shape='../../Data_main/shapefiles/Basins_of_interest/South_Platte_Basin.shp',
+    #              predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
+    #              skip_processing=skip_LOBO_SPB)
+    #
+    # # Arkansas River Basin, CO
+    # perform_LOBO(years_list=years, years_no_pumping_data_dict=years_no_data_dict,
+    #              model_version=f'{model_version}', basin_code='AR', state_code='CO',
+    #              model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
+    #              annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
+    #              basin_shape='../../Data_main/shapefiles/Basins_of_interest/Arkansas_Basin.shp',
+    #              predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
+    #              skip_processing=skip_LOBO_AR)
 
     # San Luis Valley, CO
     perform_LOBO(years_list=years, years_no_pumping_data_dict=years_no_data_dict,
@@ -446,23 +443,14 @@ if __name__ == '__main__':
                  predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
                  skip_processing=skip_LOBO_HQR)
 
-    # Phoenix AMA, AZ
-    perform_LOBO(years_list=years, years_no_pumping_data_dict=years_no_data_dict,
-                 model_version=f'{model_version}', basin_code='PHX', state_code='AZ',
-                 model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
-                 annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
-                 basin_shape='../../Data_main/shapefiles/Basins_of_interest/Phoenix_AMA.shp',
-                 predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
-                 skip_processing=skip_LOBO_PHX)
-
-    # Pinal AMA, AZ
-    perform_LOBO(years_list=years, years_no_pumping_data_dict=years_no_data_dict,
-                 model_version=f'{model_version}', basin_code='PNL', state_code='AZ',
-                 model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
-                 annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
-                 basin_shape='../../Data_main/shapefiles/Basins_of_interest/Pinal_AMA.shp',
-                 predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
-                 skip_processing=skip_LOBO_PNL)
+    # # Pinal AMA, AZ
+    # perform_LOBO(years_list=years, years_no_pumping_data_dict=years_no_data_dict,
+    #              model_version=f'{model_version}', basin_code='PNL', state_code='AZ',
+    #              model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
+    #              annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
+    #              basin_shape='../../Data_main/shapefiles/Basins_of_interest/Pinal_AMA.shp',
+    #              predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
+    #              skip_processing=skip_LOBO_PNL)
 
     # Santa Cruz AMA, AZ
     perform_LOBO(years_list=years, years_no_pumping_data_dict=years_no_data_dict,

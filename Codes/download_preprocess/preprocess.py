@@ -36,7 +36,7 @@ def extract_month_from_GrowSeason_data(GS_data_dir, skip_processing=False):
 
     :param GS_data_dir: Directory path of growing season dataset. The GEE-downloaded datasets are in the
                         'ee_exports' folder.
-    :param skip_processing: Set to true if you want to skip processing.
+    :param skip_processing: Set True if you want to skip processing.
 
     :return: None.
     """
@@ -119,7 +119,7 @@ def dynamic_gs_sum_of_variable(year_list, growing_season_dir, monthly_input_dir,
     :param monthly_input_dir:  Directory path for monthly datasets.
     :param gs_output_dir:  Directory path (output) for summed growing season datasets.
     :param sum_keyword: Keyword str to add before the summed raster.
-    :param skip_processing: Set to True if you want to skip processing this step.
+    :param skip_processing: Set True if you want to skip processing this step.
 
     :return: None.
     """
@@ -185,7 +185,7 @@ def dynamic_gs_mean_of_variable(year_list, growing_season_dir, monthly_input_dir
     :param monthly_input_dir:  Directory path for monthly datasets.
     :param gs_output_dir:  Directory path (output) for averaged growing season datasets.
     :param mean_keyword: Keyword str to add before the averaged raster.
-    :param skip_processing: Set to True if  you want to skip processing this step.
+    :param skip_processing: Set True if  you want to skip processing this step.
 
     :return: None.
     """
@@ -286,11 +286,11 @@ def process_prism_data(prism_bil_dir, prism_tif_dir, output_dir_prism_monthly, g
                                 growing season of each year at Western US extent.
     :param year_list: Tuple/list of year_list for which prism data was downloaded.
     :param keyword: keyword to add before processed datasets. Can take 'prism_precip', 'prism_tmax', 'prism_tmin'.
-                    Default set to 'prism_precip'.
+                    Default set 'prism_precip'.
     :param west_US_shape: Filepath of Western US shapefile.
     :param ref_raster: Model reference raster filepath.
     :param resolution: Resolution used in the model. Default set to model_res = 0.02000000000000000736.
-    :param skip_processing: Set to True if  you want to skip prism precip processing.
+    :param skip_processing: Set True if  you want to skip prism precip processing.
 
     :return: None.
     """
@@ -400,7 +400,7 @@ def merge_GEE_data_patches_IrrMapper_LANID_extents(year_list, input_dir_irrmappe
     :param merged_output_dir: Output directory filepath to save merged data.
     :param merge_keyword: Keyword to use while merging. Foe example: 'Rainfed_Frac', 'Irrigated_crop_OpenET', etc.
     :param ref_raster: Reference raster to use in merging. Default set to Western US reference raster.
-    :param skip_processing: Set to True if want to skip merging IrrMapper and LANID extent data patches.
+    :param skip_processing: Set True to skip merging IrrMapper and LANID extent data patches.
 
     :return: None.
     """
@@ -468,7 +468,7 @@ def classify_irrigated_cropland(years, irrigated_fraction_dir,
     :param irr_fraction_threshold_BasinRange: Minimum threshold (float) to consider a pixel irrigated in
                                               regions inside basin and range-fill region.
     :param basin_range_shp: Basin and range-fill region shapefile.
-    :param skip_processing: Set to True to skip classifying irrigated and rainfed cropland data.
+    :param skip_processing: Set True to skip classifying irrigated and rainfed cropland data.
 
     :return: None
     """
@@ -513,7 +513,7 @@ def create_stateID_raster(westUS_shp, output_dir, skip_processing=False):
 
     :param westUS_shp: Western US shapefile with the attribute 'stateID'.
     :param output_dir: Output directory to save the created raster.
-    :param skip_processing: Set to True to skip this process.
+    :param skip_processing: Set True to skip this process.
 
     :return: None.
     """
@@ -541,7 +541,7 @@ def create_HUC12_SW_irrigation_rasters(HUC12_SW_shape, output_dir, resolution=mo
     :param output_dir: Directory path to save outputs.
     :param resolution: Resolution. Default set to model resolution.
     :param ref_raster: Reference raster. Default set to Western US reference raster.
-    :param skip_processing: Set to True to skip processing.
+    :param skip_processing: Set True to skip processing.
 
     :return: None.
     """
@@ -595,7 +595,7 @@ def create_GW_use_perc_rasters(HUC12_GW_perc_shape, output_dir, resolution=model
     :param output_dir: Directory path to save outputs.
     :param resolution: Resolution. Default set to model resolution.
     :param ref_raster: Reference raster. Default set to Western US reference raster.
-    :param skip_processing: Set to True to skip processing.
+    :param skip_processing: Set True to skip processing.
 
     :return: None.
     """
@@ -638,7 +638,7 @@ def process_and_OneHotEncode_Koppen_Geiger(koppen_geiger_raster, output_dir,
     :param koppen_geiger_raster: Filepath of raw Koppen-Geiger raster data.
     :param output_dir: Filepath of output dir.
     :param ref_raster: Western US reference raster.
-    :param skip_processing: Set to True to skip this process.
+    :param skip_processing: Set True to skip this process.
 
     :return: None.
     """
@@ -698,7 +698,7 @@ def process_netGWIrr_data(netGW_dir, output_dir, skip_processing=False):
 
     :param netGW_dir: Directory of consumptive groundwater irrigation dataset.
     :param output_dir: Output directory filepath.
-    :param skip_processing: Set to True to skip this step.
+    :param skip_processing: Set True to skip this step.
 
     :return: None.
     """
@@ -728,7 +728,7 @@ def create_pixelID_raster(WestUS_refraster, output_dir, skip_processing=False):
 
     :param WestUS_refraster: Western US reference raster.
     :param output_dir: Directory path to save the output raster.
-    :param skip_processing: Set to True to skip processing.
+    :param skip_processing: Set True to skip processing.
 
     :return: None.
     """
@@ -772,7 +772,7 @@ def create_canal_density_raster(canal_shapefile, output_dir,
     :param output_dir: Output directory path to save canal coverage rasters.
     :param ref_raster: Filepath of reference raster.
     :param resolution: Model resolution.
-    :param skip_processing: Set to True to skip this step.
+    :param skip_processing: Set True to skip this step.
 
     :return: None.
     """
@@ -815,7 +815,7 @@ def create_distance_canal_raster(canal_shapefile, output_dir,
     :param output_dir: Output directory path to save canal coverage rasters.
     :param ref_raster: Filepath of reference raster.
     :param resolution: Model resolution.
-    :param skip_processing: Set to True to skip this step.
+    :param skip_processing: Set True to skip this step.
 
     :return: None.
     """
@@ -874,32 +874,34 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
                           skip_create_canal_density_raster=False,
                           skip_create_canal_distance_raster=False,
                           skip_irr_frac_data_processing=False,
-                          skip_irr_cropland_classification=False):
+                          skip_irr_cropland_classification=False,
+                          skip_process_USGS_GW_perc=False):
     """
     Run all preprocessing steps.
 
-    :param skip_stateID_raster_creation: Set to True to skip stateID raster creation.
-    :param skip_pixelID_raster_creation: Set to True to skip pixelID raster creation.
-    :param skip_process_GrowSeason_data: Set to True to skip processing growing season data.
-    :param skip_process_netGW: Set to True to skip consumptive groundwater irrigation dataset processing.
-    :param skip_ET_processing: Set to True to skip processing growing season ET data.
-    :param skip_gridmet_RET_processing: Set to True to skip processing RET growing season data.
-    :param skip_gridmet_precip_processing: Set to True to skip processing gridmet precip growing season data.
-    :param skip_gridmet_tmax_processing: Set to True to skip processing gridmet max temperature growing season data.
-    :param skip_gridmet_maxRH_processing: Set to True to skip processing gridmet max RH growing season data.
-    :param skip_gridmet_minRH_processing: Set to True to skip processing gridmet min RH growing season data.
-    :param skip_gridmet_windVel_processing: Set to True to skip processing gridmet wind velocity growing season data.
-    :param skip_gridmet_shortRad_processing: Set to True to skip processing gridmet shortwave radiation growing season data.
-    :param skip_gridmet_vpd_processing: Set to True to skip processing gridmet vapor pressure deficit growing season data.
-    :param skip_daymet_sunHr_processing: Set to True to skip processing daymet sun hour growing season data.
-    :param skip_HUC12_SW_processing: Set to True to skip create SW irrigation dataset.
-    :param skip_HUC12_GW_perc_processing: Set to True to skip create GW use % dataset.
-    :param skip_create_canal_density_raster: Set to True to skip create canal density raster.
-    :param skip_create_canal_distance_raster: Set to True to skip create distance from canal raster.
-    :param skip_irr_frac_data_processing: Set to True to skip process irrigation fraction data from 2021-2023.
+    :param skip_stateID_raster_creation: Set True to skip stateID raster creation.
+    :param skip_pixelID_raster_creation: Set True to skip pixelID raster creation.
+    :param skip_process_GrowSeason_data: Set True to skip processing growing season data.
+    :param skip_process_netGW: Set True to skip consumptive groundwater irrigation dataset processing.
+    :param skip_ET_processing: Set True to skip processing growing season ET data.
+    :param skip_gridmet_RET_processing: Set True to skip processing RET growing season data.
+    :param skip_gridmet_precip_processing: Set True to skip processing gridmet precip growing season data.
+    :param skip_gridmet_tmax_processing: Set True to skip processing gridmet max temperature growing season data.
+    :param skip_gridmet_maxRH_processing: Set True to skip processing gridmet max RH growing season data.
+    :param skip_gridmet_minRH_processing: Set True to skip processing gridmet min RH growing season data.
+    :param skip_gridmet_windVel_processing: Set True to skip processing gridmet wind velocity growing season data.
+    :param skip_gridmet_shortRad_processing: Set True to skip processing gridmet shortwave radiation growing season data.
+    :param skip_gridmet_vpd_processing: Set True to skip processing gridmet vapor pressure deficit growing season data.
+    :param skip_daymet_sunHr_processing: Set True to skip processing daymet sun hour growing season data.
+    :param skip_HUC12_SW_processing: Set True to skip create SW irrigation dataset.
+    :param skip_HUC12_GW_perc_processing: Set True to skip create GW use % dataset.
+    :param skip_create_canal_density_raster: Set True to skip create canal density raster.
+    :param skip_create_canal_distance_raster: Set True to skip create distance from canal raster.
+    :param skip_irr_frac_data_processing: Set True to skip process irrigation fraction data from 2021-2023.
                                           2000-2020 data was processed in the Peff paper.
-    :param skip_irr_cropland_classification: Set to True to skip irrigation cropland classification from 2021-2023.
+    :param skip_irr_cropland_classification: Set True to skip irrigation cropland classification from 2021-2023.
                                              2000-2020 data was processed in the Peff paper.
+    :param skip_process_USGS_GW_perc: Set True to skip create GW use % of HUC12 from USGS data.
 
     :return: None.
     """
@@ -1057,3 +1059,21 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
                                 irr_fraction_threshold_BasinRange=0.01,     # 1%
                                 basin_range_shp='../../Data_main/shapefiles/Basin_Range_aquifer/Basin_RangeFill_extent.shp',
                                 skip_processing=skip_irr_cropland_classification)
+
+    # convert USGS HUC12 GW use % data to annual rasters
+    if not skip_process_USGS_GW_perc:
+        years_of_usgs = list(range(2000, 2024))
+
+        for year in years_of_usgs:
+            if year < 2021:
+                shapefile_to_raster(input_shape='../../Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_with_GW_use_perc.shp',
+                                    output_dir='../../Data_main/rasters/USGS_GW_%',
+                                    raster_name=f'GW_perc_{year}.tif', use_attr=True,
+                                    attribute=f'{year}_gw_%')
+
+            elif year >= 2021:
+                shapefile_to_raster(
+                    input_shape='../../Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_Avg_GW_use_perc.shp',
+                    output_dir='../../Data_main/rasters/USGS_GW_%',
+                    raster_name=f'GW_perc_{year}.tif', use_attr=True,
+                    attribute=f'avg_gw_%')

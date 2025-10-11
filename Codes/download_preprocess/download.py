@@ -20,13 +20,13 @@ from os.path import dirname, abspath
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import makedirs
-from Codes.utils.raster_ops import read_raster_arr_object, clip_resample_reproject_raster, mosaic_rasters_from_directory
+from Codes.utils.raster_ops import clip_resample_reproject_raster, mosaic_rasters_from_directory
 
 # ***************************** gcloud and earth engine authentication *****************************
 
 # # first, we need to install and authenticate gcloud. use the link https://cloud.google.com/sdk/docs/install to install
 # # gcloud for windows/linux
-# # Once, installed gcloud need to be authenticated. For windows, I used the instructions fro the following link to authenticate
+# # Once, installed gcloud need to be authenticated. For windows, I used the instructions from the following link to authenticate
 # # and set gcloud project - https://www.youtube.com/watch?v=k-8qFh8EfFA
 # # For linux, I used the instructions from the following link to download and install gcloud - https://cloud.google.com/sdk/docs/install#linux
 # # After installation in linux, I used the following commands to authenticate and set project
@@ -84,15 +84,15 @@ def get_data_GEE_saveTopath(url_and_file_path):
                 f.write(r.content)
 
             # This is a check block to see if downloaded datasets are OK
-            # sometimes a particular grid's data is corrupted but it's completely random, not sure why it happens.
+            # sometimes a particular grid's data is corrupted, but it's completely random, not sure why it happens.
             # Re-downloading the same data might not have that error
             if '.tif' in file_path:  # only for data downloaded in geotiff format
                 src = rio.open(file_path)
                 data = src.read(1)
                 src.close()
 
-            break      # exit loop if download and data reading succeed; it data can't be read break will not be implemented
-                       # and code will go to the 'except' block
+            break  # exit loop if download and data reading succeed; if data can't be read break will not be implemented
+            # and code will go to the 'except' block
 
         except Exception as e:
             print(f'attempt {attempt + 1} failed for {file_path}. Error: {e}. Trying again')
@@ -103,7 +103,7 @@ def get_data_GEE_saveTopath(url_and_file_path):
 def download_data_from_GEE_by_multiprocess(download_urls_fp_list, use_cpu=2):
     """
     Use python multiprocessing library to download data from GEE in a multi-thread approach. This function is a
-    wrapper over get_data_GEE_saveTopath() function providing muti-threading support.
+    wrapper over get_data_GEE_saveTopath() function providing multi-threading support.
 
     :param download_urls_fp_list: A list of tuples where each tuple has the data url (1st member) and local file path
                                   (2nd member).
@@ -185,9 +185,10 @@ def get_gee_dict(data_name):
         'Clay_content': 'OpenLandMap/SOL/SOL_CLAY-WFRACTION_USDA-3A1A1A_M/v02',
         'DEM': 'USGS/SRTMGL1_003',
         'Tree_cover': 'NASA/MEASURES/GFCC/TC/v3',
-        'spi': 'GRIDMET/DROUGHT',       # Standardized Precipitation Index (precipitation anomalies)
-        'spei': 'GRIDMET/DROUGHT',      # Standardized Precipitation Evapotranspiration Index (temperature-driven drought-water balance)
-        'eddi': 'GRIDMET/DROUGHT'       # Evaporative Drought Demand Index (atmospheric drying demand)
+        'spi': 'GRIDMET/DROUGHT',  # Standardized Precipitation Index (precipitation anomalies)
+        'spei': 'GRIDMET/DROUGHT',
+        # Standardized Precipitation Evapotranspiration Index (temperature-driven drought-water balance)
+        'eddi': 'GRIDMET/DROUGHT'  # Evaporative Drought Demand Index (atmospheric drying demand)
     }
 
     gee_band_dict = {
@@ -213,9 +214,9 @@ def get_gee_dict(data_name):
     }
 
     gee_scale_dict = {
-        'GRIDMET_Precip':1,
+        'GRIDMET_Precip': 1,
         'GRIDMET_RET': 1,
-        'GRIDMET_Tmax':1,
+        'GRIDMET_Tmax': 1,
         'GRIDMET_maxRH': 1,
         'GRIDMET_minRH': 1,
         'GRIDMET_windVel': 1,
@@ -351,8 +352,8 @@ def get_gee_dict(data_name):
     }
 
     return gee_data_dict[data_name], gee_band_dict[data_name], gee_scale_dict[data_name], aggregation_dict[data_name], \
-           month_start_date_dict[data_name], month_end_date_dict[data_name], year_start_date_dict[data_name], \
-           year_end_date_dict[data_name]
+        month_start_date_dict[data_name], month_end_date_dict[data_name], year_start_date_dict[data_name], \
+        year_end_date_dict[data_name]
 
 
 def cloudMask_MODIS(data_name, start_date, end_date, from_bit, to_bit, geometry_bounds):
@@ -451,6 +452,7 @@ def cloudMask_landsat(data_name, imcol, start_date, end_date, geometry_bounds):
     return cloud_masked_imcol
 
 
+# noinspection PyTypeChecker
 def download_soil_datasets(data_name, download_dir, merge_keyword,
                            gee_grid_shape=gee_grid_shape_large,
                            refraster_westUS=WestUS_raster,
@@ -502,6 +504,7 @@ def download_soil_datasets(data_name, download_dir, merge_keyword,
                                                     'region': gee_extent,
                                                     'format': 'GEO_TIFF'})
             key_word = data_name
+            # noinspection PyTypeChecker
             local_file_name = os.path.join(download_dir, f'{key_word}_{str(grid_sr)}.tif')
             print('Downloading', local_file_name, '.....')
             r = requests.get(data_url, allow_redirects=True)
@@ -698,7 +701,7 @@ def download_gee_data_monthly(data_name, download_dir, year_list, month_range, m
     :param refraster_gee_merge: Reference raster to use for merging downloaded datasets from GEE. The merged
                                 datasets have to be clipped for Western US ROI.
     :param use_cpu_while_multidownloading: Number (Int) of CPU cores to use for multi-download by
-                                           multi-processing/multi-threading. Default set to 15.
+                                           multiprocessing/multi-threading. Default set to 15.
     :param westUS_shape: Filepath of West US shapefile.
 
     :return: None.
@@ -719,7 +722,7 @@ def download_gee_data_monthly(data_name, download_dir, year_list, month_range, m
 
     # Extracting dataset information required for downloading from GEE
     data, band, scale_factor, reducer, month_start_range, month_end_range, \
-    year_start_range, year_end_range = get_gee_dict(data_name)
+        year_start_range, year_end_range = get_gee_dict(data_name)
 
     # loading grids that will be used to download the data
     grids = gpd.read_file(gee_grid_shape)
@@ -822,7 +825,8 @@ def download_gee_data_monthly(data_name, download_dir, year_list, month_range, m
 
                     # The GEE connection gets disconnected sometimes, therefore, we download the data in batches when
                     # there is enough data url gathered for download.
-                    if (len(data_url_list) == 120) | (grid_sr == len(grid_no)):  # downloads data when one of the conditions are met
+                    if (len(data_url_list) == 120) | (
+                            grid_sr == len(grid_no)):  # downloads data when one of the conditions are met
 
                         # Combining url and file paths together to pass in multiprocessing
                         urls_to_file_paths_compile = []
@@ -830,7 +834,7 @@ def download_gee_data_monthly(data_name, download_dir, year_list, month_range, m
                         for j, k in zip(data_url_list, local_file_paths_list):
                             urls_to_file_paths_compile.append([j, k])
 
-                        # Download data by multi-processing/multi-threading
+                        # Download data by multiprocessing/multi-threading
                         download_data_from_GEE_by_multiprocess(download_urls_fp_list=urls_to_file_paths_compile,
                                                                use_cpu=use_cpu_while_multidownloading)
 
@@ -886,7 +890,7 @@ def download_gee_data_yearly(data_name, download_dir, year_list, month_range, me
     :param refraster_gee_merge: Reference raster to use for merging downloaded datasets from GEE. The merged
                                 datasets have to be clipped for Western US ROI.
     :param use_cpu_while_multidownloading: Number (Int) of CPU cores to use for multi-download by
-                                           multi-processing/multi-threading. Default set to 15.
+                                           multiprocessing/multi-threading. Default set to 15.
     :param westUS_shape: Filepath of West US shapefile.
 
     :return: None.
@@ -907,7 +911,7 @@ def download_gee_data_yearly(data_name, download_dir, year_list, month_range, me
 
     # Extracting dataset information required for downloading from GEE
     data, band, scale_factor, reducer, month_start_range, month_end_range, \
-    year_start_range, year_end_range = get_gee_dict(data_name)
+        year_start_range, year_end_range = get_gee_dict(data_name)
 
     # loading grids that will be used to download the data
     grids = gpd.read_file(gee_grid_shape)
@@ -1026,7 +1030,7 @@ def download_gee_data_yearly(data_name, download_dir, year_list, month_range, me
                     for j, k in zip(data_url_list, local_file_paths_list):
                         urls_to_file_paths_compile.append([j, k])
 
-                    # Download data by multi-processing/multi-threading
+                    # Download data by multiprocessing/multi-threading
                     download_data_from_GEE_by_multiprocess(download_urls_fp_list=urls_to_file_paths_compile,
                                                            use_cpu=use_cpu_while_multidownloading)
 
@@ -1060,7 +1064,8 @@ def download_gee_data_yearly(data_name, download_dir, year_list, month_range, me
 
 def download_drought_indices_water_year(data_name, download_dir, year_list, merge_keyword,
                                         gee_grid_shape='../../Data_main/ref_shapes/WestUS_gee_grid_large.shp',
-                                        refraster_westUS=WestUS_raster, refraster_gee_merge=GEE_merging_refraster_large_grids,
+                                        refraster_westUS=WestUS_raster,
+                                        refraster_gee_merge=GEE_merging_refraster_large_grids,
                                         use_cpu_while_multidownloading=15, westUS_shape=WestUS_shape):
     """
     Download drought indices (spi, spei, eddi)  data (at water yearly scale) from GEE.
@@ -1074,7 +1079,7 @@ def download_drought_indices_water_year(data_name, download_dir, year_list, merg
     :param refraster_gee_merge: Reference raster to use for merging downloaded datasets from GEE. The merged
                                 datasets have to be clipped for Western US ROI.
     :param use_cpu_while_multidownloading: Number (Int) of CPU cores to use for multi-download by
-                                           multi-processing/multi-threading. Default set to 15.
+                                           multiprocessing/multi-threading. Default set to 15.
     :param westUS_shape: Filepath of West US shapefile.
 
     :return: None.
@@ -1088,7 +1093,7 @@ def download_drought_indices_water_year(data_name, download_dir, year_list, merg
 
     # Extracting dataset information required for downloading from GEE
     data, band, scale_factor, reducer, _, _, \
-       year_start_range, year_end_range = get_gee_dict(data_name)
+        year_start_range, year_end_range = get_gee_dict(data_name)
 
     # loading grids that will be used to download the data
     grids = gpd.read_file(gee_grid_shape)
@@ -1102,7 +1107,7 @@ def download_drought_indices_water_year(data_name, download_dir, year_list, merg
         # climate conditions (precipitation and PET) averaged over the previous 12 months.
         #
         # To align with the water year, we set the date to the **end of the water year** (~September 30).
-        # But the data isn't available at September 30 each year due to a 5 day cadence. So, we set up a range
+        # But the data isn't available at September 30 each year due to a 5-day cadence. So, we set up a range
         # of 6 days, search the data within that range. If there is single data found in that range, we download it,
         # otherwise, we average it and download (if 2 datasets are found).
         #
@@ -1136,7 +1141,6 @@ def download_drought_indices_water_year(data_name, download_dir, year_list, merg
                                                          'region': gee_extent,
                                                          'format': 'GEO_TIFF'})
 
-
                 key_word = data_name
                 local_file_path = os.path.join(download_dir, f'{key_word}_{str(year)}_{str(grid_sr)}.tif')
 
@@ -1153,7 +1157,7 @@ def download_drought_indices_water_year(data_name, download_dir, year_list, merg
                     for j, k in zip(data_url_list, local_file_paths_list):
                         urls_to_file_paths_compile.append([j, k])
 
-                    # Download data by multi-processing/multi-threading
+                    # Download data by multiprocessing/multi-threading
                     download_data_from_GEE_by_multiprocess(download_urls_fp_list=urls_to_file_paths_compile,
                                                            use_cpu=use_cpu_while_multidownloading)
 
@@ -1228,7 +1232,8 @@ def download_all_gee_data(data_list, download_dir, year_list, month_range,
                                'MODIS_Terra_NDVI', 'MODIS_Terra_EVI',
                                'MODIS_NDMI', 'MODIS_NDVI', 'MODIS_Day_LST']:
                 download_gee_data_yearly(data_name=data_name, download_dir=download_dir, year_list=year_list,
-                                          month_range=(2, 10), merge_keyword='WestUS_yearly')  # months 2-10 chosen to keep a good overlap between regions with different growing season
+                                         month_range=(2, 10),
+                                         merge_keyword='WestUS_yearly')  # months 2-10 chosen to keep a good overlap between regions with different growing season
 
             elif data_name == 'USDA_CDL':
                 download_gee_data_yearly(data_name=data_name, download_dir=download_dir, year_list=year_list,

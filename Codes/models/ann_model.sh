@@ -1,6 +1,6 @@
 #!/bin/bash
 
-## running the dr11_LOBO_run.py script on GPU nodes
+## running the ann_model.py script on GPU nodes
 
 #SBATCH --partition=smi_all
 #SBATCH --ntasks=30
@@ -10,5 +10,5 @@
 #SBATCH --mail-type=BEGIN,END,FAIL,TIME_LIMIT
 #SBATCH --mail-user=Fahim.Hasan@colostate.edu
 
-python dr11_LOBO_run.py
+python ann_model.py
 

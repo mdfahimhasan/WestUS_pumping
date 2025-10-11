@@ -12,7 +12,7 @@ from os.path import dirname, abspath
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.raster_ops import mask_raster_by_shape, set_nodata_inside_shapefile
-from Codes.models.dr08_df import create_train_test_dataframe, split_train_val_test_set_v2, \
+from Codes.models.ann_df import create_train_test_dataframe, split_train_val_test_set_v2, \
     calc_scaling_statistics, standardize_train_val_test
 
 

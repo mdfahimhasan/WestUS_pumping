@@ -1,6 +1,6 @@
 #!/bin/bash
 
-## running the dr08_df.py script on CPU nodes
+## running the ann_preprocess_LOBO.py script on CPU nodes
 
 #SBATCH --partition=smi_all
 #SBATCH --ntasks=30
@@ -9,5 +9,5 @@
 #SBATCH --mail-type=BEGIN,END,FAIL,TIME_LIMIT
 #SBATCH --mail-user=Fahim.Hasan@colostate.edu
 
-python dr08_df.py
+python ann_preprocess_LOBO.py
 

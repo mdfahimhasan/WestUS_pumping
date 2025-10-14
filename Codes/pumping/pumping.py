@@ -440,7 +440,7 @@ def pumping_pts_to_raster_v1(state_code, years, pumping_pts_shp, pumping_attr_AF
     :return: Raster directories' path with AF and mm pumping.
     """
     if not skip_processing:
-        print(f'\nCreating pumping rasters for {state_code}...')
+        print(f'\nCreating pumping rasters for {state_code}...\n')
 
         # creating subdirectories
         annual_pump_shp_dir = os.path.join(output_dir, 'annual_pumping_shp')
@@ -1053,7 +1053,7 @@ def main(skip_process_AZ_pumping,
         pod_shp='../../Data_main/pumping/Nevada/raw/Diamond Valley/pod/dv_pod.shp',
         output_dir='../../Data_main/pumping/Nevada/Final',
         year_col='year',
-        pumping_col='pumping_mm',
+        pumping_col='pumping_AF',
         pod_col_csv='all_app',
         pod_col_shp='app',
         skip_processing=skip_NV_dist_pumping_to_pod)
@@ -1117,7 +1117,7 @@ if __name__ == '__main__':
         skip_make_KS_pumping_raster=True,  #######
         skip_process_CO_pumping=True,  #######
         skip_make_CO_pumping_raster=True,  #######
-        skip_NV_dist_pumping_to_pod=True,  #######
-        skip_make_NV_pumping_raster=True,  #######
+        skip_NV_dist_pumping_to_pod=False,  #######
+        skip_make_NV_pumping_raster=False,  #######
         skip_combine_pumping_rasters=False  #######
     )

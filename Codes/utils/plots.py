@@ -236,3 +236,62 @@ def variable_correlation_plot(variables_to_include, dataframe_csv,
     # Calculating total value of absolute
     corr_coef = round(df.corr(method=method).abs(), 2)
     corr_coef['sum'] = corr_coef.sum() - 1  # deleting 1 to remove self correlation
+
+
+def plot_heatmap(df, title, cbar_label,
+                 fontsize=12, cmap='coolwarm',
+                 annot=True, figsize=(7, 5),
+                 fmt='.2f', mask_diag=True,
+                 savepath=None):
+    """
+    Plots a heatmap for pairwise statistics (for example, RMSE, R2, P-value).
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Square DataFrame containing pairwise statistics.
+    title : str
+        Title of the heatmap.
+    cbar_label: str
+        Colorbar label.
+    fontsize: int
+        Fontsize.
+    cmap : str, default='coolwarm'
+        Colormap to use for the heatmap.
+    annot : bool, default=True
+        Whether to annotate the cells with values.
+    figsize : tuple, default=(7, 5)
+        Figure size in inches.
+    fmt : str, default='.2f'
+        String formatting code for annotations.
+    mask_diag : bool, default=True
+        Whether to hide (mask) the diagonal cells.
+    savepath : str or None, optional
+        If provided, saves the heatmap to this file path.
+
+    Returns
+    -------
+    ax : matplotlib.axes.Axes
+        The heatmap axes object.
+    """
+
+    # Optional mask for diagonal
+    mask = None
+    if mask_diag:
+        mask = np.eye(len(df), dtype=bool)
+
+    plt.figure(figsize=figsize)
+    ax = sns.heatmap(df, annot=annot, fmt=fmt, cmap=cmap,
+                     linewidths=0.5, mask=mask,
+                     cbar_kws={'label': cbar_label})
+
+    ax.set_title(title, fontsize=fontsize, pad=12)
+    ax.set_xlabel('')
+    ax.set_ylabel('')
+    plt.xticks(rotation=90, ha='right')
+    plt.yticks(rotation=0)
+
+    plt.tight_layout()
+
+    if savepath:
+        plt.savefig(savepath, dpi=300, bbox_inches='tight', facecolor='white')

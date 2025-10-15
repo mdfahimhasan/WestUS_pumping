@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from scipy.stats import ks_2samp
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 
 
@@ -226,3 +227,60 @@ def quantile_mapping(predictions, observed_train):
     corrected_predictions = corrected_predictions.reshape(predictions.shape)
 
     return corrected_predictions
+
+
+def ks_test_pairwise(state_dfs_dict, round_digits=3):
+    """
+    Performs pairwise Kolmogorov–Smirnov (K–S) tests between multiple state datasets.
+
+    ------------------------------------------------------------------------------------------------------------------
+    Kolmogorov–Smirnov (K–S) Test Overview
+
+    source: https://www.geeksforgeeks.org/machine-learning/kolmogorov-smirnov-test-ks-test/
+    ------------------------------------------------------------------------------------------------------------------
+    The Kolmogorov–Smirnov (K–S) test is a nonparametric statistical test used to compare two empirical distributions.
+    It quantifies the maximum absolute difference between their empirical cumulative distribution functions (ECDFs).
+    The resulting D-statistic measures how far apart the two distributions are, while the p-value indicates whether
+    this difference is statistically significant. Because the K–S test makes no assumptions about the underlying
+    distribution shape, it is particularly useful for assessing whether two samples originate from the same
+    population. In this function, it is used to evaluate feature distribution similarity across
+    states—for example, comparing Utah’s or California’s climatic and irrigation feature spaces
+    against the model’s training states.
+
+    Parameters
+    ----------
+    state_dfs_dict : dict
+        Dictionary where keys are state names and values are DataFrames
+        containing the column specified by `value_col`.
+    round_digits : int, default=3
+        Number of decimal places to round D and p-values.
+
+    Returns
+    -------
+    D_mat : pd.DataFrame
+        Matrix of K–S D-statistics.
+    p_mat : pd.DataFrame
+        Matrix of corresponding p-values.
+    """
+
+    state_names = list(state_dfs_dict.keys())
+    D_mat = pd.DataFrame(index=state_names, columns=state_names)
+    p_mat = pd.DataFrame(index=state_names, columns=state_names)
+
+    for s1 in state_names:
+        vals1 = state_dfs_dict[s1].dropna()
+        for s2 in state_names:
+            vals2 = state_dfs_dict[s2].dropna()
+
+            # The D-value is the maximum vertical distance between the two empirical
+            # cumulative distribution functions (ECDFs). It ranges between 0 and 1.
+            # 0 → identical distributions; closer to 1 → very different distributions
+            D, p = ks_2samp(vals1, vals2)
+            D_mat.loc[s1, s2] = round(D, round_digits)
+
+        #  When n1 and n2 are large, even a small shift in distributions produces a tiny p-value.
+        # So, with pixel-scale datasets, we’ll almost always reject the null hypothesis of “same distribution.”
+        # so, we are ignoring 'p value' for now.
+        # p_mat.loc[s1, s2] = round(p, 8)
+
+    return D_mat

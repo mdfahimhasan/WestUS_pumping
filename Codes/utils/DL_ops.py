@@ -271,14 +271,14 @@ class MLPRegression(nn.Module):
         if optimizer_name.lower() == 'sgd':
             return torch.optim.SGD(self.parameters(), lr=lr, momentum=momentum, weight_decay=weight_decay)
 
+        elif optimizer_name.lower() == 'adagrad':
+            return torch.optim.Adagrad(self.parameters(), lr=lr, weight_decay=weight_decay)
+
         elif optimizer_name.lower() == 'adam':
             return torch.optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay, betas=(0.9, 0.999))
 
         elif optimizer_name.lower() == 'adamw':
             return torch.optim.AdamW(self.parameters(), lr=lr, weight_decay=weight_decay, betas=(0.9, 0.999))
-
-        elif optimizer_name.lower() == 'adagrad':
-            return torch.optim.Adagrad(self.parameters(), lr=lr, weight_decay=weight_decay)
 
         else:
             raise ValueError(

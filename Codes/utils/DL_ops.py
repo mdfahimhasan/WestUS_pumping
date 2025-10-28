@@ -1351,8 +1351,8 @@ def load_model_and_predict_raster(trained_model_path, trained_model_info, years_
             ref_arr = ref_file.read(1)
             pred_arr = pred_arr.reshape(ref_arr.shape)
 
-            # noticed some -ve pumping pixels near oregon, replcing them with zero
-            pred_arr = np.where(~np.isnan(pred_arr) & (pred_arr < 0), 0, pred_arr)
+            # noticed some -ve pumping pixels near oregon, replacing them with zero
+            pred_arr = np.where((pred_arr != -9999) & (pred_arr < 0), 0, pred_arr)
 
             # # # saving
             output_prediction_raster = os.path.join(output_dir, f'pumping_{year}.tif')

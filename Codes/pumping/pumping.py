@@ -322,12 +322,16 @@ def process_CO_pumping_data(raw_data_dir, well_ID_shp, output_pump_shp, skip_pro
 
         compiled_gdf = df_merged.merge(well_id_gdf, how='left', on='WDID')
 
+        # I found some very high pumping values, e.g., in a well (0207026) in south platte
+        # has a value of 49153 AF. Dropping them.
+        compiled_gdf = compiled_gdf[compiled_gdf['AF_pumped'] <= 5000]
+
         # converting to shapefile
         compiled_gdf = gpd.GeoDataFrame(compiled_gdf, geometry='geometry', crs='EPSG:4269')
         compiled_gdf.to_file(output_pump_shp)
 
         # saving as csv
-        df_merged.to_csv(os.path.join(os.path.dirname(output_pump_shp), 'pumping_CO_v0.csv'), index=False)
+        compiled_gdf.to_csv(os.path.join(os.path.dirname(output_pump_shp), 'pumping_CO_v0.csv'), index=False)
 
     else:
         pass
@@ -936,6 +940,43 @@ def combine_pumping_rasters(years, years_no_data_dict,
         pass
 
 
+def create_consumptive_gw_use_raster(Irr_eff_dir, combined_pumping_dir,
+                                     output_dir, skip_processing=False):
+    """
+    Creates consumptive groundwater use raster from compiled pumping data and
+    USGS HUC12 irrigation efficiency data.
+
+    :param Irr_eff_dir: Rasterized USGS HUC12 irrigation efficiency raster.
+    :param combined_pumping_dir: Combiner pumping data.
+    :param output_dir: Path of output directory.
+    :param skip_processing: Set True to skip this process.
+
+    :return: None.
+    """
+    if not skip_processing:
+        makedirs([output_dir])
+
+        for year in range(2000, 2024):
+
+            Irr_eff_data = glob(os.path.join(Irr_eff_dir, f'*{year}*.tif'))[0]
+            Irr_eff, file = read_raster_arr_object(Irr_eff_data)
+
+            arr_shape = Irr_eff.shape
+            Irr_eff = Irr_eff.flatten()
+
+            pumping_data = glob(os.path.join(combined_pumping_dir, f'*{year}.tif'))[0]
+            pumping = read_raster_arr_object(pumping_data, get_file=False).flatten()
+
+            # consumptive groundwater use
+            consmp_gw = np.where((~np.isnan(Irr_eff)) & (~np.isnan(pumping)), pumping * Irr_eff, -9999)
+            consmp_gw = consmp_gw.reshape(arr_shape)
+
+            write_array_to_raster(consmp_gw, file, file.transform, os.path.join(output_dir, f'pumping_{year}.tif'))
+
+    else:
+        pass
+
+
 def main(skip_process_AZ_pumping,
          skip_irrig_zone_filter_AZ,
          skip_make_AZ_pumping_raster,
@@ -1020,10 +1061,10 @@ def main(skip_process_AZ_pumping,
     ####################################################################################################################
     # compile from raw data (v0)
     # already processed for major_irrig_zones
-    process_CO_pumping_data(raw_data_dir='../../Data_main/pumping/Colorado/raw/all_data',
-                            well_ID_shp='../../Data_main/pumping/Colorado/raw/Well_ID/Well_ID_CO_v1.shp',
+    process_CO_pumping_data(raw_data_dir='../../Data_main/pumping/Colorado/raw/pumping/all_data',
+                            well_ID_shp='../../Data_main/pumping/Colorado/raw/pumping/Well_ID/Well_ID_CO_v1.shp',
                             # this is clipped for 'major_irrig_zones'
-                            output_pump_shp='../../Data_main/pumping/Colorado/raw/pumping_CO_v0.shp',
+                            output_pump_shp='../../Data_main/pumping/Colorado/Final/pumping_CO_v0.shp',
                             skip_process=skip_process_CO_pumping)
 
     # make 2 km rasters
@@ -1091,7 +1132,7 @@ def main(skip_process_AZ_pumping,
                             skip_processing=skip_combine_pumping_rasters)
 
     # combine the filtered pumping rasters where filtering through threshold was applied.
-    # will be used for model training.
+    # Either this or consumptive groundwater use data will be used for model training.
     combine_pumping_rasters(years=list(range(2000, 2024)),
                             years_no_data_dict={'KS': list(range(2021, 2024)),
                                                 'CO': list(range(2000, 2011)),
@@ -1107,6 +1148,13 @@ def main(skip_process_AZ_pumping,
                             output_dir='../../Data_main/pumping/rasters/WestUS_pumping',
                             skip_processing=skip_combine_pumping_rasters)
 
+    # create consumptive groundwater use raster
+    # Either this or pumping data will be used for model training.
+    create_consumptive_gw_use_raster(Irr_eff_dir='../../Data_main/rasters/HUC12_Irr_Eff',
+                                     combined_pumping_dir='../../Data_main/pumping/rasters/WestUS_pumping',
+                                     output_dir='../../Data_main/pumping/rasters/WestUS_consumptive_gw',
+                                     skip_processing=False)
+
 
 if __name__ == '__main__':
     main(
@@ -1116,8 +1164,8 @@ if __name__ == '__main__':
         skip_process_KS_pumping=True,  #######
         skip_make_KS_pumping_raster=True,  #######
         skip_process_CO_pumping=True,  #######
-        skip_make_CO_pumping_raster=True,  #######
-        skip_NV_dist_pumping_to_pod=False,  #######
-        skip_make_NV_pumping_raster=False,  #######
+        skip_make_CO_pumping_raster=False,  #######
+        skip_NV_dist_pumping_to_pod=True,  #######
+        skip_make_NV_pumping_raster=True,  #######
         skip_combine_pumping_rasters=False  #######
     )

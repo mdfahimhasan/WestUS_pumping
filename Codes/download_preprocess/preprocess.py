@@ -6,11 +6,14 @@
 import os
 import re
 import sys
+import time
+import shutil
 import datetime
 import numpy as np
 from glob import glob
 from osgeo import gdal
 import rasterio as rio
+import geopandas as gpd
 from rasterio.warp import reproject, Resampling
 
 from os.path import dirname, abspath
@@ -365,7 +368,7 @@ def paste_and_reproject(src_raster_path, ref_raster_path, nodata):
     Returns a full-size array aligned to reference raster.
     """
 
-    # opening the referecne raster file and creating an empty array using its shape
+    # opening the reference raster file and creating an empty array using its shape
     ref_profile = rio.open(ref_raster_path)
     out_arr = np.full((ref_profile.height, ref_profile.width), nodata, dtype=np.float32)
 
@@ -586,14 +589,60 @@ def create_HUC12_SW_irrigation_rasters(HUC12_SW_shape, output_dir, resolution=mo
             write_array_to_raster(normalized_sw_arr, file, file.transform, output_normal_raster)
 
 
-def create_GW_use_perc_rasters(HUC12_GW_perc_shape, output_dir, resolution=model_res,
-                               ref_raster=WestUS_raster, skip_processing=False):
+# def create_GW_use_perc_rasters(HUC12_GW_perc_shape, output_dir, resolution=model_res,
+#                                ref_raster=WestUS_raster, skip_processing=False):
+#     """
+#     Rasterize USGS HUC12 level GW use % (GW use % w.r.t. total water use) dataset.
+#     The created rasters has similar GW use % values for each pixel in
+#     a HUC12.
+#
+#     :param HUC12_GW_perc_shape: Shapefile of HUC12 GW use % shapefile.
+#     :param output_dir: Directory path to save outputs.
+#     :param resolution: Resolution. Default set to model resolution.
+#     :param ref_raster: Reference raster. Default set to Western US reference raster.
+#     :param skip_processing: Set True to skip processing.
+#
+#     :return: None.
+#     """
+#     if not skip_processing:
+#         print('rasterizing HUC12 GW % datasets...')
+#
+#         # making output directories
+#         interim_outdir = os.path.join(output_dir, 'interim')
+#         makedirs([output_dir, interim_outdir])
+#
+#         years = list(range(2000, 2020 + 1))  # years from 2000 to 2020
+#
+#         for year in years:
+#             column_to_rasterize = f'{year}_gw_%'
+#
+#             interim_raster = shapefile_to_raster(input_shape=HUC12_GW_perc_shape,
+#                                                  output_dir=interim_outdir,
+#                                                  raster_name=f'HUC12_GW_perc_{year}.tif',
+#                                                  burnvalue=None, use_attr=True,
+#                                                  attribute=column_to_rasterize,
+#                                                  add=None, ref_raster=ref_raster,
+#                                                  resolution=resolution, alltouched=False)
+#
+#             # the produced interim raster has no data values in a few HUCs
+#             # setting them to 0 to create a continuous raster
+#             ref_arr = read_raster_arr_object(ref_raster, get_file=False)
+#
+#             interim_sw_arr, file = read_raster_arr_object(interim_raster)
+#             final_sw_arr = np.where(np.isnan(interim_sw_arr) & (ref_arr == 0), 0, interim_sw_arr)
+#
+#             output_raster = os.path.join(output_dir, f'HUC12_GW_perc_{year}.tif')
+#             write_array_to_raster(final_sw_arr, file, file.transform, output_raster)
+
+
+def create_Irr_eff_rasters(HUC12_Irr_Eff_shape, output_dir, resolution=model_res,
+                           ref_raster=WestUS_raster, skip_processing=False):
     """
-    Rasterize USGS HUC12 level GW use % (GW use % w.r.t. total water use) dataset.
-    The created rasters has similar GW use % values for each pixel in
+    Rasterize USGS HUC12 level Irrigation Efficiency dataset.
+    The created rasters has similar irrigation efficiency values for each pixel in
     a HUC12.
 
-    :param HUC12_GW_perc_shape: Shapefile of HUC12 GW use % shapefile.
+    :param HUC12_Irr_Eff_shape: Shapefile of HUC12 Irrigation Efficiency shapefile.
     :param output_dir: Directory path to save outputs.
     :param resolution: Resolution. Default set to model resolution.
     :param ref_raster: Reference raster. Default set to Western US reference raster.
@@ -602,34 +651,49 @@ def create_GW_use_perc_rasters(HUC12_GW_perc_shape, output_dir, resolution=model
     :return: None.
     """
     if not skip_processing:
-        print('rasterizing HUC12 GW % datasets...')
+        print('rasterizing HUC12 Irrigation Efficiency datasets...')
 
         # making output directories
         interim_outdir = os.path.join(output_dir, 'interim')
         makedirs([output_dir, interim_outdir])
 
-        years = list(range(2000, 2020 + 1))  # years from 2000 to 2020
+        # there are some 0 values in irrigated HUC12s. Replacing them by
+        # average irrigation efficiency for that HUC12
+        irr_eff_gdf = gpd.read_file(HUC12_Irr_Eff_shape)
+        year_cols = [col for col in irr_eff_gdf.columns if col.isdigit()]
+        irr_eff_gdf[year_cols] = irr_eff_gdf[year_cols].replace(0, np.nan)
+
+        irr_eff_gdf[year_cols] = irr_eff_gdf[year_cols].apply(lambda row: row.fillna(row.mean()), axis=1)
+
+        # The HUC12 dataset only has data up to 2020. Assuming that remains the same for 2021-2023
+        irr_eff_gdf['2021'] = irr_eff_gdf['2020']
+        irr_eff_gdf['2022'] = irr_eff_gdf['2020']
+        irr_eff_gdf['2023'] = irr_eff_gdf['2020']
+
+        interim_output_shp = os.path.join(output_dir, 'interim_irr_eff.shp')
+        irr_eff_gdf.to_file(interim_output_shp)
+
+        # rasterizing
+        years = list(range(2000, 2023 + 1))  # years from 2000 to 2023
 
         for year in years:
-            column_to_rasterize = f'{year}_gw_%'
+            column_to_rasterize = f'{year}'
 
-            interim_raster = shapefile_to_raster(input_shape=HUC12_GW_perc_shape,
+            interim_raster = shapefile_to_raster(input_shape=interim_output_shp,
                                                  output_dir=interim_outdir,
-                                                 raster_name=f'HUC12_GW_perc_{year}.tif',
+                                                 raster_name=f'HUC12_Irr_eff_{year}.tif',
                                                  burnvalue=None, use_attr=True,
                                                  attribute=column_to_rasterize,
                                                  add=None, ref_raster=ref_raster,
                                                  resolution=resolution, alltouched=False)
 
-            # the produced interim raster has no data values in a few HUCs
-            # setting them to 0 to create a continuous raster
-            ref_arr = read_raster_arr_object(ref_raster, get_file=False)
+            # the produced interim raster has zero in pixels with no irrigation
+            # setting them at no data
+            interim_arr, file = read_raster_arr_object(interim_raster)
+            final_arr = np.where(interim_arr == 0, -9999, interim_arr)
 
-            interim_sw_arr, file = read_raster_arr_object(interim_raster)
-            final_sw_arr = np.where(np.isnan(interim_sw_arr) & (ref_arr == 0), 0, interim_sw_arr)
-
-            output_raster = os.path.join(output_dir, f'HUC12_GW_perc_{year}.tif')
-            write_array_to_raster(final_sw_arr, file, file.transform, output_raster)
+            output_raster = os.path.join(output_dir, f'HUC12_Irr_eff_{year}.tif')
+            write_array_to_raster(final_arr, file, file.transform, output_raster)
 
 
 def process_and_OneHotEncode_Koppen_Geiger(koppen_geiger_raster, output_dir,
@@ -872,12 +936,12 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
                           skip_gridmet_vpd_processing=False,
                           skip_daymet_sunHr_processing=False,
                           skip_HUC12_SW_processing=False,
-                          skip_HUC12_GW_perc_processing=False,
                           skip_create_canal_density_raster=False,
                           skip_create_canal_distance_raster=False,
                           skip_irr_frac_data_processing=False,
                           skip_irr_cropland_classification=False,
-                          skip_process_USGS_GW_perc=False):
+                          skip_process_USGS_GW_perc=False,
+                          skip_process_USGS_Irr_Eff=False):
     """
     Run all preprocessing steps.
 
@@ -896,7 +960,6 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     :param skip_gridmet_vpd_processing: Set True to skip processing gridmet vapor pressure deficit growing season data.
     :param skip_daymet_sunHr_processing: Set True to skip processing daymet sun hour growing season data.
     :param skip_HUC12_SW_processing: Set True to skip create SW irrigation dataset.
-    :param skip_HUC12_GW_perc_processing: Set True to skip create GW use % dataset.
     :param skip_create_canal_density_raster: Set True to skip create canal density raster.
     :param skip_create_canal_distance_raster: Set True to skip create distance from canal raster.
     :param skip_irr_frac_data_processing: Set True to skip process irrigation fraction data from 2021-2023.
@@ -904,6 +967,7 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     :param skip_irr_cropland_classification: Set True to skip irrigation cropland classification from 2021-2023.
                                              2000-2020 data was processed in the Peff paper.
     :param skip_process_USGS_GW_perc: Set True to skip create GW use % of HUC12 from USGS data.
+    :param skip_process_USGS_Irr_Eff: Set True to skip rasterizing irrigation efficiency data.
 
     :return: None.
     """
@@ -1023,12 +1087,6 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
         resolution=model_res, ref_raster=WestUS_raster,
         skip_processing=skip_HUC12_SW_processing)
 
-    # HUC12 GW use % rasterization
-    create_GW_use_perc_rasters(
-        HUC12_GW_perc_shape='../../Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_with_GW_use_perc.shp',
-        output_dir='../../Data_main/rasters/HUC12_GW_perc', resolution=model_res,
-        ref_raster=WestUS_raster, skip_processing=skip_HUC12_GW_perc_processing)
-
     # Canal density raster processing
     create_canal_density_raster(
         canal_shapefile='../../Data_main/shapefiles/Surface_water_shapes/NHD/NHD_CanalDitch.shp',
@@ -1074,3 +1132,10 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
                 output_dir='../../Data_main/rasters/USGS_GW_%',
                 raster_name=f'GW_perc_{year}.tif', use_attr=True,
                 attribute=f'avg_gw_%')
+
+    # rasterize USGS HUC12 Irrigation Efficiency data
+    create_Irr_eff_rasters(
+        HUC12_Irr_Eff_shape='../../Data_main/shapefiles/USGS_WaterUse\HUC12_WestUS_with_Irr_Eff.shp',
+        output_dir='../../Data_main/rasters/HUC12_Irr_Eff',
+        resolution=model_res, ref_raster=WestUS_raster,
+        skip_processing=skip_process_USGS_Irr_Eff)

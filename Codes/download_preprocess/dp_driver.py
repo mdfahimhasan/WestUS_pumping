@@ -104,7 +104,7 @@ if __name__ == '__main__':
     skip_irr_frac_processing = True             ########################################################################
     skip_irr_cropland_classification = True     ########################################################################
     skip_process_USGS_GW_perc = True            ########################################################################
-    skip_USGS_Irr_eff_raster = False             ########################################################################
+    skip_USGS_Irr_eff_raster = True            ########################################################################
 
     run_all_preprocessing(skip_stateID_raster_creation=skip_stateID_raster_creation,
                           skip_pixelID_raster_creation=skip_pixelID_raster_creation,

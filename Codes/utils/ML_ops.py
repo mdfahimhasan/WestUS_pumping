@@ -885,7 +885,8 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
             'sw_huc12': 'Normalized HUC12 Surface water irrigation', 'gw_perc_huc12': 'Groundwater use % at HUC12',
             'climate': 'Climate', 'FC': 'Field capacity', 'spi': 'Standardized precipitation index',
             'spei': 'Standardized precipitation evapotranspiration index', 'eddi': 'Evaporative demand drought index',
-            'Canal_density': 'Canal density', 'Canal_distance': 'Distance from canals'
+            'Canal_density': 'Canal density', 'Canal_distance': 'Distance from canals',
+            'irr_eff': 'Irrigation Efficiency'
         }
 
         importances = importances.rename(columns=feature_name_dict)
@@ -969,7 +970,9 @@ def plot_shap_summary_plot(trained_model_path, use_samples,
                               'maxRH': 'Relative humidity (max)', 'minRH': 'Relative humidity (min)',
                               'shortRad': 'Shortwave radiation', 'vpd': 'Vapor pressure deficit',
                               'sunHr': 'Sun hour', 'FC': 'Field capacity',
-                              'Canal_distance': 'Distance from canal', 'Canal_density': 'Canal density'}
+                              'Canal_distance': 'Distance from canal', 'Canal_density': 'Canal density',
+                              'irr_eff': 'Irrigation Efficiency'
+                              }
         df = df.rename(columns=feature_names_dict)
         feature_names = np.array(df.columns.tolist())
 
@@ -1052,7 +1055,7 @@ def plot_shap_interaction_plot(model_version, trained_model_path, use_samples, f
                               'shortRad': 'Shortwave radiation', 'vpd': 'Vapor pressure deficit',
                               'sunHr': 'Sun hour', 'FC': 'Field capacity',
                               'Canal_distance': 'Distance from canal',
-                              'Canal_density': 'Canal density'}
+                              'Canal_density': 'Canal density', 'irr_eff': 'Irrigation Efficiency'}
 
         df = df.rename(columns=feature_names_dict)
         feature_names = np.array(df.columns.tolist())

@@ -115,7 +115,7 @@ def process_AZ_pumping_csv(raw_csv_dir, well_reg_shp, well_reg_dict, output_shp,
         makedirs([os.path.dirname(output_shp)])
 
         # collecting all csvs
-        pumping_csvs = glob(os.path.join(raw_csv_dir, '*AZ*.csv'))
+        pumping_csvs = glob(os.path.join(raw_csv_dir, '*GW_*.csv'))
 
         # compiling all csvs into one dataframe
         compiled_pump_df = pd.DataFrame()
@@ -1164,7 +1164,7 @@ if __name__ == '__main__':
         skip_process_KS_pumping=True,  #######
         skip_make_KS_pumping_raster=True,  #######
         skip_process_CO_pumping=True,  #######
-        skip_make_CO_pumping_raster=False,  #######
+        skip_make_CO_pumping_raster=True,  #######
         skip_NV_dist_pumping_to_pod=True,  #######
         skip_make_NV_pumping_raster=True,  #######
         skip_combine_pumping_rasters=False  #######

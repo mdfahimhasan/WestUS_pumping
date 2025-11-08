@@ -951,10 +951,13 @@ def plot_shap_summary_plot(trained_model_path, use_samples,
         print('\n___________________________________________________________________________')
         print(f'\nplotting SHAP feature importance...')
 
-        # loading data + random sampling + renaming dataframe features
-        if 'pumping_mm' not in exclude_features:
-            exclude_features = exclude_features + ['pumping_mm']
+        # making sure to exclude training data.
+        # only one of these was used for training.
+        for col in ['pumping_mm', 'consumptive_gw']:
+            if col not in exclude_features:
+                exclude_features.append(col)
 
+        # loading data + random sampling + renaming dataframe features
         if '.csv' in data_csv:
             df = pd.read_csv(data_csv)
             df = df.drop(columns=exclude_features)
@@ -1035,10 +1038,13 @@ def plot_shap_interaction_plot(model_version, trained_model_path, use_samples, f
         print('\n___________________________________________________________________________')
         print(f'\nplotting SHAP interaction plot...')
 
-        # loading data + random sampling + renaming dataframe features
-        if 'pumping_mm' not in exclude_features_from_df:
-            exclude_features_from_df = exclude_features_from_df + ['pumping_mm']
+        # making sure to exclude training data.
+        # only one of these was used for training.
+        for col in ['pumping_mm', 'consumptive_gw']:
+            if col not in exclude_features_from_df:
+                exclude_features_from_df.append(col)
 
+        # loading data + random sampling + renaming dataframe features
         if '.csv' in data_csv:
             df = pd.read_csv(data_csv)
             df = df.drop(columns=exclude_features_from_df)
@@ -1206,7 +1212,7 @@ def predict_annual_pumping_rasters(trained_model, years_list, exclude_columns,
             nan_pos_dict_path = glob(os.path.join(predictor_csv_and_nan_pos_dir, f'*{year}.pkl'))[0]
 
             df = pd.read_csv(predictor_csv)
-            df = df.drop(columns=exclude_columns)
+            df = df.drop(columns=exclude_columns, errors='ignore')
             df = reindex_df(df)
 
             # generating prediction raster with trained model
@@ -1228,38 +1234,49 @@ def predict_annual_pumping_rasters(trained_model, years_list, exclude_columns,
         pass
 
 
-def postprocess_prediction(predicted_pumping_dir, output_dir, USGS_GW_perc_dir, skip_processing=False):
+def compute_pumping_from_consumptive_use(consmp_gw_prediction_dir,
+                                         irr_eff_dir, output_dir,
+                                         skip_processing=False):
     """
-    Post-processes predicted groundwater pumping rasters by applying groundwater percentage (USGS) scaling
-    and saving the scaled results for each year.
+    Computes annual pumping rasters by dividing consumptive groundwater use
+    by irrigation efficiency rasters for each year.
 
-    :param predicted_pumping_dir: Path to the directory containing predicted pumping raster files.
-                                  Each file should be named with a year identifier (e.g., '*2000.tif').
+    Parameters
+    ----------
+    consmp_gw_prediction_dir : str
+        Directory containing annual consumptive groundwater use rasters.
+    irr_eff_dir : str
+        Directory containing annual irrigation efficiency rasters from USGS HUC12 dataset.
+    output_dir : str
+        Directory to save the computed pumping rasters.
+    skip_processing : bool
+        Set True to skip this step.
 
-    :param output_dir: Path to the directory where processed rasters will be saved.
-                       The function creates the directory if it does not exist.
-
-    :param USGS_GW_perc_dir: Path to the directory containing annual USGS groundwater percentage rasters.
-                             Each file should correspond to the same year as the predicted pumping file.
-
-    :param skip_processing: If True, the function skips processing and exits without performing any operations.
-                            Default is False.
-
-    :return: None. The function writes scaled raster files named as
-             'WestUS_pumping_<year>.tif' in the output directory.
+    :return None.
     """
     if not skip_processing:
+        print("\nConverting consumptive gw use prediction to pumping raster...")
+
         makedirs([output_dir])
 
-        print('\nScaled predicted pumping with USGS HUC12-scale GW use % data....')
+        years = list(range(2000, 2023 + 1))
 
-        for year in list(range(2000, 2024)):
-            predicted_arr, file = read_raster_arr_object(glob(os.path.join(predicted_pumping_dir, f'*{year}.tif'))[0])
-            gw_perc = read_raster_arr_object(glob(os.path.join(USGS_GW_perc_dir, f'*{year}.tif'))[0], get_file=False)
+        for year in years:
+            # Find the matching rasters
+            cnsmp_file = glob(os.path.join(consmp_gw_prediction_dir, f'*{year}.tif'))[0]
+            irr_eff_file = glob(os.path.join(irr_eff_dir, f'*{year}.tif'))[0]
 
-            # applying scaling
-            scaled_arr = np.where(~np.isnan(predicted_arr), predicted_arr * gw_perc / 100, -9999)
+            cnsmp_arr, file = read_raster_arr_object(cnsmp_file)
+            irr_eff_arr = read_raster_arr_object(irr_eff_file, get_file=False)
 
-            # save
-            write_array_to_raster(scaled_arr, file, file.transform,
-                                  os.path.join(output_dir, f'WestUS_pumping_{year}.tif'))
+            # Compute pumping only where both arrays have valid data
+            pump_arr = np.where(
+                (~np.isnan(cnsmp_arr)) & (~np.isnan(irr_eff_arr)),
+                cnsmp_arr / irr_eff_arr,
+                -9999
+            )
+
+            output_path = os.path.join(output_dir, f'WestUS_pumping_{year}.tif')
+            write_array_to_raster(pump_arr, file, file.transform, output_path)
+
+

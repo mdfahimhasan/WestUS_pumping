@@ -391,17 +391,25 @@ def paste_and_reproject(src_raster_path, ref_raster_path, nodata):
     return out_arr, ref_profile
 
 
-def merge_GEE_data_patches_IrrMapper_LANID_extents(year_list, input_dir_irrmapper, input_dir_lanid, merged_output_dir,
-                                                   merge_keyword, ref_raster=WestUS_raster,
+def merge_GEE_data_patches_IrrMapper_LANID_extents(year_with_full_extent, input_dir_irrmapper,
+                                                   input_dir_lanid, merged_output_dir,
+                                                   merge_keyword, year_with_partial_extent=None,
+                                                   monthly_data=True, ref_raster=WestUS_raster,
                                                    skip_processing=False):
     """
     Merge/mosaic downloaded GEE data for IrrMapper and LANID extent.
 
-    :param year_list: Tuple/list of years_list for which data will be processed.
+    :param year_with_full_extent: Tuple/list of years for which data will be processed. This list should be
+                                  used to process datasets for which data is available for entire Western US extent.
+
     :param input_dir_irrmapper: Input directory filepath of datasets at IrrMapper extent.
     :param input_dir_lanid: Input directory filepath of datasets at LANID extent.
     :param merged_output_dir: Output directory filepath to save merged data.
     :param merge_keyword: Keyword to use while merging. Foe example: 'Rainfed_Frac', 'Irrigated_crop_OpenET', etc.
+    :param year_with_partial_extent: Tuple/list of years for which partial data is available for the Western US extent.
+                                Default is None.
+    :param monthly_data: Boolean. If False will look/search for yearly data patches. Default set to True to look for
+                         monthly datasets.
     :param ref_raster: Reference raster to use in merging. Default set to Western US reference raster.
     :param skip_processing: Set True to skip merging IrrMapper and LANID extent data patches.
 
@@ -410,49 +418,112 @@ def merge_GEE_data_patches_IrrMapper_LANID_extents(year_list, input_dir_irrmappe
     if not skip_processing:
         makedirs([merged_output_dir])
 
-        for year in year_list:
-            print(f'Merging IrrMapper and LANID data patches for {year}')
+        ################################################################################################################
+        # # processing block for monthly data like ET
+        if monthly_data:  # for datasets that are monthly
+            month_list = list(range(1, 13))
 
-            if year < 2021:
-                search_by = f'*{year}_*.tif'
+            # processing block for data that has Western US-scale coverage
+            if year_with_full_extent is not None:
+                for year in year_with_full_extent:
+                    for month in month_list:
+                        search_by = f'*{year}_{month}_*.tif'
 
-                # making input raster list by joining rasters of irrmapper extent and rasters of lanid extent
-                irrmapper_raster_list = glob(os.path.join(input_dir_irrmapper, search_by))
-                lanid_raster_list = glob(os.path.join(input_dir_lanid, search_by))
+                        # making input raster list by joining rasters of irrmapper extent and rasters of lanid extent
+                        irrmapper_raster_list = glob(os.path.join(input_dir_irrmapper, search_by))
+                        lanid_raster_list = glob(os.path.join(input_dir_lanid, search_by))
+                        irrmapper_raster_list.extend(lanid_raster_list)
 
-                irrmapper_raster_list.extend(lanid_raster_list)
+                        total_raster_list = irrmapper_raster_list
 
-                total_raster_list = irrmapper_raster_list
+                        if len(total_raster_list) > 0:  # to only merge for years_list and months when data is available
+                            merged_raster_name = f'{merge_keyword}_{year}_{month}.tif'
+                            mosaic_rasters_list(input_raster_list=total_raster_list, output_dir=merged_output_dir,
+                                                raster_name=merged_raster_name, ref_raster=ref_raster, dtype=None,
+                                                resampling_method='nearest', mosaicing_method='first',
+                                                resolution=model_res, nodata=no_data_value)
 
-                if len(total_raster_list) > 0:  # to only merge for years_list and months when data is available
-                    merged_raster_name = f'{merge_keyword}_{year}.tif'
-                    mosaic_rasters_list(input_raster_list=total_raster_list, output_dir=merged_output_dir,
-                                        raster_name=merged_raster_name, ref_raster=ref_raster, dtype=None,
-                                        resampling_method='nearest', mosaicing_method='first',
-                                        resolution=model_res, nodata=no_data_value)
+                            print(f'{merge_keyword} data merged for year {year}, month {month}')
+
+            # processing block for data that has partial coverage over Western US
+            if year_with_partial_extent is not None:
+                for year in year_with_partial_extent:
+                    for month in month_list:
+                        search_by = f'*{year}_{month}_*.tif'
+
+                        ref_arr, ref_file = read_raster_arr_object(ref_raster)
+
+                        # Opening each data and pasting it on ref raster.
+                        # This approach is followed because we want to create a WesternUS-wide raster even if
+                        # there is no irrigated cropland data for LANID and AIM-HPA after 2020 for midwest and
+                        # CONUS-wide
+                        irrmapper_raster_list = glob(os.path.join(input_dir_irrmapper, search_by))
+
+                        for irr_data in irrmapper_raster_list:
+                            temp_arr, _ = paste_and_reproject(src_raster_path=irr_data,
+                                                              ref_raster_path=ref_raster,
+                                                              nodata=no_data_value)
+
+                            ref_arr = np.where(temp_arr != -9999, temp_arr, ref_arr)
+
+                        ref_arr[ref_arr == 0] = no_data_value
+                        output_raster = os.path.join(merged_output_dir, f'{merge_keyword}_{year}_{month}.tif')
+                        write_array_to_raster(ref_arr, ref_file, ref_file.transform, output_raster)
+
+                        print(f'{merge_keyword} data merged for year {year}, month {month}')
+
+        ################################################################################################################
+        # # processing block for datasets that are yearly like land use
+        else:
+
+            # processing block for data that has Western US-scale coverage
+            if year_with_full_extent is not None:
+                for year in year_with_full_extent:
+                    search_by = f'*{year}_*.tif'
+
+                    # making input raster list by joining rasters of irrmapper extent and rasters of lanid extent
+                    irrmapper_raster_list = glob(os.path.join(input_dir_irrmapper, search_by))
+                    lanid_raster_list = glob(os.path.join(input_dir_lanid, search_by))
+
+                    irrmapper_raster_list.extend(lanid_raster_list)
+
+                    total_raster_list = irrmapper_raster_list
+
+                    if len(total_raster_list) > 0:  # to only merge for years_list and months when data is available
+                        merged_raster_name = f'{merge_keyword}_{year}.tif'
+                        mosaic_rasters_list(input_raster_list=total_raster_list, output_dir=merged_output_dir,
+                                            raster_name=merged_raster_name, ref_raster=ref_raster, dtype=None,
+                                            resampling_method='nearest', mosaicing_method='first',
+                                            resolution=model_res, nodata=no_data_value)
+
+                        print(f'{merge_keyword} data merged for year {year}')
+
+            # processing block for data that has partial coverage over Western US
+            if year_with_partial_extent is not None:
+                for year in year_with_partial_extent:
+                    search_by = f'*{year}_*.tif'
+
+                    ref_arr, ref_file = read_raster_arr_object(ref_raster)
+
+                    # Opening each data and pasting it on ref raster.
+                    # This approach is followed because we want to create a WesternUS-wide raster even if
+                    # there is no irrigated cropland data for LANID and AIM-HPA after 2020 for midwest and CONUS-wide
+                    irrmapper_raster_list = glob(os.path.join(input_dir_irrmapper, search_by))
+
+                    for irr_data in irrmapper_raster_list:
+                        temp_arr, _ = paste_and_reproject(src_raster_path=irr_data,
+                                                          ref_raster_path=ref_raster,
+                                                          nodata=no_data_value)
+
+                        ref_arr = np.where(temp_arr != -9999, temp_arr, ref_arr)
+
+                    ref_arr[ref_arr == 0] = no_data_value
+                    output_raster = os.path.join(merged_output_dir, f'{merge_keyword}_{year}.tif')
+                    write_array_to_raster(ref_arr, ref_file, ref_file.transform, output_raster)
 
                     print(f'{merge_keyword} data merged for year {year}')
-
-            else:  # year 2021-2023 only has IrrMapper dataset
-                search_by = f'*{year}_*.tif'
-                irrmapper_raster_list = glob(os.path.join(input_dir_irrmapper, search_by))
-
-                ref_arr, ref_file = read_raster_arr_object(ref_raster)
-
-                # Opening each data and pasting it on ref raster.
-                # This approach is followed because we want to create a WesternUS-wide raster even if
-                # there is no irrigated cropland data for LANID and AIM-HPA after 2020 for midwest and CONUS-wide
-                for irr_data in irrmapper_raster_list:
-                    temp_arr, _ = paste_and_reproject(src_raster_path=irr_data,
-                                                      ref_raster_path=ref_raster,
-                                                      nodata=no_data_value)
-
-                    ref_arr = np.where(temp_arr != -9999, temp_arr, ref_arr)
-
-                ref_arr[ref_arr == 0] = no_data_value
-                output_raster = os.path.join(merged_output_dir, f'{merge_keyword}_{year}.tif')
-                write_array_to_raster(ref_arr, ref_file, ref_file.transform, output_raster)
-
+    else:
+        pass
 
 def classify_irrigated_cropland(years, irrigated_fraction_dir,
                                 irrigated_cropland_output_dir,
@@ -1102,13 +1173,18 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
         skip_processing=skip_create_canal_distance_raster)
 
     # process irrigated fraction data (2021-2023)
-    # 2000-2020 data was processed int he Peff paper
-    merge_GEE_data_patches_IrrMapper_LANID_extents(year_list=list(range(2021, 2024)),
-                                                   input_dir_irrmapper='../../Data_main/rasters/Irrigation_Frac_IrrMapper',
-                                                   input_dir_lanid=None,  # LANID not available after 2020
-                                                   merged_output_dir='../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac',
-                                                   merge_keyword='Irrigated_Frac', ref_raster=WestUS_raster,
-                                                   skip_processing=skip_irr_frac_data_processing)
+    # processed in the Peff paper
+    merge_GEE_data_patches_IrrMapper_LANID_extents(
+        year_with_full_extent=(1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
+                               2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016,
+                               2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024),
+        year_with_partial_extent=None,
+        input_dir_irrmapper='../../Data_main/Rasters/Irrigation_Frac_IrrMapper',
+        input_dir_lanid='../../Data_main/Rasters/Irrigation_Frac_LANID',
+        merged_output_dir='../../Data_main/Rasters/Irrigated_cropland/Irrigated_Frac',
+        merge_keyword='Irrigated_Frac', monthly_data=False,
+        ref_raster=WestUS_raster,
+        skip_processing=skip_irr_frac_data_processing)
 
     # process irrigated cropland data (2000-2023)
     # 2000-2020 data was processed int he Peff paper

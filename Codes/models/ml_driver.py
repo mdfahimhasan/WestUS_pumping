@@ -16,8 +16,8 @@ from Codes.utils.plots import scatter_plot_of_same_vars
 from Codes.utils.ML_ops import (create_train_test_dataframe, split_train_val_test_set_v2, \
                                 train_model, test_model, plot_permutation_importance, \
                                 cross_val_performance, plot_shap_summary_plot, plot_shap_interaction_plot, \
-                                create_annual_dataframes_for_pumping_prediction, predict_annual_pumping_rasters,\
-                                postprocess_prediction)
+                                create_annual_dataframes_for_pumping_prediction, predict_annual_pumping_rasters, \
+                                compute_pumping_from_consumptive_use)
 
 # model resolution and reference raster/shapefile
 no_data_value = -9999
@@ -30,7 +30,12 @@ WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
 
 # predictor data paths
 data_path_dict = {
+    # training data
     'pumping_mm': '../../Data_main/pumping/rasters/WestUS_pumping',
+    'consumptive_gw': '../../Data_main/pumping/rasters/WestUS_consumptive_gw',
+
+    # predictors
+    'irr_eff': '../../Data_main/rasters/HUC12_Irr_Eff',
     'peff': '../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
     'ret': '../../Data_main/rasters/RET/WestUS_growing_season',
     'precip': '../../Data_main/rasters/Precip/WestUS_growing_season',
@@ -54,10 +59,17 @@ static_vars = {'FC', 'Canal_density', 'Canal_distance', 'stateID', 'pixelID'}  #
 annual_data_path_dict = {i: j for i, j in data_path_dict.items() if i not in static_vars}  # annual data paths
 static_data_path_dict = {i: j for i, j in data_path_dict.items() if i in static_vars}  # static data paths
 
-# exclude columns during training
-exclude_columns_in_training = ['stateID', 'pixelID', 'year',
-                               'shortRad', 'minRH']  # pumping_mm will be excluded in train_val_test_split_v2
+# training attribute selection
+# we previously used 'pumping_mm' as attribute. Now using, 'consumptive_gw'
 
+train_attr = 'consumptive_gw'                           ##############################
+alternate_train_attr = 'pumping_mm'                     ##############################
+
+# exclude columns during training
+# train_attr will be excluded in train_val_test_split_v2() function
+exclude_columns_in_training = ['stateID', 'pixelID', 'year',
+                               'shortRad', 'minRH', 'irr_eff',
+                               'Canal_density', 'Canal_distance'] + [alternate_train_attr]
 # training time periods
 years_list = [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011,
               2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023]
@@ -66,21 +78,21 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------------------------------------------
     # flags
     # --------------------------------------------------------------------------------------------------------------
-    model_version = 'v10'                  ######
+    model_version = 'v11'  ######
 
-    skip_df_creation = True               ######
-    skip_train_test_split = True          ######
-    skip_hyperparam_tune = True            ######
-    load_model = False                     ######
-    save_model = True                     ######
-    skip_scatter_plots = False             ######
-    skip_cross_val = False                 ######
-    skip_perm_imp_plot = False             ######
-    skip_SHAP_importance = False           ######
-    skip_SHAP_interact_plot = False        ######
-    skip_create_df_for_prediction = True  ######
-    skip_create_prediction_raster = False  ######
-    skip_scale_with_USGS_GW_use = False    ######
+    skip_df_creation = False                             ######
+    skip_train_test_split = False                        ######
+    skip_hyperparam_tune = False                         ######
+    load_model = False                                   ######
+    save_model = True                                   ######
+    skip_scatter_plots = False                           ######
+    skip_cross_val = False                               ######
+    skip_perm_imp_plot = False                           ######
+    skip_SHAP_importance = False                         ######
+    skip_SHAP_interact_plot = False                      ######
+    skip_create_df_for_prediction = False                ######
+    skip_create_prediction_raster = False                ######
+    skip_convert_prediction_raster_to_pumping = False    ######
 
     # --------------------------------------------------------------------------------------------------------------
     # Dataframe creation and train-test split
@@ -101,7 +113,7 @@ if __name__ == '__main__':
     output_dir = f'../../Model_run/ML_model/Model_csv'
 
     x_train, x_test, y_train, y_test = \
-        split_train_val_test_set_v2(data_parquet=train_test_parquet_path, pred_attr='pumping_mm',
+        split_train_val_test_set_v2(data_parquet=train_test_parquet_path, pred_attr=train_attr,
                                     exclude_columns=exclude_columns_in_training, output_dir=output_dir,
                                     model_version=model_version, train_size=0.7, test_size=0.3,
                                     random_state=42, skip_processing=skip_train_test_split)
@@ -186,7 +198,7 @@ if __name__ == '__main__':
                                   x_label='Actual pumping (mm/year)', y_label='Predicted pumping (mm/year)',
                                   plot_name=f'train_scatter_{model_version}.jpg', savedir=plot_dir, alpha=0.5,
                                   marker_size=5, title='Performance on train set',
-                                  axis_lim=None, tick_interval=200)
+                                  axis_lim=(0, 1000), tick_interval=200)
 
         # plotting test scatters
         y_test_df = pd.read_csv(test_prediction_csv_path)
@@ -194,7 +206,7 @@ if __name__ == '__main__':
                                   x_label='Actual pumping (mm/year)', y_label='Predicted pumping (mm/year)',
                                   plot_name=f'test_scatter_{model_version}.jpg', savedir=plot_dir, alpha=0.5,
                                   marker_size=5, title='Performance on test set',
-                                  axis_lim=None, tick_interval=200)
+                                  axis_lim=(0, 1000), tick_interval=200)
 
     # permutation importance
     sorted_imp_vars = \
@@ -215,8 +227,7 @@ if __name__ == '__main__':
     # Shap interaction plot
     features_to_plot = ['Effective precipitation', 'Irrigated crop fraction',
                         'ET', 'Field capacity', 'Precipitation',
-                        'Reference ET', 'Distance from canal',
-                        'Temperature (max)', 'Canal density']
+                        'Reference ET', 'Temperature (max)']
 
     plot_shap_interaction_plot(model_version=model_version,
                                trained_model_path=os.path.join(save_model_to_dir, model_name),
@@ -225,11 +236,16 @@ if __name__ == '__main__':
                                save_plot_dir=os.path.join(plot_dir, 'SHAP_interaction'),
                                skip_processing=skip_SHAP_interact_plot)
 
+    # --------------------------------------------------------------------------------------------------------------
+    # Annual dataframe creation + prediction
+    # -------------------------------------------------------------------------------------------------------
     # create prediction rasters
     # create dataframe and nan position dict
 
     datasets_to_include = list(datasets_to_include)
-    datasets_to_include.remove('pumping_mm')
+    for col in ['pumping_mm', 'consumptive_gw']:
+        if col in datasets_to_include:
+            datasets_to_include.remove(col)
 
     predictor_csv_and_nan_pos_dir = f'../../Model_run/ML_model/Model_csv/annual_df'
 
@@ -241,26 +257,23 @@ if __name__ == '__main__':
                                                     output_dir=predictor_csv_and_nan_pos_dir,
                                                     skip_processing=skip_create_df_for_prediction)
 
-    # prediction
-    pumping_prediction_output_dir = f'../../Data_main/rasters/pumping_prediction/ML/{model_version}'
+    # prediction (consumptive groundwater use)
+    prediction_output_dir = f'../../Data_main/rasters/pumping_prediction/ML/{model_version}/consumptive_gw'
 
     exclude_columns_in_prediction = [i for i in exclude_columns_in_training if i != 'year']
 
     predict_annual_pumping_rasters(trained_model=lgbm_reg_trained, years_list=years_list,
                                    exclude_columns=exclude_columns_in_prediction,
                                    predictor_csv_and_nan_pos_dir=predictor_csv_and_nan_pos_dir,
-                                   prediction_name_keyword='WestUS_pumping',
-                                   output_dir=pumping_prediction_output_dir,
+                                   prediction_name_keyword='consumptive_gw',
+                                   output_dir=prediction_output_dir,
                                    ref_raster=WestUS_raster,
                                    skip_processing=skip_create_prediction_raster)
 
-    # scale conjunctive GW-SW basins' prediction with USGS GW use % data
-    # Note - this postprocessing only applies to conjunctive water use basins
-    scaled_output_dir = f'../../Data_main/rasters/pumping_prediction/ML/{model_version}/scaled_by_gw_perc'
-    usgs_data_dir = '../../Data_main/rasters/USGS_GW_%'
+    # convert consumptive groundwater use prediction to pumping estimates
+    irr_eff_dir = '../../Data_main/rasters/HUC12_Irr_Eff'
+    pumping_output_dir = f'../../Data_main/rasters/pumping_prediction/ML/{model_version}'
 
-    postprocess_prediction(predicted_pumping_dir=pumping_prediction_output_dir,
-                           output_dir=scaled_output_dir,
-                           USGS_GW_perc_dir=usgs_data_dir,
-                           skip_processing=skip_scale_with_USGS_GW_use)
-
+    compute_pumping_from_consumptive_use(consmp_gw_prediction_dir=prediction_output_dir,
+                                         irr_eff_dir=irr_eff_dir, output_dir=pumping_output_dir,
+                                         skip_processing=skip_convert_prediction_raster_to_pumping)

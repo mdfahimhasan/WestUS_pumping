@@ -80,9 +80,9 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------------------------------------------
     model_version = 'v11'  ######
 
-    skip_df_creation = False                             ######
-    skip_train_test_split = False                        ######
-    skip_hyperparam_tune = False                         ######
+    skip_df_creation = True                             ######
+    skip_train_test_split = True                        ######
+    skip_hyperparam_tune = True                         ######
     load_model = False                                   ######
     save_model = True                                   ######
     skip_scatter_plots = False                           ######
@@ -90,9 +90,9 @@ if __name__ == '__main__':
     skip_perm_imp_plot = False                           ######
     skip_SHAP_importance = False                         ######
     skip_SHAP_interact_plot = False                      ######
-    skip_create_df_for_prediction = False                ######
-    skip_create_prediction_raster = False                ######
-    skip_convert_prediction_raster_to_pumping = False    ######
+    skip_create_df_for_prediction = True                ######
+    skip_create_prediction_raster = True                ######
+    skip_convert_prediction_raster_to_pumping = True   ######
 
     # --------------------------------------------------------------------------------------------------------------
     # Dataframe creation and train-test split
@@ -125,19 +125,19 @@ if __name__ == '__main__':
     # model training  (if hyperparameter tuning is on, the default parameter dictionary will be disregarded)
     print('\n########## Model training')
     lgbm_param_dict = {'boosting_type': 'dart',
-                       'subsample': 0.6829215227612229,
-                       'drop_rate': 0.053580380609203414,
-                       'max_drop': 65,
-                       'skip_drop': 0.6942593565581209,
-                       'colsample_bynode': 0.629698628885302,
-                       'colsample_bytree': 0.7802877213579982,
+                       'subsample': 0.6454492553736668,
+                       'drop_rate': 0.05036013167819103,
+                       'max_drop': 45,
+                       'skip_drop': 0.6953778880017931,
+                       'colsample_bynode': 0.6661038824758351,
+                       'colsample_bytree': 0.7879741167882488,
                        'data_sample_strategy': 'bagging',
-                       'learning_rate': 0.01858192379183022,
+                       'learning_rate': 0.018902364764416157,
                        'max_depth': 7,
-                       'min_child_samples': 60,
+                       'min_child_samples': 75,
                        'n_estimators': 400,
-                       'num_leaves': 50,
-                       'path_smooth': 0.6928805760535238,
+                       'num_leaves': 35,
+                       'path_smooth': 0.6296503107684386,
                        'force_col_wise': True
                        }
 

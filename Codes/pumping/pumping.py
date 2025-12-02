@@ -1118,7 +1118,7 @@ def main(skip_process_AZ_pumping,
     # combine the original pumping rasters where filtering by threshold wasn't applied.
     # useful for basin scale comparison with model outputs.
     combine_pumping_rasters(years=list(range(2000, 2024)),
-                            years_no_data_dict={'KS': list(range(2021, 2024)),
+                            years_no_data_dict={'KS': [],
                                                 'CO': list(range(2000, 2011)),
                                                 'AZ': [],
                                                 'NV': list(range(2000, 2018)) + [2023]},
@@ -1134,7 +1134,7 @@ def main(skip_process_AZ_pumping,
     # combine the filtered pumping rasters where filtering through threshold was applied.
     # Either this or consumptive groundwater use data will be used for model training.
     combine_pumping_rasters(years=list(range(2000, 2024)),
-                            years_no_data_dict={'KS': list(range(2021, 2024)),
+                            years_no_data_dict={'KS': [],
                                                 'CO': list(range(2000, 2011)),
                                                 'AZ': [],
                                                 'NV': list(range(2000, 2018)) + [2023]},

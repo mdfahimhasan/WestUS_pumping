@@ -91,8 +91,8 @@ if __name__ == '__main__':
     skip_SHAP_importance = False                         ######
     skip_SHAP_interact_plot = False                      ######
     skip_create_df_for_prediction = True                ######
-    skip_create_prediction_raster = True                ######
-    skip_convert_prediction_raster_to_pumping = True   ######
+    skip_create_prediction_raster = False                ######
+    skip_convert_prediction_raster_to_pumping = False   ######
 
     # --------------------------------------------------------------------------------------------------------------
     # Dataframe creation and train-test split
@@ -125,19 +125,19 @@ if __name__ == '__main__':
     # model training  (if hyperparameter tuning is on, the default parameter dictionary will be disregarded)
     print('\n########## Model training')
     lgbm_param_dict = {'boosting_type': 'dart',
-                       'subsample': 0.6454492553736668,
-                       'drop_rate': 0.05036013167819103,
-                       'max_drop': 45,
-                       'skip_drop': 0.6953778880017931,
-                       'colsample_bynode': 0.6661038824758351,
-                       'colsample_bytree': 0.7879741167882488,
+                       'subsample': 0.6424569150291416,
+                       'drop_rate': 0.15193294688842177,
+                       'max_drop': 55,
+                       'skip_drop': 0.6997028395106997,
+                       'colsample_bynode': 0.7201884877927008,
+                       'colsample_bytree': 0.6594527779108277,
                        'data_sample_strategy': 'bagging',
-                       'learning_rate': 0.018902364764416157,
-                       'max_depth': 7,
-                       'min_child_samples': 75,
+                       'learning_rate': 0.019988466711388122,
+                       'max_depth': 6,
+                       'min_child_samples': 90,
                        'n_estimators': 400,
-                       'num_leaves': 35,
-                       'path_smooth': 0.6296503107684386,
+                       'num_leaves': 45,
+                       'path_smooth': 0.7387036577638288,
                        'force_col_wise': True
                        }
 

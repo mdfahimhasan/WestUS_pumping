@@ -907,6 +907,7 @@ def combine_pumping_rasters(years, years_no_data_dict,
                 'doug': '../../Data_main/shapefiles/Basins_of_interest/Douglas_AMA.shp',
                 'phx': '../../Data_main/shapefiles/Basins_of_interest/Phoenix_AMA.shp',
                 'pnl': '../../Data_main/shapefiles/Basins_of_interest/Pinal_AMA.shp',
+                'tucs': '../../Data_main/shapefiles/Basins_of_interest/Tucson_AMA.shp',
                 'scruz': '../../Data_main/shapefiles/Basins_of_interest/SantaCruz_AMA.shp',
                 'dv': '../../Data_main/shapefiles/Basins_of_interest/Diamond_Valley_Basin.shp'
             }

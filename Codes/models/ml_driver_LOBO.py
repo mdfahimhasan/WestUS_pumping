@@ -7,7 +7,6 @@ import os
 import sys
 import pandas as pd
 from glob import glob
-
 from os.path import dirname, abspath
 
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
@@ -17,7 +16,8 @@ from Codes.utils.stats_ops import calculate_metrics
 from Codes.utils.plots import scatter_plot_of_same_vars
 from Codes.utils.raster_ops import mask_raster_by_shape, set_nodata_inside_shapefile
 from Codes.utils.ML_ops import reindex_df, create_train_test_dataframe, split_train_val_test_set_v2, \
-    train_model, create_annual_dataframes_for_pumping_prediction, predict_annual_pumping_rasters
+    train_model, create_annual_dataframes_for_pumping_prediction, predict_annual_pumping_rasters, \
+    compute_pumping_from_consumptive_use
 
 WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
 
@@ -46,6 +46,7 @@ def predict_LOBO_basin(trained_model, predictor_array, target_array, year_series
     # creating and saving dataframe
     # only considering pixels where both actual and predicted pumping values exist
     y_pred_test = trained_model.predict(predictor_array)
+
     test_obsv_predict_df = pd.DataFrame({'actual': target_array.values.ravel(),
                                          'predicted': y_pred_test})
     test_obsv_predict_df['year'] = year_series
@@ -121,12 +122,12 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
         skip_create_prediction_raster = False   ######
 
         # --------------------------------------------------------------------------------------------------------------
-        # Pumping data adjustment
-        # during training, the pumping data will consist no pixel from inside the respective basin
-        # during testing, the holdout will only have pumping data from inside the basin
+        # Training (pumping/consumptive gw use) data adjustment
+        # during training, the pumping/consumptive gw use data will consist no pixel from inside the respective basin
+        # during testing, the holdout will only have pumping/consumptive gw use data from inside the basin
         # --------------------------------------------------------------------------------------------------------------
         if not skip_process_pumping_data:
-            westUS_pumping_dir = f'../../Data_main/pumping/rasters/WestUS_pumping'  # this is the WestUS-scale filtered pumping data
+            westUS_pumping_dir = '../../Data_main/pumping/rasters/WestUS_consumptive_gw'  # this is the WestUS-scale filtered consumptive use data
             westUS_pumping_rasters = glob(os.path.join(westUS_pumping_dir, '*.tif'))
 
             # pumping data extraction for fitting (training) and holdout
@@ -156,12 +157,12 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
         # Parquet (tabular data) creation
         # --------------------------------------------------------------------------------------------------------------
 
-        # adding pumping_mm to the annual dataset
+        # adding training data ('consumptive_gw') to the annual dataset
         annual_training_data_path_dict = {**annual_data_path_dict,
-                                          'pumping_mm': fitting_output_dir}  # final annual data paths
+                                          'consumptive_gw': fitting_output_dir}  # final annual data paths
 
         # datasets to include in the dataframe (not all will go into the final model)
-        # pumping_mm will be excluded in train_val_test_split_v2
+        # consumptive_gw will be excluded in train_val_test_split_v2
         datasets_to_include = list(static_data_path_dict.keys()) + list(annual_training_data_path_dict.keys())
 
         # --------------------------------------------------------------------------------------------------------------
@@ -186,7 +187,7 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
         output_dir = f'../../Model_run/ML_model/LOBO/{model_version}/interim_csv/{basin_code}'
 
         x_train, x_test, y_train, y_test = \
-            split_train_val_test_set_v2(data_parquet=train_test_parquet_path, pred_attr='pumping_mm',
+            split_train_val_test_set_v2(data_parquet=train_test_parquet_path, pred_attr='consumptive_gw',
                                         exclude_columns=exclude_columns, output_dir=output_dir,
                                         model_version=model_version, train_size=0.7, test_size=0.3,
                                         random_state=42, skip_processing=skip_train_test_split)
@@ -212,7 +213,7 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
         # --------------------------------------------------------------------------------------------------------------
         print(f'\n########## Leave-One-Basin-Out performance')
 
-        annual_LOBO_data_path_dict = {**annual_data_path_dict, 'pumping_mm': holdout_dir}
+        annual_LOBO_data_path_dict = {**annual_data_path_dict, 'consumptive_gw': holdout_dir}
 
         LOBO_df_parquet = f'../../Model_run/ML_model/LOBO/{model_version}/interim_csv/{basin_code}/{basin_code}.parquet'
 
@@ -226,9 +227,9 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
 
         df_basin = pd.read_parquet(LOBO_df_parquet)
 
-        x_basin = df_basin.drop(columns=['pumping_mm'] + exclude_columns)
+        x_basin = df_basin.drop(columns=['consumptive_gw'] + exclude_columns)
         x_basin = reindex_df(x_basin)
-        y_basin = df_basin['pumping_mm']
+        y_basin = df_basin['consumptive_gw']
         year_series = df_basin['year']
 
         basin_prediction_csv_path = f'../../Model_run/ML_model/LOBO/{model_version}/{basin_code}/results/{basin_code}_results.csv'
@@ -264,19 +265,27 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
                                                         output_dir=predictor_csv_and_nan_pos_dir,
                                                         skip_processing=skip_create_df_for_prediction)
 
-        # prediction
-        prediction_interim_output_dir = f'../../Data_main/rasters/ML_LOBO/{basin_code}/interim'
+        # prediction (consumptive groundwater use)
+        prediction_consumptive_output_dir = f'../../Data_main/rasters/ML_LOBO/{basin_code}/interim_consumptive_use'
 
         exclude_columns = [i for i in exclude_columns if i != 'year']
 
         predict_annual_pumping_rasters(trained_model=lgbm_reg_trained, years_list=list(range(2000, 2024)),
                                        exclude_columns=exclude_columns,
                                        predictor_csv_and_nan_pos_dir=predictor_csv_and_nan_pos_dir,
-                                       prediction_name_keyword=basin_code, output_dir=prediction_interim_output_dir,
+                                       prediction_name_keyword=basin_code, output_dir=prediction_consumptive_output_dir,
                                        ref_raster=WestUS_raster, skip_processing=skip_create_prediction_raster)
 
+        # convert consumptive groundwater use prediction to pumping estimates
+        irr_eff_dir = '../../Data_main/rasters/HUC12_Irr_Eff'
+        prediction_pumping_output_dir = f'../../Data_main/rasters/ML_LOBO/{basin_code}/interim_pumping'
+
+        compute_pumping_from_consumptive_use(consmp_gw_prediction_dir=prediction_consumptive_output_dir,
+                                             irr_eff_dir=irr_eff_dir, output_dir=prediction_pumping_output_dir,
+                                             skip_processing=skip_create_prediction_raster)
+
         # the generated prediction rasters are Western US scale. Clipping them to the basin
-        interim_predictions = glob(os.path.join(prediction_interim_output_dir, '*.tif'))
+        interim_predictions = glob(os.path.join(prediction_pumping_output_dir, '*.tif'))
         prediction_output_dir = f'../../Data_main/rasters/ML_LOBO/{basin_code}'
 
         for pred in interim_predictions:
@@ -299,12 +308,9 @@ if __name__ == '__main__':
     skip_LOBO_GMD3 = False      ##### GMD3, KS
     skip_LOBO_GMD4 = False      ##### GMD4, KS
     skip_LOBO_RPB = False       ##### Republican Basin, CO
-    # skip_LOBO_SPB = False       ##### South Platte River Basin, CO
-    # skip_LOBO_AR = False        ##### Arkansas River Basin, CO
     skip_LOBO_SLV = False       ##### San Luis Valley, CO
     skip_LOBO_HQR = False       ##### Harquahala INA, AZ
     skip_LOBO_DOUG = False      ##### Douglas AMA, AZ
-    # skip_LOBO_PNL = False       ##### Pinal AMA, AZ
     skip_LOBO_SCRUZ = False     ##### Santa Cruz AMA, AZ
     skip_LOBO_DV = False        ##### Diamond Valley, NV
 
@@ -312,7 +318,7 @@ if __name__ == '__main__':
     years = list(range(2000, 2024))
 
     years_no_data_dict = {
-        'KS': list(range(2021, 2024)),                  # applies to GMD3, GMD4 (Kansas)
+        'KS': [],                  # applies to GMD3, GMD4 (Kansas)
         'CO': list(range(2000, 2011)),                  # applies to RPB, SPB, AR, SLV (Colorado)
         'AZ': [],                                       # applies to HQR, DOUG, PHX, PNL, SCRUZ (Arizona)
         'NV': list(range(2000, 2018)) + [2023]          # applies to DV (Nevada)
@@ -320,28 +326,30 @@ if __name__ == '__main__':
 
     # exclude columns during training
     exclude_columns_in_training = ['stateID', 'pixelID', 'year',
-                                   'shortRad', 'minRH']  ##################################
+                                   'shortRad', 'minRH', 'irr_eff',
+                                   'Canal_density', 'Canal_distance']  ############################
 
     # hyperparameters from tuned model
     lgbm_param_dict = {'boosting_type': 'dart',
-                       'subsample': 0.6829215227612229,
-                       'drop_rate': 0.053580380609203414,
-                       'max_drop': 65,
-                       'skip_drop': 0.6942593565581209,
-                       'colsample_bynode': 0.629698628885302,
-                       'colsample_bytree': 0.7802877213579982,
+                       'subsample': 0.7259183216113654,
+                       'drop_rate': 0.05070408360935104,
+                       'max_drop': 35,
+                       'skip_drop': 0.6936963461114615,
+                       'colsample_bynode': 0.6667988407968647,
+                       'colsample_bytree': 0.6676746423846298,
                        'data_sample_strategy': 'bagging',
-                       'learning_rate': 0.01858192379183022,
+                       'learning_rate': 0.019947198735611116,
                        'max_depth': 7,
-                       'min_child_samples': 60,
+                       'min_child_samples': 75,
                        'n_estimators': 400,
-                       'num_leaves': 50,
-                       'path_smooth': 0.6928805760535238,
+                       'num_leaves': 40,
+                       'path_smooth': 0.598677089788458,
                        'force_col_wise': True
                        }
 
     # datasets
     data_path_dict = {
+        'irr_eff': '../../Data_main/rasters/HUC12_Irr_Eff',
         'peff': '../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
         'ret': '../../Data_main/rasters/RET/WestUS_growing_season',
         'precip': '../../Data_main/rasters/Precip/WestUS_growing_season',
@@ -369,7 +377,7 @@ if __name__ == '__main__':
 
     prediction_df_output_dir = f'../../Data_main/rasters/ML_LOBO/dataframes_for_prediction'
 
-    model_version = 'v10'
+    model_version = 'v11'
 
     # GMD3, KS
     perform_LOBO(years_list=years, years_no_pumping_data_dict=years_no_data_dict,
@@ -398,24 +406,6 @@ if __name__ == '__main__':
                  predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
                  skip_processing=skip_LOBO_RPB)
 
-    # # South Platte River Basin, CO
-    # perform_LOBO(years_list=years, years_no_pumping_data_dict=years_no_data_dict,
-    #              model_version=f'{model_version}', basin_code='SPB', state_code='CO',
-    #              model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
-    #              annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
-    #              basin_shape='../../Data_main/shapefiles/Basins_of_interest/South_Platte_Basin.shp',
-    #              predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
-    #              skip_processing=skip_LOBO_SPB)
-    #
-    # # Arkansas River Basin, CO
-    # perform_LOBO(years_list=years, years_no_pumping_data_dict=years_no_data_dict,
-    #              model_version=f'{model_version}', basin_code='AR', state_code='CO',
-    #              model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
-    #              annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
-    #              basin_shape='../../Data_main/shapefiles/Basins_of_interest/Arkansas_Basin.shp',
-    #              predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
-    #              skip_processing=skip_LOBO_AR)
-
     # San Luis Valley, CO
     perform_LOBO(years_list=years, years_no_pumping_data_dict=years_no_data_dict,
                  model_version=f'{model_version}', basin_code='SLV', state_code='CO',
@@ -442,15 +432,6 @@ if __name__ == '__main__':
                  basin_shape='../../Data_main/shapefiles/Basins_of_interest/Harquahala_INA.shp',
                  predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
                  skip_processing=skip_LOBO_HQR)
-
-    # # Pinal AMA, AZ
-    # perform_LOBO(years_list=years, years_no_pumping_data_dict=years_no_data_dict,
-    #              model_version=f'{model_version}', basin_code='PNL', state_code='AZ',
-    #              model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
-    #              annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
-    #              basin_shape='../../Data_main/shapefiles/Basins_of_interest/Pinal_AMA.shp',
-    #              predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
-    #              skip_processing=skip_LOBO_PNL)
 
     # Santa Cruz AMA, AZ
     perform_LOBO(years_list=years, years_no_pumping_data_dict=years_no_data_dict,

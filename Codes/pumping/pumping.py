@@ -809,7 +809,7 @@ def combine_pumping_rasters(years, years_no_data_dict,
     :param years: List/Tuple of years to process data for.
     :param years_no_data_dict: A dictionary with information of what years of pumping data not available/processed for
                            KS, CO, and AZ ---
-                           {'KS': list(range(2021, 2024)),
+                           {'KS': [],
                            'CO': list(range(2000, 2011)),
                            'AZ': [],
                            'NV': list(range(2000, 2018)) + [2023]}
@@ -895,7 +895,6 @@ def combine_pumping_rasters(years, years_no_data_dict,
             write_array_to_raster(pump_arr, ref_file, ref_file.transform, interim_raster)
 
             # this is a provision to exclude particular basins out of the training data
-
             basin_shp_dict = {
                 'gmd4': '../../Data_main/shapefiles/Basins_of_interest/GMD4.shp',
                 'gmd3': '../../Data_main/shapefiles/Basins_of_interest/GMD3.shp',
@@ -1140,7 +1139,7 @@ def main(skip_process_AZ_pumping,
                                                 'AZ': [],
                                                 'NV': list(range(2000, 2018)) + [2023]},
                             basins_exclude_from_training=['spb', 'ar',
-                                                          'phx', 'pnl'],
+                                                          'pnl'],
                             KS_dir='../../Data_main/pumping/rasters/Kansas/pumping_mm',
                             CO_dir='../../Data_main/pumping/rasters/Colorado/pumping_mm',
                             AZ_dir='../../Data_main/pumping/rasters/Arizona/pumping_mm',

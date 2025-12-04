@@ -258,6 +258,7 @@ if __name__ == '__main__':
                                                     skip_processing=skip_create_df_for_prediction)
 
     # prediction (consumptive groundwater use)
+    # This is for 17 states of the Western US
     prediction_output_dir = f'../../Data_main/rasters/pumping_prediction/ML/{model_version}/consumptive_gw'
 
     exclude_columns_in_prediction = [i for i in exclude_columns_in_training if i != 'year']
@@ -271,9 +272,11 @@ if __name__ == '__main__':
                                    skip_processing=skip_create_prediction_raster)
 
     # convert consumptive groundwater use prediction to pumping estimates
+    # This is for 8 states (where model was trained ad validated) we report in the paper
     irr_eff_dir = '../../Data_main/rasters/HUC12_Irr_Eff'
-    pumping_output_dir = f'../../Data_main/rasters/pumping_prediction/ML/{model_version}'
+    pumping_output_dir = f'../../Data_main/rasters/pumping_prediction/ML/{model_version}/WestUS_pumping'
 
     compute_pumping_from_consumptive_use(consmp_gw_prediction_dir=prediction_output_dir,
-                                         irr_eff_dir=irr_eff_dir, output_dir=pumping_output_dir,
+                                         irr_eff_dir=irr_eff_dir, westernUS_output_dir=pumping_output_dir,
+                                         Western_US_ROI_shp='../../Data_main/ref_shapes/WestUS_ROI.shp',
                                          skip_processing=skip_convert_prediction_raster_to_pumping)

@@ -17,7 +17,7 @@ from Codes.utils.ML_ops import (create_train_test_dataframe, split_train_val_tes
                                 train_model, test_model, plot_permutation_importance, \
                                 cross_val_performance, plot_shap_summary_plot, plot_shap_interaction_plot, \
                                 create_annual_dataframes_for_pumping_prediction, predict_annual_pumping_rasters, \
-                                compute_pumping_from_consumptive_use)
+                                compute_and_clip_pumping_from_consumptive_use)
 
 # model resolution and reference raster/shapefile
 no_data_value = -9999
@@ -276,7 +276,7 @@ if __name__ == '__main__':
     irr_eff_dir = '../../Data_main/rasters/HUC12_Irr_Eff'
     pumping_output_dir = f'../../Data_main/rasters/pumping_prediction/ML/{model_version}/WestUS_pumping'
 
-    compute_pumping_from_consumptive_use(consmp_gw_prediction_dir=prediction_output_dir,
-                                         irr_eff_dir=irr_eff_dir, westernUS_output_dir=pumping_output_dir,
-                                         Western_US_ROI_shp='../../Data_main/ref_shapes/WestUS_ROI.shp',
-                                         skip_processing=skip_convert_prediction_raster_to_pumping)
+    compute_and_clip_pumping_from_consumptive_use(consmp_gw_prediction_dir=prediction_output_dir,
+                                                  irr_eff_dir=irr_eff_dir, westernUS_output_dir=pumping_output_dir,
+                                                  Western_US_ROI_shp='../../Data_main/ref_shapes/WestUS_ROI.shp',
+                                                  skip_processing=skip_convert_prediction_raster_to_pumping)

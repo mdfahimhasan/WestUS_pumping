@@ -17,7 +17,7 @@ from Codes.utils.plots import scatter_plot_of_same_vars
 from Codes.utils.raster_ops import mask_raster_by_shape, set_nodata_inside_shapefile
 from Codes.utils.ML_ops import reindex_df, create_train_test_dataframe, split_train_val_test_set_v2, \
     train_model, create_annual_dataframes_for_pumping_prediction, predict_annual_pumping_rasters, \
-    compute_pumping_from_consumptive_use
+    compute_and_clip_pumping_from_consumptive_use
 
 WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
 
@@ -280,9 +280,9 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
         irr_eff_dir = '../../Data_main/rasters/HUC12_Irr_Eff'
         prediction_pumping_output_dir = f'../../Data_main/rasters/ML_LOBO/{basin_code}/interim_pumping'
 
-        compute_pumping_from_consumptive_use(consmp_gw_prediction_dir=prediction_consumptive_output_dir,
-                                             irr_eff_dir=irr_eff_dir, output_dir=prediction_pumping_output_dir,
-                                             skip_processing=skip_create_prediction_raster)
+        compute_and_clip_pumping_from_consumptive_use(consmp_gw_prediction_dir=prediction_consumptive_output_dir,
+                                                      irr_eff_dir=irr_eff_dir, westernUS_output_dir=prediction_pumping_output_dir,
+                                                      skip_processing=skip_create_prediction_raster)
 
         # the generated prediction rasters are Western US scale. Clipping them to the basin
         interim_predictions = glob(os.path.join(prediction_pumping_output_dir, '*.tif'))

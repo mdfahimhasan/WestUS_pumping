@@ -33,7 +33,7 @@ from os.path import dirname, abspath
 sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 
 from Codes.utils.system_ops import makedirs
-from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster
+from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster, clip_resample_reproject_raster
 from Codes.utils.stats_ops import calculate_metrics
 
 no_data_value = -9999
@@ -1234,9 +1234,10 @@ def predict_annual_pumping_rasters(trained_model, years_list, exclude_columns,
         pass
 
 
-def compute_pumping_from_consumptive_use(consmp_gw_prediction_dir,
-                                         irr_eff_dir, output_dir,
-                                         skip_processing=False):
+def compute_and_clip_pumping_from_consumptive_use(consmp_gw_prediction_dir,
+                                                  irr_eff_dir, westernUS_output_dir,
+                                                  Western_US_ROI_shp,
+                                                  skip_processing=False):
     """
     Computes annual pumping rasters by dividing consumptive groundwater use
     by irrigation efficiency rasters for each year.
@@ -1247,8 +1248,10 @@ def compute_pumping_from_consumptive_use(consmp_gw_prediction_dir,
         Directory containing annual consumptive groundwater use rasters.
     irr_eff_dir : str
         Directory containing annual irrigation efficiency rasters from USGS HUC12 dataset.
-    output_dir : str
+    westernUS_output_dir : str
         Directory to save the computed pumping rasters.
+    Western_US_ROI_shp:  str
+        path of model reporting ROI's shapefile consisting of 8 states.
     skip_processing : bool
         Set True to skip this step.
 
@@ -1257,7 +1260,7 @@ def compute_pumping_from_consumptive_use(consmp_gw_prediction_dir,
     if not skip_processing:
         print("\nConverting consumptive gw use prediction to pumping raster...")
 
-        makedirs([output_dir])
+        makedirs([westernUS_output_dir])
 
         years = list(range(2000, 2023 + 1))
 
@@ -1276,7 +1279,13 @@ def compute_pumping_from_consumptive_use(consmp_gw_prediction_dir,
                 -9999
             )
 
-            output_path = os.path.join(output_dir, f'WestUS_pumping_{year}.tif')
+            output_path = os.path.join(westernUS_output_dir, f'WestUS_pumping_{year}.tif')
             write_array_to_raster(pump_arr, file, file.transform, output_path)
 
-
+            # clipping for the region of interest (ROI) - 8 states
+            clip_resample_reproject_raster(input_raster=output_path, input_shape=Western_US_ROI_shp,
+                                           output_raster_dir=os.path.dirname(westernUS_output_dir),
+                                           keyword=' ', raster_name=f'WestUS_pumping_{year}.tif',
+                                           clip_and_resample=False, clip=True, use_ref_width_height=False,
+                                           resample_algorithm='near', resolution=model_res,
+                                           ref_raster='../../Data_main/ref_rasters/Western_US_ROI_refraster_2km.tif')

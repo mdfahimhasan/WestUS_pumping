@@ -282,17 +282,8 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
 
         compute_and_clip_pumping_from_consumptive_use(consmp_gw_prediction_dir=prediction_consumptive_output_dir,
                                                       irr_eff_dir=irr_eff_dir, westernUS_output_dir=prediction_pumping_output_dir,
-                                                      skip_processing=skip_create_prediction_raster)
-
-        # the generated prediction rasters are Western US scale. Clipping them to the basin
-        interim_predictions = glob(os.path.join(prediction_pumping_output_dir, '*.tif'))
-        prediction_output_dir = f'../../Data_main/rasters/ML_LOBO/{basin_code}'
-
-        for pred in interim_predictions:
-            raster_name = os.path.basename(pred)
-            mask_raster_by_shape(input_raster=pred, input_shape=basin_shape, crop=True,
-                                 output_dir=prediction_output_dir, raster_name=raster_name)
-
+                                                      skip_processing=skip_create_prediction_raster,
+                                                      Western_US_ROI_shp=basin_shape)
     else:
         pass
 
@@ -331,19 +322,19 @@ if __name__ == '__main__':
 
     # hyperparameters from tuned model
     lgbm_param_dict = {'boosting_type': 'dart',
-                       'subsample': 0.7259183216113654,
-                       'drop_rate': 0.05070408360935104,
-                       'max_drop': 35,
-                       'skip_drop': 0.6936963461114615,
-                       'colsample_bynode': 0.6667988407968647,
-                       'colsample_bytree': 0.6676746423846298,
+                       'subsample': 0.6424569150291416,
+                       'drop_rate': 0.15193294688842177,
+                       'max_drop': 55,
+                       'skip_drop': 0.6997028395106997,
+                       'colsample_bynode': 0.7201884877927008,
+                       'colsample_bytree': 0.6594527779108277,
                        'data_sample_strategy': 'bagging',
-                       'learning_rate': 0.019947198735611116,
-                       'max_depth': 7,
-                       'min_child_samples': 75,
+                       'learning_rate': 0.019988466711388122,
+                       'max_depth': 6,
+                       'min_child_samples': 90,
                        'n_estimators': 400,
-                       'num_leaves': 40,
-                       'path_smooth': 0.598677089788458,
+                       'num_leaves': 45,
+                       'path_smooth': 0.7387036577638288,
                        'force_col_wise': True
                        }
 

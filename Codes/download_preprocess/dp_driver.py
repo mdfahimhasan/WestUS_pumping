@@ -103,6 +103,7 @@ if __name__ == '__main__':
     skip_irr_frac_processing = True             ########################################################################
     skip_irr_cropland_classification = True     ########################################################################
     skip_process_USGS_GW_perc = True            ########################################################################
+    skip_mod_USGS_GW_perc_raster = True         ########################################################################
     skip_USGS_Irr_eff_raster = True            ########################################################################
 
     run_all_preprocessing(skip_stateID_raster_creation=skip_stateID_raster_creation,
@@ -125,5 +126,6 @@ if __name__ == '__main__':
                           skip_irr_frac_data_processing=skip_irr_frac_processing,
                           skip_irr_cropland_classification=skip_irr_cropland_classification,
                           skip_process_USGS_GW_perc=skip_process_USGS_GW_perc,
+                          skip_modify_USGS_GW_perc=skip_mod_USGS_GW_perc_raster,
                           skip_process_USGS_Irr_Eff=skip_USGS_Irr_eff_raster)
 

@@ -6,14 +6,14 @@
 import os
 import re
 import sys
-import time
-import shutil
 import datetime
 import numpy as np
 from glob import glob
 from osgeo import gdal
 import rasterio as rio
 import geopandas as gpd
+import rioxarray as rxr
+from rasterio.mask import mask
 from rasterio.warp import reproject, Resampling
 
 from os.path import dirname, abspath
@@ -660,50 +660,188 @@ def create_HUC12_SW_irrigation_rasters(HUC12_SW_shape, output_dir, resolution=mo
             write_array_to_raster(normalized_sw_arr, file, file.transform, output_normal_raster)
 
 
-# def create_GW_use_perc_rasters(HUC12_GW_perc_shape, output_dir, resolution=model_res,
-#                                ref_raster=WestUS_raster, skip_processing=False):
-#     """
-#     Rasterize USGS HUC12 level GW use % (GW use % w.r.t. total water use) dataset.
-#     The created rasters has similar GW use % values for each pixel in
-#     a HUC12.
-#
-#     :param HUC12_GW_perc_shape: Shapefile of HUC12 GW use % shapefile.
-#     :param output_dir: Directory path to save outputs.
-#     :param resolution: Resolution. Default set to model resolution.
-#     :param ref_raster: Reference raster. Default set to Western US reference raster.
-#     :param skip_processing: Set True to skip processing.
-#
-#     :return: None.
-#     """
-#     if not skip_processing:
-#         print('rasterizing HUC12 GW % datasets...')
-#
-#         # making output directories
-#         interim_outdir = os.path.join(output_dir, 'interim')
-#         makedirs([output_dir, interim_outdir])
-#
-#         years = list(range(2000, 2020 + 1))  # years from 2000 to 2020
-#
-#         for year in years:
-#             column_to_rasterize = f'{year}_gw_%'
-#
-#             interim_raster = shapefile_to_raster(input_shape=HUC12_GW_perc_shape,
-#                                                  output_dir=interim_outdir,
-#                                                  raster_name=f'HUC12_GW_perc_{year}.tif',
-#                                                  burnvalue=None, use_attr=True,
-#                                                  attribute=column_to_rasterize,
-#                                                  add=None, ref_raster=ref_raster,
-#                                                  resolution=resolution, alltouched=False)
-#
-#             # the produced interim raster has no data values in a few HUCs
-#             # setting them to 0 to create a continuous raster
-#             ref_arr = read_raster_arr_object(ref_raster, get_file=False)
-#
-#             interim_sw_arr, file = read_raster_arr_object(interim_raster)
-#             final_sw_arr = np.where(np.isnan(interim_sw_arr) & (ref_arr == 0), 0, interim_sw_arr)
-#
-#             output_raster = os.path.join(output_dir, f'HUC12_GW_perc_{year}.tif')
-#             write_array_to_raster(final_sw_arr, file, file.transform, output_raster)
+def create_GW_use_perc_rasters(HUC12_GW_perc_shape, output_dir, resolution=model_res,
+                               ref_raster=WestUS_raster, skip_processing=False):
+    """
+    Rasterize USGS HUC12 level GW use % (GW use % w.r.t. total water use) dataset.
+    The created rasters has similar GW use % values for each pixel in
+    a HUC12.
+
+    :param HUC12_GW_perc_shape: Shapefile of HUC12 GW use % shapefile.
+    :param output_dir: Directory path to save outputs.
+    :param resolution: Resolution. Default set to model resolution.
+    :param ref_raster: Reference raster. Default set to Western US reference raster.
+    :param skip_processing: Set True to skip processing.
+
+    :return: None.
+    """
+    if not skip_processing:
+        print('rasterizing HUC12 GW % datasets...')
+
+        # making output directories
+        interim_outdir = os.path.join(output_dir, 'interim')
+        makedirs([output_dir, interim_outdir])
+
+        years = list(range(2000, 2020 + 1))  # years from 2000 to 2020
+
+        for year in years:
+            column_to_rasterize = f'{year}_gw_%'
+
+            interim_raster = shapefile_to_raster(input_shape=HUC12_GW_perc_shape,
+                                                 output_dir=interim_outdir,
+                                                 raster_name=f'HUC12_GW_perc_{year}.tif',
+                                                 burnvalue=None, use_attr=True,
+                                                 attribute=column_to_rasterize,
+                                                 add=None, ref_raster=ref_raster,
+                                                 resolution=resolution, alltouched=False)
+
+            # the produced interim raster has no data values in a few HUCs
+            # setting them to 0 to create a continuous raster
+            ref_arr = read_raster_arr_object(ref_raster, get_file=False)
+
+            interim_sw_arr, file = read_raster_arr_object(interim_raster)
+            final_sw_arr = np.where(np.isnan(interim_sw_arr) & (ref_arr == 0), 0, interim_sw_arr)
+
+            output_raster = os.path.join(output_dir, f'HUC12_GW_perc_{year}.tif')
+            write_array_to_raster(final_sw_arr, file, file.transform, output_raster)
+
+
+def reclassify_GW_use_perc_rasters(GW_use_perc_dir, westUS_ROI, final_pumping_prediction_dir,
+                                   output_dir, skip_processing=False):
+    """
+    Reclassifies Groundwater (GW) use percentage rasters into a binary classification
+    (Groundwater-Dominated vs. Conjunctive Use) based on a specific Region of Interest (ROI).
+
+    This function performs the following steps:
+    1. Clips the source GW use raster to the West US ROI shapefile.
+    2. Manually corrects data for the Rio Grande Basin (San Luis Valley) to 100% GW use
+       based on known local irrigation practices.
+    3. Reclassifies the data: >= 70% GW use becomes 1 (Dominated), otherwise 0 (Conjunctive).
+    4. Masks the result to match the valid pixels of the pumping prediction rasters.
+
+    parameters:
+
+    GW_use_perc_dir (str): Directory containing the source GW use percentage GeoTIFFs.
+    westUS_ROI (str): Filepath to the shapefile defining the Western US Region of Interest.
+    final_pumping_prediction_dir (str): Directory containing prediction rasters. These are used
+                                        as a mask to ensure the output binary raster only contains
+                                        pixels where predictions exist.
+    output_dir (str): Directory path where the output rasters will be saved.
+    skip_processing (bool, optional): If True, skips execution. Defaults to False.
+
+    Returns:
+        None
+    """
+    if not skip_processing:
+
+        # making output directories
+        makedirs([output_dir])
+
+        # Opening GW use raster
+        # All annual data are same. Taking the 1st one selected.
+        gw_use_perc_raster = glob(os.path.join(GW_use_perc_dir, '*.tif'))[0]
+        raster_file = rio.open(gw_use_perc_raster)
+        raster_arr = raster_file.read(1)
+
+        # opening input shapefile and taking it to a GeoJSON format
+        shp_extent = gpd.read_file(westUS_ROI)
+        shp_extent = shp_extent.to_crs(crs=raster_file.crs)
+        geoms = [geom.__geo_interface__ for geom in shp_extent.geometry]  # GeoJSON format
+
+        masked_arr, mask_transform = mask(dataset=raster_file,
+                                          shapes=geoms, filled=True,
+                                          crop=True, invert=False,
+                                          all_touched=False)
+
+        masked_arr = masked_arr.squeeze()
+
+        # saving clipped raster for WestUS ROI
+        interim_output_raster = os.path.join(output_dir, 'GW_use_perc_ROI_interim.tif')
+
+        with rio.open(
+                interim_output_raster,
+                'w',
+                driver='GTiff',
+                height=masked_arr.shape[0],
+                width=masked_arr.shape[1],
+                count=1,
+                dtype=masked_arr.dtype,
+                crs=raster_file.crs,
+                transform=mask_transform,
+                nodata=-9999
+        ) as dst:
+            dst.write(masked_arr, 1)
+
+        ################################################################################################################
+        # # updating GW use % data in the Rio Grande Basin (we know for sure that they are ~100% GW irrigated)
+
+        # geographic bounds (Rio Grande region)
+        lat_min, lat_max = 36.96, 38.498
+        lon_min, lon_max = -106.657, -105.128
+
+        # setting values of the lat-lon window to 100%
+        gw_perc = rxr.open_rasterio(interim_output_raster)
+
+        gw_perc.loc[
+            dict(
+                y=slice(lat_max, lat_min),
+                x=slice(lon_min, lon_max)
+            )] = 100
+
+        gw_prediction_data = glob(os.path.join(final_pumping_prediction_dir, '*.tif'))
+        gw_perc_arr = gw_perc.values.squeeze().squeeze()
+        modified_gw_perc = np.full_like(gw_perc_arr, fill_value=-9999)
+
+        for data in gw_prediction_data:
+            gw_prediction = rio.open(data).read(1)
+            modified_gw_perc = np.where(gw_prediction != - 9999, gw_perc_arr, modified_gw_perc)
+
+        # saving the modified raster
+        with rio.open(
+                os.path.join(output_dir, 'GW_use_perc_ROI.tif'),
+                'w',
+                driver='GTiff',
+                height=modified_gw_perc.shape[0],
+                width=modified_gw_perc.shape[1],
+                count=1,
+                dtype=modified_gw_perc.dtype,
+                crs=raster_file.crs,
+                transform=mask_transform,
+                nodata=-9999
+        ) as dst:
+            dst.write(modified_gw_perc, 1)
+
+        ################################################################################################################
+        # # creating a binary raster
+        # >=70% GW use will be 1 (groundwater-dominated), others will be 0 (conjunctive use)
+        gw_perc_binary = np.where(gw_perc_arr >= 70, 1, 0).squeeze()
+
+        # Now, this is a modified raster from HUC12 level. We need to set nan to non-irrigated pixel to look it better
+        final_arr = np.full_like(gw_perc_binary, fill_value=-9999)
+
+        for data in gw_prediction_data:
+            gw_prediction = rio.open(data).read(1)
+            final_arr = np.where(gw_prediction != - 9999, gw_perc_binary, final_arr)
+
+        # save the binary classified raster
+        binary_raster = os.path.join(output_dir, 'GW_use_ROI_binary.tif')
+        with rio.open(
+                binary_raster,
+                'w',
+                driver='GTiff',
+                height=final_arr.shape[0],
+                width=final_arr.shape[1],
+                count=1,
+                dtype=final_arr.dtype,
+                crs=raster_file.crs,
+                transform=mask_transform,
+                nodata=-9999
+        ) as dst:
+            dst.write(final_arr, 1)
+
+        # delete the interim raster
+        gw_perc.close()
+        os.remove(interim_output_raster)
 
 
 def create_Irr_eff_rasters(HUC12_Irr_Eff_shape, output_dir, resolution=model_res,
@@ -1012,6 +1150,7 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
                           skip_irr_frac_data_processing=False,
                           skip_irr_cropland_classification=False,
                           skip_process_USGS_GW_perc=False,
+                          skip_modify_USGS_GW_perc=False,
                           skip_process_USGS_Irr_Eff=False):
     """
     Run all preprocessing steps.
@@ -1038,6 +1177,8 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     :param skip_irr_cropland_classification: Set True to skip irrigation cropland classification from 2021-2023.
                                              2000-2020 data was processed in the Peff paper.
     :param skip_process_USGS_GW_perc: Set True to skip create GW use % of HUC12 from USGS data.
+    :param skip_modify_USGS_GW_perc: Set True to skip modify GW perc raster and create a binary raster
+                                     for groundwater-dominated and conjunctive basins.
     :param skip_process_USGS_Irr_Eff: Set True to skip rasterizing irrigation efficiency data.
 
     :return: None.
@@ -1208,6 +1349,13 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
                 output_dir='../../Data_main/rasters/USGS_GW_%',
                 raster_name=f'GW_perc_{year}.tif', use_attr=True,
                 attribute=f'avg_gw_%')
+
+    # modify and reclassify GW_perc raster
+    reclassify_GW_use_perc_rasters(GW_use_perc_dir='../../Data_main/rasters/USGS_GW_%',
+                                   westUS_ROI='../../Data_main/ref_shapes/WestUS_ROI.shp',
+                                   final_pumping_prediction_dir='../../Data_main/rasters/pumping_prediction/ML/v11',
+                                   output_dir='../../Data_main/rasters/USGS_GW_%/reclassified',
+                                   skip_processing=skip_modify_USGS_GW_perc)
 
     # rasterize USGS HUC12 Irrigation Efficiency data
     create_Irr_eff_rasters(

@@ -771,7 +771,7 @@ def create_pdplots(trained_model, x_train, features_to_include, output_dir, plot
             'ET': 'ET (mm/gs)', 'irr_crop_frac': 'Fraction of irrigated cropland',
             'maxRH': 'Max. relative humidity (%)',
             'minRH': 'Min. relative humidity (%)', 'shortRad': 'Downward shortwave radiation (W/$m^2$)',
-            'vpd': 'Vapour pressure deficit (kpa)', 'sunHr': 'Daylight duration (hr)',
+            'vpd': 'Vapor pressure deficit (kpa)', 'sunHr': 'Daylight duration (hr)',
             'SW_Irr': 'Surface water irrigation (mm/gs)', 'FC': 'Field capacity',
             'Canal_density': 'Canal density', 'Canal_distance': 'Distance from canals'
         }
@@ -881,7 +881,7 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
             'ret': 'Reference ET', 'precip': 'Precipitation', 'tmax': f'Max. temperature',
             'ET': 'ET', 'irr_crop_frac': 'Fraction of irrigated cropland', 'maxRH': 'Max. relative humidity',
             'minRH': 'Min. relative humidity', 'shortRad': 'Downward shortwave radiation',
-            'vpd': 'Vapour pressure deficit', 'sunHr': 'Daylight duration',
+            'vpd': 'Vapor pressure deficit', 'sunHr': 'Daylight duration',
             'sw_huc12': 'Normalized HUC12 Surface water irrigation', 'gw_perc_huc12': 'Groundwater use % at HUC12',
             'climate': 'Climate', 'FC': 'Field capacity', 'spi': 'Standardized precipitation index',
             'spei': 'Standardized precipitation evapotranspiration index', 'eddi': 'Evaporative demand drought index',

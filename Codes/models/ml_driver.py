@@ -227,7 +227,7 @@ if __name__ == '__main__':
     # Shap interaction plot
     features_to_plot = ['Effective precipitation', 'Irrigated crop fraction',
                         'ET', 'Field capacity', 'Precipitation',
-                        'Vapour pressure deficit', 'Reference ET', 'Temperature (max)']
+                        'Vapor pressure deficit', 'Reference ET', 'Temperature (max)']
 
     plot_shap_interaction_plot(model_version=model_version,
                                trained_model_path=os.path.join(save_model_to_dir, model_name),

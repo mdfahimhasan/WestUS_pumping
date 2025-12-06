@@ -879,7 +879,7 @@ def plot_permutation_importance(trained_model, x_test, y_test, output_dir, plot_
         feature_name_dict = {
             'netGW_Irr': 'Consumptive groundwater use', 'peff': 'Effective precipitation',
             'ret': 'Reference ET', 'precip': 'Precipitation', 'tmax': f'Max. temperature',
-            'ET': 'ET', 'irr_crop_frac': 'Fraction of irrigated croplnad', 'maxRH': 'Max. relative humidity',
+            'ET': 'ET', 'irr_crop_frac': 'Fraction of irrigated cropland', 'maxRH': 'Max. relative humidity',
             'minRH': 'Min. relative humidity', 'shortRad': 'Downward shortwave radiation',
             'vpd': 'Vapour pressure deficit', 'sunHr': 'Daylight duration',
             'sw_huc12': 'Normalized HUC12 Surface water irrigation', 'gw_perc_huc12': 'Groundwater use % at HUC12',

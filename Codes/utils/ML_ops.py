@@ -1079,10 +1079,10 @@ def plot_shap_interaction_plot(model_version, trained_model_path, use_samples, f
         for feature in features_to_plot:
             shap.dependence_plot(feature, shap_values_np, df, feature_names=feature_names,
                                  interaction_index=None, show=False)
-            plt.gca().set_ylabel('SHAP value', fontsize=14)
-            plt.gca().set_xlabel(feature, fontsize=14)
-            plt.xticks(fontsize=12)
-            plt.yticks(fontsize=12)
+            plt.gca().set_ylabel('SHAP value', fontsize=18)
+            plt.gca().set_xlabel(feature, fontsize=18)
+            plt.xticks(fontsize=13)
+            plt.yticks(fontsize=13)
 
             plt.savefig(os.path.join(save_plot_dir, f'{feature}.png'), dpi=400, bbox_inches='tight')
 

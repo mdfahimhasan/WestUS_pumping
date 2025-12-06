@@ -525,6 +525,7 @@ def merge_GEE_data_patches_IrrMapper_LANID_extents(year_with_full_extent, input_
     else:
         pass
 
+
 def classify_irrigated_cropland(years, irrigated_fraction_dir,
                                 irrigated_cropland_output_dir,
                                 irr_fraction_threshold_others,

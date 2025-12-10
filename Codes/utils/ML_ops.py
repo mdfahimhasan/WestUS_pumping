@@ -969,10 +969,10 @@ def plot_shap_summary_plot(trained_model_path, use_samples,
 
         feature_names_dict = {'netGW_Irr': 'Consumptive groundwater use', 'peff': 'Effective precipitation',
                               'SW_Irr': 'Surface water irrigation', 'ret': 'Reference ET', 'precip': 'Precipitation',
-                              'tmax': 'Temperature (max)', 'ET': 'ET', 'irr_crop_frac': 'Irrigated crop fraction',
+                              'tmax': 'Temperature (max)', 'ET': 'ET', 'irr_crop_frac': 'Fraction of irrigated cropland',
                               'maxRH': 'Relative humidity (max)', 'minRH': 'Relative humidity (min)',
                               'shortRad': 'Shortwave radiation', 'vpd': 'Vapor pressure deficit',
-                              'sunHr': 'Sun hour', 'FC': 'Field capacity',
+                              'sunHr': 'Daylight duration', 'FC': 'Field capacity',
                               'Canal_distance': 'Distance from canal', 'Canal_density': 'Canal density',
                               'irr_eff': 'Irrigation Efficiency'
                               }
@@ -1056,10 +1056,10 @@ def plot_shap_interaction_plot(model_version, trained_model_path, use_samples, f
 
         feature_names_dict = {'netGW_Irr': 'Consumptive groundwater use', 'peff': 'Effective precipitation',
                               'SW_Irr': 'Surface water irrigation', 'ret': 'Reference ET', 'precip': 'Precipitation',
-                              'tmax': 'Temperature (max)', 'ET': 'ET', 'irr_crop_frac': 'Irrigated crop fraction',
+                              'tmax': 'Temperature (max)', 'ET': 'ET', 'irr_crop_frac': 'Fraction of irrigated cropland',
                               'maxRH': 'Relative humidity (max)', 'minRH': 'Relative humidity (min)',
                               'shortRad': 'Shortwave radiation', 'vpd': 'Vapor pressure deficit',
-                              'sunHr': 'Sun hour', 'FC': 'Field capacity',
+                              'sunHr': 'Daylight duration', 'FC': 'Field capacity',
                               'Canal_distance': 'Distance from canal',
                               'Canal_density': 'Canal density', 'irr_eff': 'Irrigation Efficiency'}
 

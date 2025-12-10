@@ -306,7 +306,7 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------------------------------------------
     # flags
     # --------------------------------------------------------------------------------------------------------------
-    model_version = 'v11'                           ##########
+    model_version = 'v12'                           ##########
 
     skip_bootstrap_dataset = False                  ##########
     skip_train_bootstrap_models = False             ##########
@@ -347,19 +347,19 @@ if __name__ == '__main__':
 
     # base param dict (from the trained model)
     lgbm_param_dict = {'boosting_type': 'dart',
-                       'subsample': 0.6424569150291416,
-                       'drop_rate': 0.15193294688842177,
+                       'subsample': 0.7238831515117926,
+                       'drop_rate': 0.1478691306542174,
                        'max_drop': 55,
-                       'skip_drop': 0.6997028395106997,
-                       'colsample_bynode': 0.7201884877927008,
-                       'colsample_bytree': 0.6594527779108277,
+                       'skip_drop': 0.6754081255040427,
+                       'colsample_bynode': 0.780388407480005,
+                       'colsample_bytree': 0.7032341699463938,
                        'data_sample_strategy': 'bagging',
-                       'learning_rate': 0.019988466711388122,
+                       'learning_rate': 0.019952060683831385,
                        'max_depth': 6,
-                       'min_child_samples': 90,
-                       'n_estimators': 400,
+                       'min_child_samples': 50,
+                       'n_estimators': 375,
                        'num_leaves': 45,
-                       'path_smooth': 0.7387036577638288,
+                       'path_smooth': 0.7537757265711595,
                        'force_col_wise': True
                        }
 

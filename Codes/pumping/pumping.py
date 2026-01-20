@@ -1159,14 +1159,14 @@ def main(skip_process_AZ_pumping,
 
 if __name__ == '__main__':
     main(
-        skip_process_AZ_pumping=True,  #######
-        skip_irrig_zone_filter_AZ=True,  #######
-        skip_make_AZ_pumping_raster=True,  #######
-        skip_process_KS_pumping=True,  #######
-        skip_make_KS_pumping_raster=False,  #######
-        skip_process_CO_pumping=True,  #######
-        skip_make_CO_pumping_raster=False,  #######
-        skip_NV_dist_pumping_to_pod=True,  #######
-        skip_make_NV_pumping_raster=True,  #######
-        skip_combine_pumping_rasters=False  #######
+        skip_process_AZ_pumping=True,       #######
+        skip_irrig_zone_filter_AZ=True,     #######
+        skip_make_AZ_pumping_raster=True,   #######
+        skip_process_KS_pumping=True,       #######
+        skip_make_KS_pumping_raster=True,   #######
+        skip_process_CO_pumping=True,       #######
+        skip_make_CO_pumping_raster=True,   #######
+        skip_NV_dist_pumping_to_pod=True,   #######
+        skip_make_NV_pumping_raster=True,   #######
+        skip_combine_pumping_rasters=False   #######
     )

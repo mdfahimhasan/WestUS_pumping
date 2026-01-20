@@ -4,15 +4,18 @@
 # Colorado State university
 # Fahim.Hasan@colostate.edu
 
-# # The pumping data processed by this script requires some hand-filtering and processing after the process
-# of raw data to point creation. After that some hand-filtering is performed and the final data is rasterized
+# # The pumping data processed by this script requires some hand-filtering and processing after the step
+# of raw data to point shapefile compilation. After that some hand-filtering is performed and the final data is rasterized
 # as pumping rasters
 
-# # We also applied filtering out very low and high pumping values for Colorado and kansas.
-# Removed pixels where pumping + surface water irrigation (if happens) + Peff < irrigated crop ET (under a threshold).
-# For Arizona, we didn't do it as Arizona has large surface water irrigation, and we don't have an accurate
-# surface water irrigation dataset (we only have a decent proxy from USGS HUC12 dataset).
-# Moreover, both Kansas and Arizona are known to have high quality pumping data.
+# # We also applied filter to remove potentially anomalous very low and high pumping values
+# In Kansas and Colorado, removed pixels where (pumping + surface water irrigation (if happens) + Peff) / ET is
+# less or greater than thresholds of 0.7 and 1.5, respectively.
+
+# In Arizona, we didn't do it as Arizona has significant surface water irrigation, and we don't have an accurate
+# surface water irrigation dataset (we only have a decent proxy from USGS HUC12 dataset). We used a value of 1500 mm
+# to filter out very high pumping values, which might have been erroneous.
+
 
 import os
 import sys

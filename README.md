@@ -34,12 +34,7 @@ __4. result_analysis -__ Consists of .py scripts and .ipynb files that are used 
 The __utils__ module do not need any execution. The other modules require to be executed using the respective driver files to implement the full funtionality of the model. __Please reach out to the authors for additional support in running this repository.__
 
 ### Dependencies
-__operating system:__ Most scripts are fully functional in windows and linux environments except some. In linux environment, gdal needs to be installed separately and the appropriate 'gdal_path' needs to be set in necessary scripts. For some functions, e.g. the `shapefile_to_raster()` in `utils > raster_ops.py` and associated scripts (`results_analysis > netGW_pumping_compile.py`), gdal system call has to enabled/installed specifically to run them in linux environment. Note that all scripts, except the scripts in `results_analysis` module, have been implemented/checked using both windows and linux environment (using conda environment). In addition, the ALE plot generation in `m01_peff_model_monthly.py` and `m02_peff_frac_model_water_yr.py` scripts do not respond (keep running indifinitely) in linux environment (probably due to scikit-explain versioning issue); therefore, set `skip_plot_ale = True` when running the monthly and water year models in linux environment.
-
-The authors recommend exercising discretion when setting up the environment and run the scripts.
-
 __conda environment:__ A _conda environment_, set up using [Anaconda](https://www.anaconda.com/products/individual) with python 3.9, has been used to implement this repositories.The 'yml_files_env' folder consists of .yml files to setup similar conda environment.
-
 
 ## Data availability
 Will be added shortly.

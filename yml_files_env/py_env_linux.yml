@@ -1,0 +1,22 @@
+name: westus_gw
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - mamba
+  - geopandas
+  - earthengine-api
+  - astropy
+  - rioxarray
+  - rasterstats
+  - matplotlib
+  - seaborn
+  - scikit-learn
+  - lightgbm
+  - dask
+  - hyperopt
+  - gdal
+  - scikit-explain
+  - optuna
+prefix: /home/fahimcsu/.conda/envs/westus_gw

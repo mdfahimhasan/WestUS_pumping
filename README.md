@@ -6,7 +6,7 @@ Efforts to monitor groundwater pumping for irrigation in the Western United Stat
 <img src="readme_figs/model_prediciton.png" height="900"/>
 
 ## Citations
-- Hasan, M. F., Smith, R. G., Davenport, F. V., Majumdar, S.(2026). Extending Historical Groundwater Pumping Estimates for Major Agricultural Basins of the Western United States with Machine Learning and Satellite Products. In Prep. for Journal of Hydrology.
+- Hasan, M. F., Smith, R. G., Davenport, F. V., Majumdar, S. (2026). Extending Historical Groundwater Pumping Estimates for Major Agricultural Basins of the Western United States with Machine Learning and Satellite Products. In Prep. for Journal of Hydrology.
 
 ## Organizations
 <img src="readme_figs/CSU-Signature-C-357-617.png" height="90"/> <img src="readme_figs/Official-DRI-Logo-for-Web.png" height="80"/>

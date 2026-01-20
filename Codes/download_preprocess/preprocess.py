@@ -774,10 +774,11 @@ def reclassify_GW_use_perc_rasters(GW_use_perc_dir, westUS_ROI, final_pumping_pr
             dst.write(masked_arr, 1)
 
         ################################################################################################################
-        # # updating GW use % data in the Rio Grande Basin (we know for sure that they are ~100% GW irrigated)
+        # # updating GW use % data in the Rio Grande Basin (we know for sure that the northern SLV is
+        # ~100% GW irrigated and the southern SLV is ~74% GW irrigated)
 
-        # geographic bounds (Rio Grande region)
-        lat_min, lat_max = 36.96, 38.498
+        # # northern SLV -> 100%
+        lat_min_n, lat_max_n = 37.50, 38.498
         lon_min, lon_max = -106.657, -105.128
 
         # setting values of the lat-lon window to 100%
@@ -785,7 +786,7 @@ def reclassify_GW_use_perc_rasters(GW_use_perc_dir, westUS_ROI, final_pumping_pr
 
         gw_perc.loc[
             dict(
-                y=slice(lat_max, lat_min),
+                y=slice(lat_max_n, lat_min_n),
                 x=slice(lon_min, lon_max)
             )] = 100
 
@@ -811,6 +812,41 @@ def reclassify_GW_use_perc_rasters(GW_use_perc_dir, westUS_ROI, final_pumping_pr
                 nodata=-9999
         ) as dst:
             dst.write(modified_gw_perc, 1)
+
+        # # southern SLV -> 74%
+        lat_min_s, lat_max_s = 36.96, 37.499
+
+        # setting values of the lat-lon window to 74%
+        gw_perc_new = rxr.open_rasterio(os.path.join(output_dir, 'GW_use_perc_ROI.tif'))
+
+        gw_perc_new.loc[
+            dict(
+                y=slice(lat_max_s, lat_min_s),
+                x=slice(lon_min, lon_max)
+            )] = 74
+
+        gw_prediction_data = glob(os.path.join(final_pumping_prediction_dir, '*.tif'))
+        gw_perc_arr = gw_perc_new.values.squeeze().squeeze()
+        modified_gw_perc_2 = np.full_like(gw_perc_arr, fill_value=-9999)
+
+        for data in gw_prediction_data:
+            gw_prediction = rio.open(data).read(1)
+            modified_gw_perc_2 = np.where(gw_prediction != - 9999, gw_perc_arr, modified_gw_perc_2)
+
+        # saving the modified raster
+        with rio.open(
+                os.path.join(output_dir, 'GW_use_perc_ROI_final.tif'),
+                'w',
+                driver='GTiff',
+                height=modified_gw_perc.shape[0],
+                width=modified_gw_perc.shape[1],
+                count=1,
+                dtype=modified_gw_perc.dtype,
+                crs=raster_file.crs,
+                transform=mask_transform,
+                nodata=-9999
+        ) as dst:
+            dst.write(modified_gw_perc_2, 1)
 
         ################################################################################################################
         # # creating a binary raster

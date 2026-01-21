@@ -1034,7 +1034,7 @@ def main(skip_process_AZ_pumping,
 
     # make 2 km rasters
     pumping_pts_to_raster_v1(state_code='NV', years=list(range(2018, 2023)),
-                             pumping_pts_shp=pod_pumping_shp,
+                             pumping_pts_shp='../../Data_main/pumping/Nevada/Final/pod_pumping.shp',
                              pumping_attr_AF='AF_pumped',
                              year_attr='year',
                              output_dir='../../Data_main/pumping/rasters/Nevada',

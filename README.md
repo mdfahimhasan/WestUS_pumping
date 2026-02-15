@@ -19,6 +19,50 @@ Efforts to monitor groundwater pumping for irrigation in the Western United Stat
 ### Repository structure
 The repository has five main modules described as follows-
 
+```
+Codes/
+├── __init__.py
+├── download_preprocess/
+│   ├── download.py
+│   ├── download_openET.py
+│   ├── dp_driver.py
+|   ├── preprocess.py
+│   └── dp_driver.sh
+├── models/
+│   ├── ann_df.py
+│   ├── ann_df.sh
+│   ├── ann_model.py
+│   ├── ann_model.sh
+│   ├── ml_driver.py
+│   ├── ml_driver.sh
+│   ├── ml_driver_LOBO.py
+│   ├── ml_driver_LOBO.sh
+│   ├── ml_uncertainty.py
+│   └── ml_uncertainty.sh
+├── pumping/
+│   └── pumping.py
+├── results_analysis/
+│   ├── __init__.py
+│   ├── analysis_utils.py
+│   ├── basin_compile.py
+│   ├── basin_compile_LOBO.py
+│   ├── conjuctive_basins_water_balance.ipynb
+│   ├── KDE_CWB.ipynb
+│   ├── model_diagnosis.ipynb
+│   ├── plots.py
+│   ├── pumping_basin_compare_with_LOBO_v11.ipynb
+│   └── stats_ops.py
+└── utils/
+    ├── __init__.py
+    ├── DL_ops.py
+    ├── ML_ops.py
+    ├── plots.py
+    ├── raster_ops.py
+    ├── stats_ops.py
+    ├── system_ops.py
+    └── vector_ops.py
+```
+
 __1. utils -__ Utility scripts for core operations across the repository:
 - `raster_ops.py` - Raster processing (read/write arrays, clipping, resampling, masking)
 - `vector_ops.py` - Vector operations (buffering, clipping shapefiles, coordinate transformations)

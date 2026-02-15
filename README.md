@@ -24,8 +24,8 @@ Codes/
 ├── download_preprocess/
 │   ├── download.py
 │   ├── download_openET.py
-│   ├── dp_driver.py
 |   ├── preprocess.py
+│   ├── dp_driver.py
 │   └── dp_driver.sh
 ├── models/
 │   ├── ann_df.py
@@ -47,10 +47,8 @@ Codes/
 │   ├── basin_compile_LOBO.py
 │   ├── comparison_basinScale.ipynb
 │   ├── conjuctive_basins_water_balance.ipynb
-│   ├── KDE_CWB.ipynb
 │   ├── model_diagnosis.ipynb
 │   ├── plots.py
-│   ├── pumping_basin_compare_with_LOBO_v11.ipynb
 │   └── stats_ops.py
 └── utils/
     ├── __init__.py
@@ -103,6 +101,7 @@ __5. results_analysis -__ Model evaluation and results compilation:
 - `basin_compile.py` / `basin_compile_LOBO.py` - Compile basin-scale predicted and actual pumping data
 - `analysis_utils.py` - Utility functions for results analysis
 - `comparison_basinScale.ipynb` - Basin-scale comparison of actual vs predicted pumping with scatter plots, time series analysis, and performance metrics (R², RMSE, MAE) across groundwater-dominated basins
+- `conjuctive_basins_water_balance.ipynb` - Water balance analysis for conjunctive basins (South Platte River Basin, CO and Pinal AMA, AZ) to compute total irrigation from groundwater and surface water sources
 - `model_diagnosis.ipynb` - Model performance diagnostics
 - Various notebooks for water balance analysis and result visualization
 

@@ -17,7 +17,7 @@ Efforts to monitor groundwater pumping for irrigation in the Western United Stat
 ## Running the repository
 
 ### Repository structure
-The repository has six main modules described as follows-
+The repository has five main modules described as follows-
 
 __1. utils -__ Utility scripts for core operations across the repository:
 - `raster_ops.py` - Raster processing (read/write arrays, clipping, resampling, masking)
@@ -41,20 +41,12 @@ __4. models -__ Core machine learning module:
 - `ml_driver.py` - Main ML driver for model training, testing, and prediction using LightGBM DART
 - `ml_driver_LOBO.py` - Leave-One-Basin-Out (LOBO) cross-validation driver for spatial transferability assessment
 - `ml_uncertainty.py` - Bootstrap-based uncertainty quantification and confidence interval estimation
-- `ann_*.py` - Artificial Neural Network model scripts (experimental; not used in final manuscript)
 - Associated `.sh` scripts for HPC job submission
 
-__5. EDA -__ Exploratory Data Analysis notebooks:
-- `pumping_irrFrac_ET.ipynb` - Analysis of pumping, irrigation fraction, and evapotranspiration relationships
-- `RS_vs_NASS_acres.ipynb` - Comparison of remote sensing-derived vs NASS irrigated acreage
-- `valueRanges_pumping_netGW.ipynb` - Value range analysis for pumping and net groundwater data
-- `allState_vs_GMD3_dist.ipynb` - Distribution comparison analysis
-
-__6. results_analysis -__ Model evaluation and results compilation:
+__5. results_analysis -__ Model evaluation and results compilation:
 - `basin_compile.py` / `basin_compile_LOBO.py` - Compile basin-scale predicted and actual pumping data
 - `analysis_utils.py` - Utility functions for results analysis
 - `model_diagnosis.ipynb` - Model performance diagnostics
-- `pumping_basin_compare_with_LOBO_v11.ipynb` - Basin-level comparison with LOBO validation
 - Various notebooks for water balance analysis and result visualization
 
 The __utils__ module does not require direct execution. Other modules should be executed using their respective driver files. __Please reach out to the authors for additional support in running this repository.__

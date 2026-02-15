@@ -45,6 +45,7 @@ Codes/
 │   ├── analysis_utils.py
 │   ├── basin_compile.py
 │   ├── basin_compile_LOBO.py
+│   ├── comparison_basinScale.ipynb
 │   ├── conjuctive_basins_water_balance.ipynb
 │   ├── KDE_CWB.ipynb
 │   ├── model_diagnosis.ipynb
@@ -101,6 +102,7 @@ __4. models -__ Core machine learning module:
 __5. results_analysis -__ Model evaluation and results compilation:
 - `basin_compile.py` / `basin_compile_LOBO.py` - Compile basin-scale predicted and actual pumping data
 - `analysis_utils.py` - Utility functions for results analysis
+- `comparison_basinScale.ipynb` - Basin-scale comparison of actual vs predicted pumping with scatter plots, time series analysis, and performance metrics (R², RMSE, MAE) across groundwater-dominated basins
 - `model_diagnosis.ipynb` - Model performance diagnostics
 - Various notebooks for water balance analysis and result visualization
 

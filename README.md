@@ -61,6 +61,18 @@ Codes/
     ├── stats_ops.py
     ├── system_ops.py
     └── vector_ops.py
+
+Data_main/
+├── pumping/
+│   ├── Arizona/
+│   ├── Colorado/
+│   ├── Kansas/
+│   ├── Nevada/
+│   └── Utah/
+├── ref_rasters/
+├── ref_shapes/
+└── shapefiles/
+    └── Basins_of_interest/
 ```
 
 __1. utils -__ Utility scripts for core operations across the repository:
@@ -116,7 +128,7 @@ __Key packages:__
 - `earthengine-api` - Google Earth Engine data access
 
 ## Data availability
-Will be added shortly.
+This repository includes the in-situ pumping datasets and associated shapefiles used to process and train the ML model. The `Data_main/pumping/` folder contains state-level pumping records from Arizona, Colorado, Kansas, Nevada, and Utah, along with reference rasters, shapefiles, and basin boundaries required for data processing and model implementation.
 
 
 

@@ -130,6 +130,15 @@ __Key packages:__
 ## Data availability
 This repository includes the in-situ pumping datasets and associated shapefiles used to process and train the ML model. The `Data_main/pumping/` folder contains state-level pumping records from Arizona, Colorado, Kansas, Nevada, and Utah, along with reference rasters, shapefiles, and basin boundaries required for data processing and model implementation.
 
+**Google Earth Engine Dataset:**  
+The annual groundwater pumping estimates (2000-2023) are available as a Google Earth Engine ImageCollection:
+```
+projects/ee-westus-pumping/assets/westus_pumping
+```
+
+Sample code for visualization and data download is available at:  
+https://code.earthengine.google.com/a439de4785b9123e7255c3471ff8ed15
+
 ## Citations
 - Hasan, M. F., Smith, R. G., Davenport, F. V., Majumdar, S. (2026). Extending Historical Groundwater Pumping Estimates for Major Agricultural Basins of the Western United States with Machine Learning and Satellite Products. In Prep. for Journal of Hydrology.
 

@@ -6,11 +6,13 @@ import warnings
 import numpy as np
 import pandas as pd
 from glob import glob
-from os.path import dirname, abspath
+from pathlib import Path
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
+# Project root directory (works regardless of cwd)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from Codes.utils.system_ops import makedirs
 from Codes.utils.ML_ops import reindex_df, train_model
@@ -19,7 +21,7 @@ from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster
 # model resolution and reference raster/shapefile
 no_data_value = -9999
 model_res = 0.01976293625031605786  # in deg, ~2 km
-WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
+WestUS_raster = PROJECT_ROOT / 'Data_main/ref_rasters/Western_US_refraster_2km.tif'
 
 
 def make_bootstrap_datasets(x_train_df, y_train_df, N_bootstrap, output_dir,
@@ -64,10 +66,11 @@ def jitter_params(base_params_dict, seed):
     params = base_params_dict.copy()
 
     # jitter num_leaves
-    params['num_leaves'] = int(params['num_leaves'] + rn_gen.integers(-5, 5))
+    params['num_leaves'] = max(2, int(params['num_leaves'] + rn_gen.integers(-5, 5)))
+
 
     # jitter max_depth
-    params['max_depth'] = params['max_depth'] + rn_gen.integers(-1, 2)
+    params['max_depth'] = max(1, params['max_depth'] + rn_gen.integers(-1, 2))
 
     # jitter learning rate
     params['learning_rate'] = params['learning_rate'] * rn_gen.uniform(0.9, 1.1)
@@ -96,6 +99,19 @@ def jitter_params(base_params_dict, seed):
 def predict_annual_mean_stdv(N_bootstrap, trained_model_dir, predictor_csv_and_nan_pos_dir,
                              exclude_columns, output_dir, irr_eff_dir, ref_raster=WestUS_raster,
                              skip_processing=False):
+    '''
+    Predict annual mean and stdv using the bootstrapped models.
+
+    :param N_bootstrap: Number of bootstrapped models.
+    :param trained_model_dir: File path of directory with trained bootstrapped models.
+    :param predictor_csv_and_nan_pos_dir: File path of directory with predictor CSV and NaN position files.
+    :param exclude_columns: List of columns to exclude from the predictor dataframe.
+    :param output_dir: File path of directory to save the output rasters.
+    :param irr_eff_dir: File path of directory with irrigation efficiency rasters.
+    :param ref_raster: File path of the reference raster.
+    :param skip_processing: Boolean flag to skip processing and use existing results. Default is False.
+    
+    '''
     if not skip_processing:
         # load all trained models and store them in a list
         models = []
@@ -138,7 +154,7 @@ def predict_annual_mean_stdv(N_bootstrap, trained_model_dir, predictor_csv_and_n
 
                 # converting consumptive use prediction back to pumping
                 irr_eff_arr_shaped = irr_eff_arr.reshape(pred_arr.shape)
-                pred_arr = np.where(~np.isnan(irr_eff_arr_shaped) & ~np.isnan(pred_arr), irr_eff_arr_shaped * pred_arr, -9999)
+                pred_arr = np.where(~np.isnan(irr_eff_arr_shaped) & ~np.isnan(pred_arr), irr_eff_arr_shaped * pred_arr, np.nan)
 
                 # mask nodata per model (same as original function, but use np.nan here)
                 nan_pos_dict = pickle.load(open(nan_pos_dict_path, "rb"))
@@ -320,20 +336,20 @@ if __name__ == '__main__':
                           'shortRad', 'minRH', 'irr_eff',
                           'Canal_density', 'Canal_distance'
                           ]
-    saved_model_dir = f'../../Model_run/ML_model/Model_trained/bootstrapped'
-    input_csv_and_nan_pos_dir = f'../../Model_run/ML_model/Model_csv/annual_df'
-    irr_eff_dir = '../../Data_main/rasters/HUC12_Irr_Eff'
+    saved_model_dir = PROJECT_ROOT / f'Model_run/ML_model/Model_trained/bootstrapped'
+    input_csv_and_nan_pos_dir = PROJECT_ROOT / f'Model_run/ML_model/Model_csv/annual_df'
+    irr_eff_dir = PROJECT_ROOT / f'Data_main/rasters/HUC12_Irr_Eff'
 
     # --------------------------------------------------------------------------------------------------------------
     # Bootstrap dataset
     # --------------------------------------------------------------------------------------------------------------
 
-    x_train = pd.read_csv(f'../../Model_run/ML_model/Model_csv/x_train_{model_version}.csv')
-    y_train = pd.read_csv(f'../../Model_run/ML_model/Model_csv/y_train_{model_version}.csv')
+    x_train = pd.read_csv(PROJECT_ROOT/f'Model_run/ML_model/Model_csv/x_train_{model_version}.csv')
+    y_train = pd.read_csv(PROJECT_ROOT/f'Model_run/ML_model/Model_csv/y_train_{model_version}.csv')
 
     make_bootstrap_datasets(x_train_df=x_train, y_train_df=y_train,
                             N_bootstrap=n_bootstrap,
-                            output_dir=f'../../Model_run/ML_model/Model_csv/boostrap',
+                            output_dir=PROJECT_ROOT / f'Model_run/ML_model/Model_csv/boostrap',
                             skip_processing=skip_bootstrap_dataset)
 
     # --------------------------------------------------------------------------------------------------------------
@@ -341,9 +357,9 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------------------------------------------
 
     # directories
-    bootstrap_data_dir = f'../../Model_run/ML_model/Model_csv/boostrap'
-    save_model_to_dir = f'../../Model_run/ML_model/Model_trained/bootstrapped'
-    mean_stdv_output_dir = f'../../Data_main/rasters/pumping_prediction/ML_uncertainty/{model_version}/mean_stdv'
+    bootstrap_data_dir = PROJECT_ROOT / f'Model_run/ML_model/Model_csv/boostrap'
+    save_model_to_dir = PROJECT_ROOT / f'Model_run/ML_model/Model_trained/bootstrapped'
+    mean_stdv_output_dir = PROJECT_ROOT / f'Data_main/rasters/pumping_prediction/ML_uncertainty/{model_version}/mean_stdv'
 
     # base param dict (from the trained model)
     # hyperparameters from tuned model
@@ -402,8 +418,8 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------------------------------------------
 
     # directories
-    predicted_pumping_dir = f'../../Data_main/rasters/pumping_prediction/ML/{model_version}/WestUS_pumping'
-    low_high_CI_output_dir = f'../../Data_main/rasters/pumping_prediction/ML_uncertainty/{model_version}'
+    predicted_pumping_dir = PROJECT_ROOT / f'Data_main/rasters/pumping_prediction/ML/{model_version}/WestUS_pumping'
+    low_high_CI_output_dir = PROJECT_ROOT / f'Data_main/rasters/pumping_prediction/ML_uncertainty/{model_version}'
 
     # calculate lower and upper 95% CI
     create_uncertainty_bounds(model_prediction_dir=predicted_pumping_dir,

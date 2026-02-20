@@ -5,9 +5,11 @@
 
 import sys
 import pandas as pd
-from os.path import dirname, abspath
+from pathlib import Path
 
-sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
+# Project root directory (works regardless of cwd)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from Codes.utils.plots import scatter_plot_of_same_vars
 from Codes.utils.DL_ops import DataLoaderCreator, main, plot_learning_curve, test, \
@@ -53,14 +55,14 @@ if __name__ == '__main__':
     }
 
     # # # directories
-    train_csv = f'../../Model_run/ANN_model/Model_csv/standardized/train.csv'
-    val_csv = f'../../Model_run/ANN_model/Model_csv/standardized/val.csv'
-    test_csv = f'../../Model_run/ANN_model/Model_csv/standardized/test.csv'
+    train_csv = PROJECT_ROOT / 'Model_run/ANN_model/Model_csv/standardized/train.csv'
+    val_csv = PROJECT_ROOT / 'Model_run/ANN_model/Model_csv/standardized/val.csv'
+    test_csv = PROJECT_ROOT / 'Model_run/ANN_model/Model_csv/standardized/test.csv'
 
-    model_save_path = f'../../Model_run/ANN_model/model_{model_version}.pth'
-    model_info_save_path = f'../../Model_run/ANN_model/model_info_{model_version}.pth'
-    hyperparam_importance_plot = f'../../Model_run/ANN_model/Plots/hyperparam_imp_{model_version}.jpg'
-    learning_curve_plot = f'../../Model_run/ANN_model/Plots/learning_curve_{model_version}.jpg'
+    model_save_path = PROJECT_ROOT / f'Model_run/ANN_model/model_{model_version}.pth'
+    model_info_save_path = PROJECT_ROOT / f'Model_run/ANN_model/model_info_{model_version}.pth'
+    hyperparam_importance_plot = PROJECT_ROOT / f'Model_run/ANN_model/Plots/hyperparam_imp_{model_version}.jpg'
+    learning_curve_plot = PROJECT_ROOT / f'Model_run/ANN_model/Plots/learning_curve_{model_version}.jpg'
 
     if RUN_MODEL:
         # --------------------------------------------------------------------------------------------------------------
@@ -91,7 +93,7 @@ if __name__ == '__main__':
                                        shuffle=False, features_to_exclude=exclude_features_from_training,
                                        batch_size=batch_size, verbose=False).get_dataloader()
 
-        train_results = f'../../Model_run/ANN_model/output_csv/train_results_{model_version}.csv'
+        train_results = PROJECT_ROOT / f'Model_run/ANN_model/output_csv/train_results_{model_version}.csv'
         test(model=trained_model, test_loader=trainLoader, output_csv=train_results)
 
         print('Test performance:')
@@ -99,18 +101,18 @@ if __name__ == '__main__':
                                        shuffle=False, features_to_exclude=exclude_features_from_training,
                                        batch_size=batch_size, verbose=False).get_dataloader()
 
-        test_results = f'../../Model_run/ANN_model/output_csv/test_results_{model_version}.csv'
+        test_results = PROJECT_ROOT / f'Model_run/ANN_model/output_csv/test_results_{model_version}.csv'
         test(model=trained_model, test_loader=testLoader, output_csv=test_results)
 
         calc_rangeWise_RMSE(results_csv=test_results, value_ranges=[0, 100, 200, 400, 500, 600, 800, 1400],
-                            output_txt=f'../../Model_run/ANN_model/output_csv/test_results_rangeWise_{model_version}.txt')
+                            output_txt=PROJECT_ROOT / f'Model_run/ANN_model/output_csv/test_results_rangeWise_{model_version}.txt')
 
         print('Validation performance:')
         valLoader = DataLoaderCreator(data_csv=val_csv,
                                       shuffle=False, features_to_exclude=exclude_features_from_training,
                                       batch_size=batch_size, verbose=False).get_dataloader()
 
-        val_results = f'../../Model_run/ANN_model/output_csv/val_results_{model_version}.csv'
+        val_results = PROJECT_ROOT / f'Model_run/ANN_model/output_csv/val_results_{model_version}.csv'
         test(model=trained_model, test_loader=valLoader, output_csv=val_results)
 
         # --------------------------------------------------------------------------------------------------------------
@@ -124,7 +126,7 @@ if __name__ == '__main__':
         scatter_plot_of_same_vars(Y_pred=train_results_df['predicted'], Y_obsv=train_results_df['actual'],
                                   x_label='actual pumping (mm/year)', y_label='predicted pumping (mm/year)',
                                   plot_name=f'train_scatter_{model_version}.jpg',
-                                  savedir=f'../../Model_run/ANN_model/Plots/', alpha=0.5,
+                                  savedir=PROJECT_ROOT / 'Model_run/ANN_model/Plots/', alpha=0.5,
                                   marker_size=5, axis_lim=(0, 1500),
                                   title='performance on train set',
                                   tick_interval=200)
@@ -133,7 +135,7 @@ if __name__ == '__main__':
         scatter_plot_of_same_vars(Y_pred=test_results_df['predicted'], Y_obsv=test_results_df['actual'],
                                   x_label='actual pumping (mm/year)', y_label='predicted pumping (mm/year)',
                                   plot_name=f'test_scatter_{model_version}.jpg',
-                                  savedir=f'../../Model_run/ANN_model/Plots/', alpha=0.5,
+                                  savedir=PROJECT_ROOT / 'Model_run/ANN_model/Plots/', alpha=0.5,
                                   marker_size=5, axis_lim=(0, 1500),
                                   title='performance on test set',
                                   tick_interval=200)
@@ -142,7 +144,7 @@ if __name__ == '__main__':
         scatter_plot_of_same_vars(Y_pred=val_results_df['predicted'], Y_obsv=val_results_df['actual'],
                                   x_label='actual pumping (mm/year)', y_label='predicted pumping (mm/year)',
                                   plot_name=f'val_scatter_{model_version}.jpg',
-                                  savedir=f'../../Model_run/ANN_model/Plots/', alpha=0.5,
+                                  savedir=PROJECT_ROOT / 'Model_run/ANN_model/Plots/', alpha=0.5,
                                   marker_size=5, axis_lim=(0, 1500),
                                   title='performance on validation set',
                                   tick_interval=200)
@@ -155,7 +157,7 @@ if __name__ == '__main__':
     plot_shap_summary_plot(trained_model_path=model_save_path, trained_model_info=model_info_save_path,
                            use_samples=2000, data_csv=test_csv,
                            exclude_features=exclude_features_from_training,
-                           save_plot_path=f'../../Model_run/ANN_model/SHAP/SHAP_summary_{model_version}.png',
+                           save_plot_path=PROJECT_ROOT / f'Model_run/ANN_model/SHAP/SHAP_summary_{model_version}.png',
                            skip_processing=skip_SHAP_summary_plot)
 
     # SHAP interaction plot
@@ -167,16 +169,16 @@ if __name__ == '__main__':
                                features_to_plot=features_to_plot, trained_model_path=model_save_path,
                                trained_model_info=model_info_save_path, use_samples=2000, data_csv=test_csv,
                                feature_excluded_in_training=exclude_features_from_training,
-                               save_plot_dir=f'../../Model_run/ANN_model/SHAP',
+                               save_plot_dir=PROJECT_ROOT / 'Model_run/ANN_model/SHAP',
                                skip_processing=skip_SHAP_interaction_plot)
 
     # ------------------------------------------------------------------------------------------------------------------
     # 5. Annual GW pumping prediction
     # ------------------------------------------------------------------------------------------------------------------
-    annual_standardized_df_dir = f'../../Model_run/ANN_model/Model_csv/annual_csv/standardized'
-    nan_pos_dir = f'../../Model_run/ANN_model/Model_csv/annual_csv'
-    predicted_raster_dir = f'../../Data_main/rasters/pumping_prediction/ANN/{model_version}'
-    WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
+    annual_standardized_df_dir = PROJECT_ROOT / 'Model_run/ANN_model/Model_csv/annual_csv/standardized'
+    nan_pos_dir = PROJECT_ROOT / 'Model_run/ANN_model/Model_csv/annual_csv'
+    predicted_raster_dir = PROJECT_ROOT / f'Data_main/rasters/pumping_prediction/ANN/{model_version}'
+    WestUS_raster = PROJECT_ROOT / 'Data_main/ref_rasters/Western_US_refraster_2km.tif'
 
     load_model_and_predict_raster(trained_model_path=model_save_path, trained_model_info=model_info_save_path,
                                   years_list=list(range(2000, 2024)),

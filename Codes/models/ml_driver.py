@@ -5,11 +5,12 @@
 
 import os
 import sys
-from os.path import dirname, abspath
-
 import pandas as pd
+from pathlib import Path
 
-sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
+# Project root directory (works regardless of cwd)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from Codes.utils.system_ops import makedirs
 from Codes.utils.plots import scatter_plot_of_same_vars
@@ -22,7 +23,7 @@ from Codes.utils.ML_ops import (create_train_test_dataframe, split_train_val_tes
 # model resolution and reference raster/shapefile
 no_data_value = -9999
 model_res = 0.01976293625031605786  # in deg, ~2 km
-WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
+WestUS_raster = PROJECT_ROOT / 'Data_main/ref_rasters/Western_US_refraster_2km.tif'
 
 # --------------------------------------------------------------------------------------------------------------
 # Directories and variables
@@ -31,26 +32,26 @@ WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
 # predictor data paths
 data_path_dict = {
     # training data
-    'consumptive_gw': '../../Data_main/pumping/rasters/WestUS_consumptive_gw',
+    'consumptive_gw': PROJECT_ROOT / 'Data_main/pumping/rasters/WestUS_consumptive_gw',
 
     # predictors
-    'irr_eff': '../../Data_main/rasters/HUC12_Irr_Eff',
-    'peff': '../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
-    'ret': '../../Data_main/rasters/RET/WestUS_growing_season',
-    'precip': '../../Data_main/rasters/Precip/WestUS_growing_season',
-    'tmax': '../../Data_main/rasters/Tmax/WestUS_growing_season',
-    'ET': '../../Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
-    'irr_crop_frac': '../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac',
-    'maxRH': '../../Data_main/rasters/maxRH/WestUS_growing_season',
-    'minRH': '../../Data_main/rasters/minRH/WestUS_growing_season',
-    'shortRad': '../../Data_main/rasters/shortRad/WestUS_growing_season',
-    'vpd': '../../Data_main/rasters/vpd/WestUS_growing_season',
-    'sunHr': '../../Data_main/rasters/sunHr/WestUS_growing_season',
-    'FC': '../../Data_main/rasters/Field_capacity/WestUS',
-    'Canal_density': '../../Data_main/rasters/Canal_density',
-    'Canal_distance': '../../Data_main/rasters/Canal_distance',
-    'pixelID': '../../Data_main/ref_rasters/pixelID',
-    'stateID': '../../Data_main/ref_rasters/stateID'
+    'irr_eff': PROJECT_ROOT / 'Data_main/rasters/HUC12_Irr_Eff',
+    'peff': PROJECT_ROOT / 'Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
+    'ret': PROJECT_ROOT / 'Data_main/rasters/RET/WestUS_growing_season',
+    'precip': PROJECT_ROOT / 'Data_main/rasters/Precip/WestUS_growing_season',
+    'tmax': PROJECT_ROOT / 'Data_main/rasters/Tmax/WestUS_growing_season',
+    'ET': PROJECT_ROOT / 'Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
+    'irr_crop_frac': PROJECT_ROOT / 'Data_main/rasters/Irrigated_cropland/Irrigated_Frac',
+    'maxRH': PROJECT_ROOT / 'Data_main/rasters/maxRH/WestUS_growing_season',
+    'minRH': PROJECT_ROOT / 'Data_main/rasters/minRH/WestUS_growing_season',
+    'shortRad': PROJECT_ROOT / 'Data_main/rasters/shortRad/WestUS_growing_season',
+    'vpd': PROJECT_ROOT / 'Data_main/rasters/vpd/WestUS_growing_season',
+    'sunHr': PROJECT_ROOT / 'Data_main/rasters/sunHr/WestUS_growing_season',
+    'FC': PROJECT_ROOT / 'Data_main/rasters/Field_capacity/WestUS',
+    'Canal_density': PROJECT_ROOT / 'Data_main/rasters/Canal_density',
+    'Canal_distance': PROJECT_ROOT / 'Data_main/rasters/Canal_distance',
+    'pixelID': PROJECT_ROOT / 'Data_main/ref_rasters/pixelID',
+    'stateID': PROJECT_ROOT / 'Data_main/ref_rasters/stateID'
 }
 
 datasets_to_include = data_path_dict.keys()  # datasets to include in the main dataframe
@@ -97,7 +98,7 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------------------------------------------
 
     # create dataframe
-    train_test_parquet_path = f'../../Model_run/ML_model/Model_csv/train_test_{model_version}.parquet'
+    train_test_parquet_path = PROJECT_ROOT / f'Model_run/ML_model/Model_csv/train_test_{model_version}.parquet'
 
     create_train_test_dataframe(years_list=years_list,
                                 yearly_data_path_dict=annual_data_path_dict,
@@ -108,7 +109,7 @@ if __name__ == '__main__':
                                 skip_processing=skip_df_creation)
 
     # train-test split
-    output_dir = f'../../Model_run/ML_model/Model_csv'
+    output_dir = PROJECT_ROOT / 'Model_run/ML_model/Model_csv'
 
     x_train, x_test, y_train, y_test = \
         split_train_val_test_set_v2(data_parquet=train_test_parquet_path, pred_attr=train_attr,
@@ -140,9 +141,9 @@ if __name__ == '__main__':
                        'force_col_wise': True
                        }
 
-    save_model_to_dir = f'../../Model_run/ML_model/Model_trained'
+    save_model_to_dir = PROJECT_ROOT / 'Model_run/ML_model/Model_trained'
     model_name = f'westus_pumping_{model_version}.joblib'
-    param_iteration_csv = f'../../Model_run/ML_model/Model_trained/hyperparam_iteration_{model_version}.csv'
+    param_iteration_csv = PROJECT_ROOT / f'Model_run/ML_model/Model_trained/hyperparam_iteration_{model_version}.csv'
     makedirs([save_model_to_dir])
 
     lgbm_reg_trained = train_model(x_train=x_train, y_train=y_train, params_dict=lgbm_param_dict,
@@ -159,7 +160,7 @@ if __name__ == '__main__':
     print('########## Model performance')
 
     # checking train accuracy
-    train_prediction_csv_path = f'../../Model_run/ML_model/Model_csv/train_obsv_pred_{model_version}.csv'
+    train_prediction_csv_path = PROJECT_ROOT / f'Model_run/ML_model/Model_csv/train_obsv_pred_{model_version}.csv'
 
     print('\nTrain performance:')
     print('------------------------------')
@@ -169,7 +170,7 @@ if __name__ == '__main__':
                categorical_columns=None)
 
     # checking test accuracy
-    test_prediction_csv_path = f'../../Model_run/ML_model/Model_csv/test_obsv_pred_{model_version}.csv'
+    test_prediction_csv_path = PROJECT_ROOT / f'Model_run/ML_model/Model_csv/test_obsv_pred_{model_version}.csv'
 
     print('\nTest performance:')
     print('------------------------------')
@@ -188,7 +189,7 @@ if __name__ == '__main__':
     # Plotting scatters + permutation importance + PDP
     # --------------------------------------------------------------------------------------------------------------
 
-    plot_dir = f'../../Model_run/ML_model/Plots'
+    plot_dir = PROJECT_ROOT / 'Model_run/ML_model/Plots'
 
     if not skip_scatter_plots:
         # plotting train scatters
@@ -246,19 +247,19 @@ if __name__ == '__main__':
         if col in datasets_to_include:
             datasets_to_include.remove(col)
 
-    predictor_csv_and_nan_pos_dir = f'../../Model_run/ML_model/Model_csv/annual_df'
+    predictor_csv_and_nan_pos_dir = PROJECT_ROOT / 'Model_run/ML_model/Model_csv/annual_df'
 
     create_annual_dataframes_for_pumping_prediction(years_list=years_list,
                                                     yearly_data_path_dict=annual_data_path_dict,
                                                     static_data_path_dict=static_data_path_dict,
                                                     datasets_to_include=datasets_to_include,
-                                                    irrigated_cropland_dir='../../Data_main/rasters/Irrigated_cropland',
+                                                    irrigated_cropland_dir=PROJECT_ROOT / 'Data_main/rasters/Irrigated_cropland',
                                                     output_dir=predictor_csv_and_nan_pos_dir,
                                                     skip_processing=skip_create_df_for_prediction)
 
     # prediction (consumptive groundwater use)
     # This is for 17 states of the Western US
-    prediction_output_dir = f'../../Data_main/rasters/pumping_prediction/ML/{model_version}/consumptive_gw'
+    prediction_output_dir = PROJECT_ROOT / f'Data_main/rasters/pumping_prediction/ML/{model_version}/consumptive_gw'
 
     exclude_columns_in_prediction = [i for i in exclude_columns_in_training if i != 'year']
 
@@ -272,10 +273,10 @@ if __name__ == '__main__':
 
     # convert consumptive groundwater use prediction to pumping estimates
     # This is for 8 states (where model was trained ad validated) we report in the paper
-    irr_eff_dir = '../../Data_main/rasters/HUC12_Irr_Eff'
-    pumping_output_dir = f'../../Data_main/rasters/pumping_prediction/ML/{model_version}/WestUS_pumping'
+    irr_eff_dir = PROJECT_ROOT / 'Data_main/rasters/HUC12_Irr_Eff'
+    pumping_output_dir = PROJECT_ROOT / f'Data_main/rasters/pumping_prediction/ML/{model_version}/WestUS_pumping'
 
     compute_and_clip_pumping_from_consumptive_use(consmp_gw_prediction_dir=prediction_output_dir,
                                                   irr_eff_dir=irr_eff_dir, westernUS_output_dir=pumping_output_dir,
-                                                  Western_US_ROI_shp='../../Data_main/ref_shapes/WestUS_ROI.shp',
+                                                  Western_US_ROI_shp=PROJECT_ROOT / 'Data_main/ref_shapes/WestUS_ROI.shp',
                                                   skip_processing=skip_convert_prediction_raster_to_pumping)

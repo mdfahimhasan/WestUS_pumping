@@ -6,10 +6,11 @@
 import sys
 from download import download_all_gee_data
 from download_openET import download_all_openET_datasets
+from pathlib import Path
 
-from os.path import dirname, abspath
-
-sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
+# Project root directory (works regardless of cwd)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from Codes.download_preprocess.preprocess import run_all_preprocessing
 
@@ -28,10 +29,10 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
 
     # directories and variables
-    data_download_dir = '../../Data_main/rasters'
-    gee_grid_shape_large = '../../Data_main/ref_shapes/WestUS_gee_grid_large.shp'
-    gee_grid_shape_for30m_IrrMapper = '../../Data_main/ref_shapes/WestUS_gee_grid_for30m_IrrMapper.shp'
-    gee_grid_shape_for30m_LANID = '../../Data_main/ref_shapes/WestUS_gee_grid_for30m_LANID.shp'
+    data_download_dir = PROJECT_ROOT / 'Data_main/rasters'
+    gee_grid_shape_large = PROJECT_ROOT / 'Data_main/ref_shapes/WestUS_gee_grid_large.shp'
+    gee_grid_shape_for30m_IrrMapper = PROJECT_ROOT / 'Data_main/ref_shapes/WestUS_gee_grid_for30m_IrrMapper.shp'
+    gee_grid_shape_for30m_LANID = PROJECT_ROOT / 'Data_main/ref_shapes/WestUS_gee_grid_for30m_LANID.shp'
 
     gee_data_list = [
         'GRIDMET_Precip',

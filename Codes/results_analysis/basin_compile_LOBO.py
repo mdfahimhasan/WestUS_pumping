@@ -1,7 +1,9 @@
 import sys
-from os.path import dirname, abspath
+from pathlib import Path
 
-sys.path.insert(0, dirname(abspath(__file__)))
+# Project root directory (works regardless of cwd)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from Codes.results_analysis.analysis_utils import (compile_basin_predicted_actual_pumping_KS_CO_AZ,
                                                    compile_annual_pumping_all_basins)
@@ -14,48 +16,48 @@ YEARS = list(range(2000, 2024))
 # Compiling basin-scale pumping (predicted + actual) to annual dataframe
 ML_basin_configs = {
     'gmd4': {'year': list(range(2000, 2024)),
-             'shape': '../../Data_main/shapefiles/Basins_of_interest/GMD4.shp',
-             'pred_pump_dir': f'../../Data_main/rasters/ML_LOBO/GMD4',
+             'shape': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/GMD4.shp',
+             'pred_pump_dir': PROJECT_ROOT / 'Data_main/rasters/ML_LOBO/GMD4',
              'type': 'ks_co_az',
              'skip': False},
     'gmd3': {'year': list(range(2000, 2024)),
-             'shape': '../../Data_main/shapefiles/Basins_of_interest/GMD3.shp',
-             'pred_pump_dir': f'../../Data_main/rasters/ML_LOBO/GMD3',
+             'shape': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/GMD3.shp',
+             'pred_pump_dir': PROJECT_ROOT / 'Data_main/rasters/ML_LOBO/GMD3',
              'type': 'ks_co_az',
              'skip': False},
     'rpb': {'year': list(range(2000, 2024)),
-            'shape': '../../Data_main/shapefiles/Basins_of_interest/Republican_Basin.shp',
-            'pred_pump_dir': f'../../Data_main/rasters/ML_LOBO/RPB',
+            'shape': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Republican_Basin.shp',
+            'pred_pump_dir': PROJECT_ROOT / 'Data_main/rasters/ML_LOBO/RPB',
             'type': 'ks_co_az',
             'skip': False},
     'slv': {'year': list(range(2000, 2024)),
-            'shape': '../../Data_main/shapefiles/Basins_of_interest/Rio_Grande_Basin.shp',
-            'pred_pump_dir': f'../../Data_main/rasters/ML_LOBO/SLV',
-            'actual_pump_dir': f'../../Data_main/pumping/rasters/WestUS_pumping/Original',
+            'shape': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Rio_Grande_Basin.shp',
+            'pred_pump_dir': PROJECT_ROOT / 'Data_main/rasters/ML_LOBO/SLV',
+            'actual_pump_dir': PROJECT_ROOT / 'Data_main/pumping/rasters/WestUS_pumping/Original',
             'type': 'ks_co_az',
             'skip': False},
     'doug': {'year': list(range(2000, 2024)),
-             'shape': '../../Data_main/shapefiles/Basins_of_interest/Douglas_AMA.shp',
-             'pred_pump_dir': f'../../Data_main/rasters/ML_LOBO/DOUG',
-             'actual_pump_dir': f'../../Data_main/pumping/rasters/WestUS_pumping/Original',
+             'shape': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Douglas_AMA.shp',
+             'pred_pump_dir': PROJECT_ROOT / 'Data_main/rasters/ML_LOBO/DOUG',
+             'actual_pump_dir': PROJECT_ROOT / 'Data_main/pumping/rasters/WestUS_pumping/Original',
              'type': 'ks_co_az',
              'skip': False},
     'hqr': {'year': list(range(2000, 2024)),
-            'shape': '../../Data_main/shapefiles/Basins_of_interest/Harquahala_INA.shp',
-            'pred_pump_dir': f'../../Data_main/rasters/ML_LOBO/HQR',
-            'actual_pump_dir': f'../../Data_main/pumping/rasters/WestUS_pumping/Original',
+            'shape': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Harquahala_INA.shp',
+            'pred_pump_dir': PROJECT_ROOT / 'Data_main/rasters/ML_LOBO/HQR',
+            'actual_pump_dir': PROJECT_ROOT / 'Data_main/pumping/rasters/WestUS_pumping/Original',
             'type': 'ks_co_az',
             'skip': False},
     'scruz': {'year': list(range(2000, 2024)),
-              'shape': '../../Data_main/shapefiles/Basins_of_interest/SantaCruz_AMA.shp',
-              'pred_pump_dir': f'../../Data_main/rasters/ML_LOBO/SCRUZ',
-              'actual_pump_dir': f'../../Data_main/pumping/rasters/WestUS_pumping/Original',
+              'shape': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/SantaCruz_AMA.shp',
+              'pred_pump_dir': PROJECT_ROOT / 'Data_main/rasters/ML_LOBO/SCRUZ',
+              'actual_pump_dir': PROJECT_ROOT / 'Data_main/pumping/rasters/WestUS_pumping/Original',
               'type': 'ks_co_az',
               'skip': False},
     'dv': {'year': list(range(2000, 2024)),
-           'shape': '../../Data_main/shapefiles/Basins_of_interest/Diamond_Valley_Basin.shp',
-           'pred_pump_dir': f'../../Data_main/rasters/ML_LOBO/DV',
-           'actual_csv': '../../Data_main/pumping/Nevada/raw/Diamond Valley/joined_data/dv_joined_et_pumping_data_all.csv',
+           'shape': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Diamond_Valley_Basin.shp',
+           'pred_pump_dir': PROJECT_ROOT / 'Data_main/rasters/ML_LOBO/DV',
+           'actual_csv': PROJECT_ROOT / 'Data_main/pumping/Nevada/raw/Diamond Valley/joined_data/dv_joined_et_pumping_data_all.csv',
            'type': 'special',
            'skip': False},
 }
@@ -68,8 +70,8 @@ def process_all_basins(config_dict):
 
         print(f"\nProcessing basin: {basin.upper()}")
         print('-----------------------------------------\n')
-        actual_pumping_dir = f'../../Data_main/pumping/rasters/WestUS_pumping/Original'
-        output_dir = f'../../Model_run/basin_comparison_results/ML_LOBO/{basin}'
+        actual_pumping_dir = PROJECT_ROOT / 'Data_main/pumping/rasters/WestUS_pumping/Original'
+        output_dir = PROJECT_ROOT / f'Model_run/basin_comparison_results/ML_LOBO/{basin}'
 
         compile_basin_predicted_actual_pumping_KS_CO_AZ(
             basin_code=basin, years=cfg['year'], basin_shp=cfg['shape'],
@@ -85,7 +87,7 @@ def process_all_basins(config_dict):
 
 def compile_all_basin_summaries(config_dict, output_csv):
     basin_annual_csvs = [
-        f'../../Model_run/basin_comparison_results/ML_LOBO/{b}/basinscale_pumping_{b}.csv'
+        PROJECT_ROOT / f'Model_run/basin_comparison_results/ML_LOBO/{b}/basinscale_pumping_{b}.csv'
         for b in config_dict.keys()
     ]
     compile_annual_pumping_all_basins(
@@ -118,4 +120,4 @@ if __name__ == '__main__':
         print('Compiling LOBO results from ML model')
         print('-----------------------------------------')
         main(config_dict=ML_basin_configs,
-             output_csv=f'../../Model_run/basin_comparison_results/annual_pumping_ML_LOBO_{model_version_ML}.csv')
+             output_csv=PROJECT_ROOT / f'Model_run/basin_comparison_results/annual_pumping_ML_LOBO_{model_version_ML}.csv')

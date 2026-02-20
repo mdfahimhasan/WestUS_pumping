@@ -1,8 +1,10 @@
 import os
 import sys
-from os.path import dirname, abspath
+from pathlib import Path
 
-sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
+# Project root directory (works regardless of cwd)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from Codes.results_analysis.analysis_utils import (
     compile_basin_predicted_actual_pumping_KS_CO_AZ,
@@ -15,52 +17,52 @@ from Codes.results_analysis.analysis_utils import (
 
 basin_configs = {
     'gmd4': {'year': list(range(2000, 2024)),
-             'shp': '../../Data_main/shapefiles/Basins_of_interest/GMD4.shp',
+             'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/GMD4.shp',
              'type': 'ks_co_az', 'skip': False},
     'gmd3': {'year': list(range(2000, 2024)),
-             'shp': '../../Data_main/shapefiles/Basins_of_interest/GMD3.shp',
+             'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/GMD3.shp',
              'type': 'ks_co_az', 'skip': False},
     'rpb': {'year': list(range(2000, 2024)),
-            'shp': '../../Data_main/shapefiles/Basins_of_interest/Republican_Basin.shp',
+            'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Republican_Basin.shp',
             'type': 'ks_co_az', 'skip': False},
     'spb': {'year': list(range(2000, 2024)),
-            'shp': '../../Data_main/shapefiles/Basins_of_interest/South_Platte_Basin_comparison_extent.shp',
+            'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/South_Platte_Basin_comparison_extent.shp',
             'type': 'ks_co_az', 'skip': False},
     'ar': {'year': list(range(2000, 2024)),
-           'shp': '../../Data_main/shapefiles/Basins_of_interest/Arkansas_Basin_comparison_extent.shp',
+           'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Arkansas_Basin_comparison_extent.shp',
            'type': 'ks_co_az', 'skip': False},
     'slv': {'year': list(range(2000, 2024)),
-            'shp': '../../Data_main/shapefiles/Basins_of_interest/Rio_Grande_Basin.shp',
+            'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Rio_Grande_Basin.shp',
             'type': 'ks_co_az', 'skip': False},
     'hqr': {'year': list(range(2000, 2024)),
-            'shp': '../../Data_main/shapefiles/Basins_of_interest/Harquahala_INA.shp',
+            'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Harquahala_INA.shp',
             'type': 'ks_co_az', 'skip': False},
     'doug': {'year': list(range(2000, 2024)),
-             'shp': '../../Data_main/shapefiles/Basins_of_interest/Douglas_AMA.shp',
+             'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Douglas_AMA.shp',
              'type': 'ks_co_az', 'skip': False},
     'phx': {'year': list(range(2000, 2024)),
-            'shp': '../../Data_main/shapefiles/Basins_of_interest/Phoenix_AMA.shp',
+            'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Phoenix_AMA.shp',
             'type': 'ks_co_az', 'skip': False},
     'pnl': {'year': list(range(2000, 2024)),
-            'shp': '../../Data_main/shapefiles/Basins_of_interest/Pinal_AMA.shp',
+            'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Pinal_AMA.shp',
             'type': 'ks_co_az', 'skip': False},
     'scruz': {'year': list(range(2000, 2024)),
-              'shp': '../../Data_main/shapefiles/Basins_of_interest/SantaCruz_AMA.shp',
+              'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/SantaCruz_AMA.shp',
               'type': 'ks_co_az', 'skip': False},
     'dv': {'year': list(range(2000, 2024)),
-           'shp': '../../Data_main/shapefiles/Basins_of_interest/Diamond_Valley_Basin.shp',
+           'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Diamond_Valley_Basin.shp',
            'type': 'ks_co_az', 'skip': False},
     'pv': {'year': list(range(2000, 2024)),
-           'shp': '../../Data_main/shapefiles/Basins_of_interest/Parowan_Valley.shp',
-           'actual': '../../Data_main/pumping/Utah/from Soheil/processed_Soheil/gw_withdrawals_parowan.csv',
+           'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Parowan_Valley.shp',
+           'actual': PROJECT_ROOT / 'Data_main/pumping/Utah/from Soheil/processed_Soheil/gw_withdrawals_parowan.csv',
            'type': 'ut', 'skip': False},
     'cdr': {'year': list(range(2000, 2024)),
-            'shp': '../../Data_main/shapefiles/Basins_of_interest/Cedar_Valley.shp',
-            'actual': '../../Data_main/pumping/Utah/from Soheil/processed_Soheil/gw_withdrawals_cedar.csv',
+            'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Cedar_Valley.shp',
+            'actual': PROJECT_ROOT / 'Data_main/pumping/Utah/from Soheil/processed_Soheil/gw_withdrawals_cedar.csv',
             'type': 'ut', 'skip': False},
     'brl': {'year': list(range(2000, 2024)),
-            'shp': '../../Data_main/shapefiles/Basins_of_interest/Beryl_Valley.shp',
-            'actual': '../../Data_main/pumping/Utah/from Soheil/processed_Soheil/gw_withdrawals_beryl.csv',
+            'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Beryl_Valley.shp',
+            'actual': PROJECT_ROOT / 'Data_main/pumping/Utah/from Soheil/processed_Soheil/gw_withdrawals_beryl.csv',
             'type': 'ut', 'skip': False},
 }
 
@@ -128,7 +130,7 @@ def process_all_basins(model_version, model_prediction_dir, output_dir,
         print('\n-----------------------------------------')
         print(f"Processing basin: {basin.upper()}")
         print('-----------------------------------------')
-        actual_pumping_dir = f'../../Data_main/pumping/rasters/WestUS_pumping/Original'
+        actual_pumping_dir = PROJECT_ROOT / 'Data_main/pumping/rasters/WestUS_pumping/Original'
 
         # original prediction
 
@@ -163,7 +165,7 @@ def process_all_basins(model_version, model_prediction_dir, output_dir,
 
             compile_prediction_CI(basin_code=basin, years=cfg['year'],
                                   basin_shp=cfg['shp'],
-                                  prediction_CI_dir=f'../../Data_main/rasters/pumping_prediction/ML_uncertainty/{model_version}',
+                                  prediction_CI_dir=PROJECT_ROOT / f'Data_main/rasters/pumping_prediction/ML_uncertainty/{model_version}',
                                   basin_output_dir=os.path.join(output_dir, f'{basin}/low_high_CI'))
 
         elif process_CIs and (model.lower() != 'ml'):
@@ -265,7 +267,7 @@ def main(model_version, model_prediction_dir, basinwise_output_dir, compiled_out
 
     """
     # for actual prediction
-    process_all_basins(model_version, model_prediction_dir, basinwise_output_dir, model, process_CIs=collect_CIs)
+    # process_aldl_basins(model_version, model_prediction_dir, basinwise_output_dir, model, process_CIs=collect_CIs)
 
     # compiling annual csv
     compile_all_basin_summaries(basinwise_output_dir, compiled_output_csv, model, collect_CIs=collect_CIs,)
@@ -298,7 +300,7 @@ if __name__ == '__main__':
         print('-----------------------------------------')
 
         main(model_version=model_version_ML, model='ML',
-             model_prediction_dir=f'../../Data_main/rasters/pumping_prediction/ML/{model_version_ML}/WestUS_pumping',
-             basinwise_output_dir=f'../../Model_run/basin_comparison_results/ML',
-             compiled_output_csv=f'../../Model_run/basin_comparison_results/annual_pumping_ML_{model_version_ML}.csv',
+             model_prediction_dir=PROJECT_ROOT / f'Data_main/rasters/pumping_prediction/ML/{model_version_ML}/WestUS_pumping',
+             basinwise_output_dir=PROJECT_ROOT / 'Model_run/basin_comparison_results/ML',
+             compiled_output_csv=PROJECT_ROOT / f'Model_run/basin_comparison_results/annual_pumping_ML_{model_version_ML}.csv',
              collect_CIs=collect_CIs_for_ML)

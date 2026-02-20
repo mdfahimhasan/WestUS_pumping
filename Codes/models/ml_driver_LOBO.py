@@ -7,9 +7,11 @@ import os
 import sys
 import pandas as pd
 from glob import glob
-from os.path import dirname, abspath
+from pathlib import Path
 
-sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
+# Project root directory (works regardless of cwd)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from Codes.utils.system_ops import makedirs
 from Codes.utils.stats_ops import calculate_metrics
@@ -19,7 +21,7 @@ from Codes.utils.ML_ops import reindex_df, create_train_test_dataframe, split_tr
     train_model, create_annual_dataframes_for_pumping_prediction, predict_annual_pumping_rasters, \
     compute_and_clip_pumping_from_consumptive_use
 
-WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
+WestUS_raster = PROJECT_ROOT / 'Data_main/ref_rasters/Western_US_refraster_2km.tif'
 
 
 def predict_LOBO_basin(trained_model, predictor_array, target_array, year_series,
@@ -127,12 +129,12 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
         # during testing, the holdout will only have pumping/consumptive gw use data from inside the basin
         # --------------------------------------------------------------------------------------------------------------
         if not skip_process_pumping_data:
-            westUS_pumping_dir = '../../Data_main/pumping/rasters/WestUS_consumptive_gw'  # this is the WestUS-scale filtered consumptive use data
+            westUS_pumping_dir = PROJECT_ROOT / 'Data_main/pumping/rasters/WestUS_consumptive_gw'  # this is the WestUS-scale filtered consumptive use data
             westUS_pumping_rasters = glob(os.path.join(westUS_pumping_dir, '*.tif'))
 
             # pumping data extraction for fitting (training) and holdout
-            fitting_output_dir = f'../../Data_main/rasters/ML_LOBO/{basin_code}/fitting/pumping'
-            holdout_dir = f'../../Data_main/rasters/ML_LOBO/{basin_code}/holdout/pumping'
+            fitting_output_dir = PROJECT_ROOT / f'Data_main/rasters/ML_LOBO/{basin_code}/fitting/pumping'
+            holdout_dir = PROJECT_ROOT / f'Data_main/rasters/ML_LOBO/{basin_code}/holdout/pumping'
 
             for ras in westUS_pumping_rasters:
                 raster_name = os.path.basename(ras)
@@ -150,8 +152,8 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
                     mask_raster_by_shape(input_raster=ras, input_shape=basin_shape, crop=False,
                                          output_dir=holdout_dir, raster_name=raster_name)
         else:
-            fitting_output_dir = f'../../Data_main/rasters/ML_LOBO/{basin_code}/fitting/pumping'
-            holdout_dir = f'../../Data_main/rasters/ML_LOBO/{basin_code}/holdout/pumping'
+            fitting_output_dir = PROJECT_ROOT / f'Data_main/rasters/ML_LOBO/{basin_code}/fitting/pumping'
+            holdout_dir = PROJECT_ROOT / f'Data_main/rasters/ML_LOBO/{basin_code}/holdout/pumping'
 
         # --------------------------------------------------------------------------------------------------------------
         # Parquet (tabular data) creation
@@ -173,7 +175,7 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
         years_list_updated = [i for i in years_list if i not in years_no_pumping_data_dict[state_code]]
 
         # create dataframe
-        train_test_parquet_path = f'../../Model_run/ML_model/LOBO/{model_version}/interim_csv/{basin_code}/train_test_{model_version}.parquet'
+        train_test_parquet_path = PROJECT_ROOT / f'Model_run/ML_model/LOBO/{model_version}/interim_csv/{basin_code}/train_test_{model_version}.parquet'
 
         create_train_test_dataframe(years_list=years_list_updated,
                                     yearly_data_path_dict=annual_training_data_path_dict,
@@ -184,7 +186,7 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
                                     skip_processing=skip_train_test_df_creation)
 
         # train-test split
-        output_dir = f'../../Model_run/ML_model/LOBO/{model_version}/interim_csv/{basin_code}'
+        output_dir = PROJECT_ROOT / f'Model_run/ML_model/LOBO/{model_version}/interim_csv/{basin_code}'
 
         x_train, x_test, y_train, y_test = \
             split_train_val_test_set_v2(data_parquet=train_test_parquet_path, pred_attr='consumptive_gw',
@@ -197,7 +199,7 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
         # --------------------------------------------------------------------------------------------------------------
         print('\n########## Model training')
 
-        save_model_to_dir = f'../../Model_run/ML_model/LOBO/{model_version}/models'
+        save_model_to_dir = PROJECT_ROOT / f'Model_run/ML_model/LOBO/{model_version}/models'
         model_name = f'westus_pumping_{model_version}.joblib'
         makedirs([save_model_to_dir])
 
@@ -215,7 +217,7 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
 
         annual_LOBO_data_path_dict = {**annual_data_path_dict, 'consumptive_gw': holdout_dir}
 
-        LOBO_df_parquet = f'../../Model_run/ML_model/LOBO/{model_version}/interim_csv/{basin_code}/{basin_code}.parquet'
+        LOBO_df_parquet = PROJECT_ROOT / f'Model_run/ML_model/LOBO/{model_version}/interim_csv/{basin_code}/{basin_code}.parquet'
 
         create_train_test_dataframe(years_list=years_list_updated,
                                     yearly_data_path_dict=annual_LOBO_data_path_dict,
@@ -232,7 +234,7 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
         y_basin = df_basin['consumptive_gw']
         year_series = df_basin['year']
 
-        basin_prediction_csv_path = f'../../Model_run/ML_model/LOBO/{model_version}/{basin_code}/results/{basin_code}_results.csv'
+        basin_prediction_csv_path = PROJECT_ROOT / f'Model_run/ML_model/LOBO/{model_version}/{basin_code}/results/{basin_code}_results.csv'
         predict_LOBO_basin(trained_model=lgbm_reg_trained, predictor_array=x_basin, target_array=y_basin,
                            year_series=year_series, prediction_csv_path=basin_prediction_csv_path,
                            categorical_columns=None)
@@ -244,7 +246,7 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
         # plotting LOBO basin scatters
         lobo_df = pd.read_csv(basin_prediction_csv_path)
 
-        plot_dir = f'../../Model_run/ML_model/LOBO/{model_version}/scatter_plots/'
+        plot_dir = PROJECT_ROOT / f'Model_run/ML_model/LOBO/{model_version}/scatter_plots/'
         scatter_plot_of_same_vars(Y_pred=lobo_df['predicted'], Y_obsv=lobo_df['actual'],
                                   x_label='Actual pumping (mm/year)', y_label='Predicted pumping (mm/year)',
                                   plot_name=f'{basin_code}_LOBO.jpg',
@@ -261,12 +263,12 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
                                                         yearly_data_path_dict=annual_data_path_dict,
                                                         static_data_path_dict=static_data_path_dict,
                                                         datasets_to_include=datasets_to_include,
-                                                        irrigated_cropland_dir='../../Data_main/rasters/Irrigated_cropland',
+                                                        irrigated_cropland_dir=PROJECT_ROOT / 'Data_main/rasters/Irrigated_cropland',
                                                         output_dir=predictor_csv_and_nan_pos_dir,
                                                         skip_processing=skip_create_df_for_prediction)
 
         # prediction (consumptive groundwater use)
-        prediction_consumptive_output_dir = f'../../Data_main/rasters/ML_LOBO/{basin_code}/interim_consumptive_use'
+        prediction_consumptive_output_dir = PROJECT_ROOT / f'Data_main/rasters/ML_LOBO/{basin_code}/interim_consumptive_use'
 
         exclude_columns = [i for i in exclude_columns if i != 'year']
 
@@ -277,8 +279,8 @@ def perform_LOBO(years_list, years_no_pumping_data_dict,
                                        ref_raster=WestUS_raster, skip_processing=skip_create_prediction_raster)
 
         # convert consumptive groundwater use prediction to pumping estimates
-        irr_eff_dir = '../../Data_main/rasters/HUC12_Irr_Eff'
-        prediction_pumping_output_dir = f'../../Data_main/rasters/ML_LOBO/{basin_code}/interim_pumping'
+        irr_eff_dir = PROJECT_ROOT / 'Data_main/rasters/HUC12_Irr_Eff'
+        prediction_pumping_output_dir = PROJECT_ROOT / f'Data_main/rasters/ML_LOBO/{basin_code}/interim_pumping'
 
         compute_and_clip_pumping_from_consumptive_use(consmp_gw_prediction_dir=prediction_consumptive_output_dir,
                                                       irr_eff_dir=irr_eff_dir, westernUS_output_dir=prediction_pumping_output_dir,
@@ -340,23 +342,23 @@ if __name__ == '__main__':
 
     # datasets
     data_path_dict = {
-        'irr_eff': '../../Data_main/rasters/HUC12_Irr_Eff',
-        'peff': '../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
-        'ret': '../../Data_main/rasters/RET/WestUS_growing_season',
-        'precip': '../../Data_main/rasters/Precip/WestUS_growing_season',
-        'tmax': '../../Data_main/rasters/Tmax/WestUS_growing_season',
-        'ET': '../../Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
-        'irr_crop_frac': '../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac',
-        'maxRH': '../../Data_main/rasters/maxRH/WestUS_growing_season',
-        'minRH': '../../Data_main/rasters/minRH/WestUS_growing_season',
-        'shortRad': '../../Data_main/rasters/shortRad/WestUS_growing_season',
-        'vpd': '../../Data_main/rasters/vpd/WestUS_growing_season',
-        'sunHr': '../../Data_main/rasters/sunHr/WestUS_growing_season',
-        'FC': '../../Data_main/rasters/Field_capacity/WestUS',
-        'Canal_density': '../../Data_main/rasters/Canal_density',
-        'Canal_distance': '../../Data_main/rasters/Canal_distance',
-        'pixelID': '../../Data_main/ref_rasters/pixelID',
-        'stateID': '../../Data_main/ref_rasters/stateID'
+        'irr_eff': PROJECT_ROOT / 'Data_main/rasters/HUC12_Irr_Eff',
+        'peff': PROJECT_ROOT / 'Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
+        'ret': PROJECT_ROOT / 'Data_main/rasters/RET/WestUS_growing_season',
+        'precip': PROJECT_ROOT / 'Data_main/rasters/Precip/WestUS_growing_season',
+        'tmax': PROJECT_ROOT / 'Data_main/rasters/Tmax/WestUS_growing_season',
+        'ET': PROJECT_ROOT / 'Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
+        'irr_crop_frac': PROJECT_ROOT / 'Data_main/rasters/Irrigated_cropland/Irrigated_Frac',
+        'maxRH': PROJECT_ROOT / 'Data_main/rasters/maxRH/WestUS_growing_season',
+        'minRH': PROJECT_ROOT / 'Data_main/rasters/minRH/WestUS_growing_season',
+        'shortRad': PROJECT_ROOT / 'Data_main/rasters/shortRad/WestUS_growing_season',
+        'vpd': PROJECT_ROOT / 'Data_main/rasters/vpd/WestUS_growing_season',
+        'sunHr': PROJECT_ROOT / 'Data_main/rasters/sunHr/WestUS_growing_season',
+        'FC': PROJECT_ROOT / 'Data_main/rasters/Field_capacity/WestUS',
+        'Canal_density': PROJECT_ROOT / 'Data_main/rasters/Canal_density',
+        'Canal_distance': PROJECT_ROOT / 'Data_main/rasters/Canal_distance',
+        'pixelID': PROJECT_ROOT / 'Data_main/ref_rasters/pixelID',
+        'stateID': PROJECT_ROOT / 'Data_main/ref_rasters/stateID'
     }
 
     static_vars = {'FC', 'Canal_density', 'Canal_distance', 'stateID', 'pixelID'}  # static vars
@@ -366,7 +368,7 @@ if __name__ == '__main__':
     yearly_data_path_dict = {i: j for i, j in data_path_dict.items() if i not in static_vars}
     stat_data_path_dict = {i: j for i, j in data_path_dict.items() if i in static_vars}  # static data paths
 
-    prediction_df_output_dir = f'../../Data_main/rasters/ML_LOBO/dataframes_for_prediction'
+    prediction_df_output_dir = PROJECT_ROOT / 'Data_main/rasters/ML_LOBO/dataframes_for_prediction'
 
     model_version = 'v11'
 
@@ -375,7 +377,7 @@ if __name__ == '__main__':
                  model_version=f'{model_version}', basin_code='GMD3', state_code='KS',
                  model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
                  annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
-                 basin_shape='../../Data_main/shapefiles/Basins_of_interest/GMD3.shp',
+                 basin_shape=PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/GMD3.shp',
                  predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
                  skip_processing=skip_LOBO_GMD3)
 
@@ -384,7 +386,7 @@ if __name__ == '__main__':
                  model_version=f'{model_version}', basin_code='GMD4', state_code='KS',
                  model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
                  annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
-                 basin_shape='../../Data_main/shapefiles/Basins_of_interest/GMD4.shp',
+                 basin_shape=PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/GMD4.shp',
                  predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
                  skip_processing=skip_LOBO_GMD4)
 
@@ -393,7 +395,7 @@ if __name__ == '__main__':
                  model_version=f'{model_version}', basin_code='RPB', state_code='CO',
                  model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
                  annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
-                 basin_shape='../../Data_main/shapefiles/Basins_of_interest/Republican_Basin.shp',
+                 basin_shape=PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Republican_Basin.shp',
                  predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
                  skip_processing=skip_LOBO_RPB)
 
@@ -402,7 +404,7 @@ if __name__ == '__main__':
                  model_version=f'{model_version}', basin_code='SLV', state_code='CO',
                  model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
                  annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
-                 basin_shape='../../Data_main/shapefiles/Basins_of_interest/Rio_Grande_Basin.shp',
+                 basin_shape=PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Rio_Grande_Basin.shp',
                  predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
                  skip_processing=skip_LOBO_SLV)
 
@@ -411,7 +413,7 @@ if __name__ == '__main__':
                  model_version=f'{model_version}', basin_code='DOUG', state_code='AZ',
                  model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
                  annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
-                 basin_shape='../../Data_main/shapefiles/Basins_of_interest/Douglas_AMA.shp',
+                 basin_shape=PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Douglas_AMA.shp',
                  predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
                  skip_processing=skip_LOBO_DOUG)
 
@@ -420,7 +422,7 @@ if __name__ == '__main__':
                  model_version=f'{model_version}', basin_code='HQR', state_code='AZ',
                  model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
                  annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
-                 basin_shape='../../Data_main/shapefiles/Basins_of_interest/Harquahala_INA.shp',
+                 basin_shape=PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Harquahala_INA.shp',
                  predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
                  skip_processing=skip_LOBO_HQR)
 
@@ -429,7 +431,7 @@ if __name__ == '__main__':
                  model_version=f'{model_version}', basin_code='SCRUZ', state_code='AZ',
                  model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
                  annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
-                 basin_shape='../../Data_main/shapefiles/Basins_of_interest/SantaCruz_AMA.shp',
+                 basin_shape=PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/SantaCruz_AMA.shp',
                  predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
                  skip_processing=skip_LOBO_SCRUZ)
 
@@ -438,6 +440,6 @@ if __name__ == '__main__':
                  model_version=f'{model_version}', basin_code='DV', state_code='NV',
                  model_param_dict=lgbm_param_dict, exclude_columns=exclude_columns_in_training,
                  annual_data_path_dict=yearly_data_path_dict, static_data_path_dict=stat_data_path_dict,
-                 basin_shape='../../Data_main/shapefiles/Basins_of_interest/Diamond_Valley_Basin.shp',
+                 basin_shape=PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Diamond_Valley_Basin.shp',
                  predictor_csv_and_nan_pos_dir=prediction_df_output_dir,
                  skip_processing=skip_LOBO_DV)

@@ -25,10 +25,11 @@ import pandas as pd
 from glob import glob
 import geopandas as gpd
 from pyproj import Transformer
+from pathlib import Path
 
-from os.path import dirname, abspath
-
-sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
+# Project root directory (works regardless of cwd)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from Codes.utils.system_ops import makedirs
 from Codes.utils.vector_ops import clip_vector
@@ -37,7 +38,7 @@ from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster
 
 no_data_value = -9999
 model_res = 0.01976293625031605786  # in deg, ~2 km
-WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
+WestUS_raster = PROJECT_ROOT / 'Data_main/ref_rasters/Western_US_refraster_2km.tif'
 
 
 def get_well_coords_for_AZ(well_registry_shp, save_dict_path, skip_processing=False):
@@ -829,19 +830,19 @@ def combine_pumping_rasters(years, years_no_data_dict,
 
             # this is a provision to exclude particular basins out of the training data
             basin_shp_dict = {
-                'gmd4': '../../Data_main/shapefiles/Basins_of_interest/GMD4.shp',
-                'gmd3': '../../Data_main/shapefiles/Basins_of_interest/GMD3.shp',
-                'rpb': '../../Data_main/shapefiles/Basins_of_interest/Republican_Basin.shp',
-                'spb': '../../Data_main/shapefiles/Basins_of_interest/South_Platte_Basin.shp',
-                'ar': '../../Data_main/shapefiles/Basins_of_interest/Arkansas_Basin.shp',
-                'slv': '../../Data_main/shapefiles/Basins_of_interest/Rio_Grande_Basin.shp',
-                'hqr': '../../Data_main/shapefiles/Basins_of_interest/Harquahala_INA.shp',
-                'doug': '../../Data_main/shapefiles/Basins_of_interest/Douglas_AMA.shp',
-                'phx': '../../Data_main/shapefiles/Basins_of_interest/Phoenix_AMA.shp',
-                'pnl': '../../Data_main/shapefiles/Basins_of_interest/Pinal_AMA.shp',
-                'tucs': '../../Data_main/shapefiles/Basins_of_interest/Tucson_AMA.shp',
-                'scruz': '../../Data_main/shapefiles/Basins_of_interest/SantaCruz_AMA.shp',
-                'dv': '../../Data_main/shapefiles/Basins_of_interest/Diamond_Valley_Basin.shp'
+                'gmd4': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/GMD4.shp',
+                'gmd3': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/GMD3.shp',
+                'rpb': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Republican_Basin.shp',
+                'spb': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/South_Platte_Basin.shp',
+                'ar': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Arkansas_Basin.shp',
+                'slv': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Rio_Grande_Basin.shp',
+                'hqr': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Harquahala_INA.shp',
+                'doug': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Douglas_AMA.shp',
+                'phx': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Phoenix_AMA.shp',
+                'pnl': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Pinal_AMA.shp',
+                'tucs': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Tucson_AMA.shp',
+                'scruz': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/SantaCruz_AMA.shp',
+                'dv': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Diamond_Valley_Basin.shp'
             }
 
             if basins_exclude_from_training is not None:
@@ -925,10 +926,10 @@ def main(skip_process_AZ_pumping,
     ####################################################################################################################
     # compile from raw data
     process_AZ_pumping_csv(
-        raw_csv_dir='../../Data_main/Pumping/Arizona/raw',
-        well_reg_shp='../../Data_main/pumping/Arizona/Well_Registry/WellRegistry.shp',
-        well_reg_dict='../../Data_main/pumping/Arizona/Well_coords_dict.pkl',
-        output_shp='../../Data_main/pumping/Arizona/Final/pumping_AZ_v0.shp',
+        raw_csv_dir=PROJECT_ROOT / 'Data_main/Pumping/Arizona/raw',
+        well_reg_shp=PROJECT_ROOT / 'Data_main/pumping/Arizona/Well_Registry/WellRegistry.shp',
+        well_reg_dict=PROJECT_ROOT / 'Data_main/pumping/Arizona/Well_coords_dict.pkl',
+        output_shp=PROJECT_ROOT / 'Data_main/pumping/Arizona/Final/pumping_AZ_v0.shp',
         skip_process_Well_registry_file=True,
         skip_process=skip_process_AZ_pumping,
         selected_columns_from_csv=['Well Id', 'AMA INA', 'YEAR', 'Right Type',
@@ -942,48 +943,48 @@ def main(skip_process_AZ_pumping,
 
     # clip for major irrigated zones
     if not skip_irrig_zone_filter_AZ:
-        clip_vector(input_shapefile='../../Data_main/pumping/Arizona/Final/pumping_AZ_v0.shp',
-                    mask_shapefile='../../Data_main/pumping/Arizona/major_irrig_zones/major_irrig_zones_AZ.shp',
-                    output_shapefile='../../Data_main/pumping/Arizona/Final/pumping_AZ_v1.shp',
+        clip_vector(input_shapefile=PROJECT_ROOT / 'Data_main/pumping/Arizona/Final/pumping_AZ_v0.shp',
+                    mask_shapefile=PROJECT_ROOT / 'Data_main/pumping/Arizona/major_irrig_zones/major_irrig_zones_AZ.shp',
+                    output_shapefile=PROJECT_ROOT / 'Data_main/pumping/Arizona/Final/pumping_AZ_v1.shp',
                     change_crs=None, create_zero_buffer=False)
 
     # make 2 km rasters
     # up to 2023, as Peff data (used for filtering) is available up to 2023
     pumping_pts_to_raster_v2_AZ(years=list(range(2000, 2024)),
-                                pumping_pts_shp='../../Data_main/pumping/Arizona/Final/pumping_AZ_v1.shp',  # using 'v1'
+                                pumping_pts_shp=PROJECT_ROOT / 'Data_main/pumping/Arizona/Final/pumping_AZ_v1.shp',  # using 'v1'
                                 pumping_attr_AF='AF_pumped',
                                 year_attr='Year',
-                                output_dir='../../Data_main/pumping/rasters/Arizona',
+                                output_dir=PROJECT_ROOT / 'Data_main/pumping/rasters/Arizona',
                                 skip_outlier_removal=False,
                                 lower_outlier_range=0,  # not setting a low threshold
                                 upper_outlier_range=1500,  # based on ET and netGW_Irr analysis
                                 ref_raster=WestUS_raster, resolution=model_res,
                                 skip_processing=skip_make_AZ_pumping_raster,
                                 skip_store_unfiltered_raster=False,
-                                unfiltered_pumping_shp='../../Data_main/pumping/Arizona/Final/pumping_AZ_v0.shp')  # using 'v0'
+                                unfiltered_pumping_shp=PROJECT_ROOT / 'Data_main/pumping/Arizona/Final/pumping_AZ_v0.shp')  # using 'v0'
 
     ####################################################################################################################
     # # Kansas
     ####################################################################################################################
 
     # # This pumping data didn't have to be filtered due to high quality
-    process_KS_pumping_csv(raw_csv='../../Data_main/pumping/Kansas/csv/pumping_KS.csv',
-                           output_pump_csv='../../Data_main/pumping/Kansas/Final/pumping_KS.csv',
-                           output_pump_shp='../../Data_main/pumping/Kansas/Final/pumping_KS.shp',
-                           output_acres_csv='../../Data_main/pumping/Kansas/pumping_acres_KS.csv',
+    process_KS_pumping_csv(raw_csv=PROJECT_ROOT / 'Data_main/pumping/Kansas/csv/pumping_KS.csv',
+                           output_pump_csv=PROJECT_ROOT / 'Data_main/pumping/Kansas/Final/pumping_KS.csv',
+                           output_pump_shp=PROJECT_ROOT / 'Data_main/pumping/Kansas/Final/pumping_KS.shp',
+                           output_acres_csv=PROJECT_ROOT / 'Data_main/pumping/Kansas/pumping_acres_KS.csv',
                            skip_process=skip_process_KS_pumping)
 
     # make 2 km rasters
     # up to 2023 as Peff data (used for filtering) is available up to 2023
     pumping_pts_to_raster_v1(state_code='KS', years=list(range(2000, 2024)),
-                             pumping_pts_shp='../../Data_main/pumping/Kansas/Final/pumping_Ks.shp',
+                             pumping_pts_shp=PROJECT_ROOT / 'Data_main/pumping/Kansas/Final/pumping_Ks.shp',
                              pumping_attr_AF='AF_pumped',
                              year_attr='Year',
-                             output_dir='../../Data_main/pumping/rasters/Kansas',
+                             output_dir=PROJECT_ROOT / 'Data_main/pumping/rasters/Kansas',
                              ref_raster=WestUS_raster, resolution=model_res,
                              skip_processing=skip_make_KS_pumping_raster,
-                             ET_dir='../../Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
-                             Peff_dir='../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
+                             ET_dir=PROJECT_ROOT / 'Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
+                             Peff_dir=PROJECT_ROOT / 'Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
                              surface_irrig_dir=None,
                              low_fraction=0.7,
                              high_fraction=1.5,
@@ -994,25 +995,25 @@ def main(skip_process_AZ_pumping,
     ####################################################################################################################
     # compile from raw data (v0)
     # already processed for major_irrig_zones
-    process_CO_pumping_data(raw_data_dir='../../Data_main/pumping/Colorado/raw/pumping/all_data',
-                            well_ID_shp='../../Data_main/pumping/Colorado/raw/pumping/Well_ID/Well_ID_CO_v1.shp',
+    process_CO_pumping_data(raw_data_dir=PROJECT_ROOT / 'Data_main/pumping/Colorado/raw/pumping/all_data',
+                            well_ID_shp=PROJECT_ROOT / 'Data_main/pumping/Colorado/raw/pumping/Well_ID/Well_ID_CO_v1.shp',
                             # this is clipped for 'major_irrig_zones'
-                            output_pump_shp='../../Data_main/pumping/Colorado/Final/pumping_CO_v0.shp',
+                            output_pump_shp=PROJECT_ROOT / 'Data_main/pumping/Colorado/Final/pumping_CO_v0.shp',
                             skip_process=skip_process_CO_pumping)
 
     # make 2 km rasters
     # from 2011 up to 2023, as Peff data (used for filtering) is available up to 2023
     # Pumping data for CO before 2010 isn't of good quality
     pumping_pts_to_raster_v1(state_code='CO', years=list(range(2011, 2024)),
-                             pumping_pts_shp='../../Data_main/pumping/Colorado/Final/pumping_CO_v0.shp',
+                             pumping_pts_shp=PROJECT_ROOT / 'Data_main/pumping/Colorado/Final/pumping_CO_v0.shp',
                              pumping_attr_AF='AF_pumped',
                              year_attr='Year',
-                             output_dir='../../Data_main/pumping/rasters/Colorado',
+                             output_dir=PROJECT_ROOT / 'Data_main/pumping/rasters/Colorado',
                              ref_raster=WestUS_raster, resolution=model_res,
                              skip_processing=skip_make_CO_pumping_raster,
-                             ET_dir='../../Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
-                             Peff_dir='../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
-                             surface_irrig_dir='../../Data_main/rasters/SW_irrigation',
+                             ET_dir=PROJECT_ROOT / 'Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
+                             Peff_dir=PROJECT_ROOT / 'Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
+                             surface_irrig_dir=PROJECT_ROOT / 'Data_main/rasters/SW_irrigation',
                              low_fraction=0.7,
                              high_fraction=1.5,
                              skip_outlier_removal=False)  # implementing low-high pumping value removal in CO
@@ -1023,9 +1024,9 @@ def main(skip_process_AZ_pumping,
 
     # connecting pod to pumping database for distributing
     pod_pumping_shp = create_pod_pumping_DV(
-        pumping_csv='../../Data_main/pumping/Nevada/raw/Diamond Valley/joined_data/dv_joined_et_pumping_data_all.csv',
-        pod_shp='../../Data_main/pumping/Nevada/raw/Diamond Valley/pod/dv_pod.shp',
-        output_dir='../../Data_main/pumping/Nevada/Final',
+        pumping_csv=PROJECT_ROOT / 'Data_main/pumping/Nevada/raw/Diamond Valley/joined_data/dv_joined_et_pumping_data_all.csv',
+        pod_shp=PROJECT_ROOT / 'Data_main/pumping/Nevada/raw/Diamond Valley/pod/dv_pod.shp',
+        output_dir=PROJECT_ROOT / 'Data_main/pumping/Nevada/Final',
         year_col='year',
         pumping_col='pumping_AF',
         pod_col_csv='all_app',
@@ -1034,10 +1035,10 @@ def main(skip_process_AZ_pumping,
 
     # make 2 km rasters
     pumping_pts_to_raster_v1(state_code='NV', years=list(range(2018, 2023)),
-                             pumping_pts_shp='../../Data_main/pumping/Nevada/Final/pod_pumping.shp',
+                             pumping_pts_shp=PROJECT_ROOT / 'Data_main/pumping/Nevada/Final/pod_pumping.shp',
                              pumping_attr_AF='AF_pumped',
                              year_attr='year',
-                             output_dir='../../Data_main/pumping/rasters/Nevada',
+                             output_dir=PROJECT_ROOT / 'Data_main/pumping/rasters/Nevada',
                              ref_raster=WestUS_raster, resolution=model_res,
                              skip_processing=skip_make_NV_pumping_raster,
                              ET_dir=None, Peff_dir=None, surface_irrig_dir=None,
@@ -1056,12 +1057,12 @@ def main(skip_process_AZ_pumping,
                                                 'AZ': [],
                                                 'NV': list(range(2000, 2018)) + [2023]},
                             basins_exclude_from_training=None,
-                            KS_dir='../../Data_main/pumping/rasters/Kansas/pumping_mm/Original',
-                            CO_dir='../../Data_main/pumping/rasters/Colorado/pumping_mm/Original',
-                            AZ_dir='../../Data_main/pumping/rasters/Arizona/pumping_mm/Original',
-                            NV_dir='../../Data_main/pumping/rasters/Nevada/pumping_mm',
+                            KS_dir=PROJECT_ROOT / 'Data_main/pumping/rasters/Kansas/pumping_mm/Original',
+                            CO_dir=PROJECT_ROOT / 'Data_main/pumping/rasters/Colorado/pumping_mm/Original',
+                            AZ_dir=PROJECT_ROOT / 'Data_main/pumping/rasters/Arizona/pumping_mm/Original',
+                            NV_dir=PROJECT_ROOT / 'Data_main/pumping/rasters/Nevada/pumping_mm',
                             irr_cropland_dir=None,
-                            output_dir='../../Data_main/pumping/rasters/WestUS_pumping//Original',
+                            output_dir=PROJECT_ROOT / 'Data_main/pumping/rasters/WestUS_pumping//Original',
                             skip_processing=skip_combine_pumping_rasters)
 
     # combine the filtered pumping rasters where filtering through threshold was applied.
@@ -1073,19 +1074,19 @@ def main(skip_process_AZ_pumping,
                                                 'NV': list(range(2000, 2018)) + [2023]},
                             basins_exclude_from_training=['spb', 'ar',
                                                           'pnl', 'phx'],
-                            KS_dir='../../Data_main/pumping/rasters/Kansas/pumping_mm',
-                            CO_dir='../../Data_main/pumping/rasters/Colorado/pumping_mm',
-                            AZ_dir='../../Data_main/pumping/rasters/Arizona/pumping_mm',
-                            NV_dir='../../Data_main/pumping/rasters/Nevada/pumping_mm',
-                            irr_cropland_dir='../../Data_main/rasters/Irrigated_cropland',
-                            output_dir='../../Data_main/pumping/rasters/WestUS_pumping',
+                            KS_dir=PROJECT_ROOT / 'Data_main/pumping/rasters/Kansas/pumping_mm',
+                            CO_dir=PROJECT_ROOT / 'Data_main/pumping/rasters/Colorado/pumping_mm',
+                            AZ_dir=PROJECT_ROOT / 'Data_main/pumping/rasters/Arizona/pumping_mm',
+                            NV_dir=PROJECT_ROOT / 'Data_main/pumping/rasters/Nevada/pumping_mm',
+                            irr_cropland_dir=PROJECT_ROOT / 'Data_main/rasters/Irrigated_cropland',
+                            output_dir=PROJECT_ROOT / 'Data_main/pumping/rasters/WestUS_pumping',
                             skip_processing=skip_combine_pumping_rasters)
 
     # create consumptive groundwater use raster
     # Either this or pumping data will be used for model training.
-    create_consumptive_gw_use_raster(Irr_eff_dir='../../Data_main/rasters/HUC12_Irr_Eff',
-                                     combined_pumping_dir='../../Data_main/pumping/rasters/WestUS_pumping',
-                                     output_dir='../../Data_main/pumping/rasters/WestUS_consumptive_gw',
+    create_consumptive_gw_use_raster(Irr_eff_dir=PROJECT_ROOT / 'Data_main/rasters/HUC12_Irr_Eff',
+                                     combined_pumping_dir=PROJECT_ROOT / 'Data_main/pumping/rasters/WestUS_pumping',
+                                     output_dir=PROJECT_ROOT / 'Data_main/pumping/rasters/WestUS_consumptive_gw',
                                      skip_processing=False)
 
 

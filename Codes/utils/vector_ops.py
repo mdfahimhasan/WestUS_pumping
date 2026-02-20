@@ -8,8 +8,12 @@ from shapely.geometry import Polygon
 
 from Codes.utils.system_ops import makedirs
 from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster
+from pathlib import Path
 
-WestUS_raster = '../../Data_main/Compiled_data/reference_rasters/Western_US_refraster_2km.tif'
+# Project root directory (works regardless of cwd)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+WestUS_raster = PROJECT_ROOT / 'Data_main/Compiled_data/reference_rasters/Western_US_refraster_2km.tif'
 
 
 def create_buffer(input_shapefile, distance, output_shapefile, change_crs='EPSG:32611'):
@@ -96,7 +100,7 @@ def create_pixel_multipoly_shapefile(refraster, interim_output_raster, output_fi
     new_arr = np.arange(start=1, stop=total_pol, step=1).reshape(shape)
 
     # creating scratch dir in case the folder doesn't exist
-    makedirs(['../../scratch'])
+    makedirs([PROJECT_ROOT / 'scratch'])
     write_array_to_raster(new_arr, ref_file, ref_file.transform, interim_output_raster)
 
     # converting the newly created raster to polygon

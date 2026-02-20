@@ -14,10 +14,11 @@ from datetime import datetime
 from shapely.geometry import Polygon
 from multiprocessing import cpu_count
 from multiprocessing.pool import ThreadPool
+from pathlib import Path
 
-from os.path import dirname, abspath
-
-sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
+# Project root directory (works regardless of cwd)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from Codes.utils.system_ops import makedirs
 from Codes.utils.raster_ops import clip_resample_reproject_raster, mosaic_rasters_from_directory
@@ -53,10 +54,10 @@ from Codes.utils.raster_ops import clip_resample_reproject_raster, mosaic_raster
 
 no_data_value = -9999
 model_res = 0.01976293625031605786  # in deg, ~2 km
-WestUS_shape = '../../Data_main/ref_shapes/WestUS_states.shp'
-WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
-GEE_merging_refraster_large_grids = '../../Data_main/ref_rasters/GEE_merging_refraster_larger_grids.tif'
-gee_grid_shape_large = '../../Data_main/ref_shapes/WestUS_gee_grid_large.shp'
+WestUS_shape = PROJECT_ROOT / 'Data_main/ref_shapes/WestUS_states.shp'
+WestUS_raster = PROJECT_ROOT / 'Data_main/ref_rasters/Western_US_refraster_2km.tif'
+GEE_merging_refraster_large_grids = PROJECT_ROOT / 'Data_main/ref_rasters/GEE_merging_refraster_larger_grids.tif'
+gee_grid_shape_large = PROJECT_ROOT / 'Data_main/ref_shapes/WestUS_gee_grid_large.shp'
 
 
 def get_data_GEE_saveTopath(url_and_file_path):
@@ -532,7 +533,7 @@ def download_soil_datasets(data_name, download_dir, merge_keyword,
 
 
 def download_tree_cover_data(data_name, download_dir, merge_keyword,
-                             gee_grid_shape='../../Data_main/ref_shapes/WestUS_gee_extent.shp',
+                             gee_grid_shape=PROJECT_ROOT / 'Data_main/ref_shapes/WestUS_gee_extent.shp',
                              refraster_westUS=WestUS_raster,
                              refraster_gee_merge=GEE_merging_refraster_large_grids, westUS_shape=WestUS_shape):
     """
@@ -679,7 +680,7 @@ def download_DEM_Slope_data(data_name, download_dir, merge_keyword,
 
 
 def download_gee_data_monthly(data_name, download_dir, year_list, month_range, merge_keyword,
-                              gee_grid_shape='../../Data_main/ref_shapes/WestUS_gee_grid_large.shp',
+                              gee_grid_shape=PROJECT_ROOT / 'Data_main/ref_shapes/WestUS_gee_grid_large.shp',
                               refraster_westUS=WestUS_raster, refraster_gee_merge=GEE_merging_refraster_large_grids,
                               use_cpu_while_multidownloading=15, westUS_shape=WestUS_shape):
     """
@@ -868,7 +869,7 @@ def download_gee_data_monthly(data_name, download_dir, year_list, month_range, m
 
 
 def download_gee_data_yearly(data_name, download_dir, year_list, month_range, merge_keyword,
-                             gee_grid_shape='../../Data_main/ref_shapes/WestUS_gee_grid_large.shp',
+                             gee_grid_shape=PROJECT_ROOT / 'Data_main/ref_shapes/WestUS_gee_grid_large.shp',
                              refraster_westUS=WestUS_raster, refraster_gee_merge=GEE_merging_refraster_large_grids,
                              use_cpu_while_multidownloading=15, westUS_shape=WestUS_shape):
     """
@@ -1063,7 +1064,7 @@ def download_gee_data_yearly(data_name, download_dir, year_list, month_range, me
 
 
 def download_drought_indices_water_year(data_name, download_dir, year_list, merge_keyword,
-                                        gee_grid_shape='../../Data_main/ref_shapes/WestUS_gee_grid_large.shp',
+                                        gee_grid_shape=PROJECT_ROOT / 'Data_main/ref_shapes/WestUS_gee_grid_large.shp',
                                         refraster_westUS=WestUS_raster,
                                         refraster_gee_merge=GEE_merging_refraster_large_grids,
                                         use_cpu_while_multidownloading=15, westUS_shape=WestUS_shape):

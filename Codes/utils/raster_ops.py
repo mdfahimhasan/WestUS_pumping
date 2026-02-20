@@ -15,14 +15,18 @@ from rasterio.merge import merge
 from rasterio.enums import Resampling
 import astropy.convolution as apc
 from scipy.ndimage import gaussian_filter
+from pathlib import Path
 
 from Codes.utils.system_ops import makedirs
 
+# Project root directory (works regardless of cwd)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
 no_data_value = -9999
 model_res = 0.01976293625031605786  # in deg, ~2 km
-WestUS_shape = '../../Data_main/ref_shapes/WestUS_states.shp'
-WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
-GEE_merging_refraster_large_grids = '../../Data_main/ref_rasters/GEE_merging_refraster_larger_grids.tif'
+WestUS_shape = PROJECT_ROOT / 'Data_main/ref_shapes/WestUS_states.shp'
+WestUS_raster = PROJECT_ROOT / 'Data_main/ref_rasters/Western_US_refraster_2km.tif'
+GEE_merging_refraster_large_grids = PROJECT_ROOT / 'Data_main/ref_rasters/GEE_merging_refraster_larger_grids.tif'
 
 
 def read_raster_arr_object(raster_file, rasterio_obj=False, band=1, get_file=True, change_dtype=True):

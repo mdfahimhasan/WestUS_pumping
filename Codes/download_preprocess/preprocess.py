@@ -15,10 +15,11 @@ import geopandas as gpd
 import rioxarray as rxr
 from rasterio.mask import mask
 from rasterio.warp import reproject, Resampling
+from pathlib import Path
 
-from os.path import dirname, abspath
-
-sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
+# Project root directory (works regardless of cwd)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from Codes.utils.system_ops import makedirs
 from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster, \
@@ -27,8 +28,8 @@ from Codes.utils.raster_ops import read_raster_arr_object, write_array_to_raster
 
 no_data_value = -9999
 model_res = 0.01976293625031605786  # in deg, ~2 km
-WestUS_shape = '../../Data_main/ref_shapes/WestUS.shp'
-WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
+WestUS_shape = PROJECT_ROOT / 'Data_main/ref_shapes/WestUS.shp'
+WestUS_raster = PROJECT_ROOT / 'Data_main/ref_rasters/Western_US_refraster_2km.tif'
 
 
 def extract_month_from_GrowSeason_data(GS_data_dir, skip_processing=False):
@@ -1221,132 +1222,132 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     :return: None.
     """
     # create stateID raster
-    create_stateID_raster(westUS_shp='../../Data_main/ref_shapes/WestUS_states.shp',
-                          output_dir='../../Data_main/ref_rasters/stateID',
+    create_stateID_raster(westUS_shp=PROJECT_ROOT / 'Data_main/ref_shapes/WestUS_states.shp',
+                          output_dir=PROJECT_ROOT / 'Data_main/ref_rasters/stateID',
                           skip_processing=skip_stateID_raster_creation)
 
     # create PixelID raster
     create_pixelID_raster(WestUS_refraster=WestUS_raster,
-                          output_dir='../../Data_main/ref_rasters/pixelID',
+                          output_dir=PROJECT_ROOT / 'Data_main/ref_rasters/pixelID',
                           skip_processing=skip_pixelID_raster_creation)
 
     # process growing season data
-    extract_month_from_GrowSeason_data(GS_data_dir='../../Data_main/rasters/Growing_season',
+    extract_month_from_GrowSeason_data(GS_data_dir=PROJECT_ROOT / 'Data_main/rasters/Growing_season',
                                        skip_processing=skip_process_GrowSeason_data)
 
     # process netGW (consumptive groundwater irrigation) data
-    process_netGWIrr_data(netGW_dir='../../Data_main/rasters/NetGW_irrigation/original',
-                          output_dir='../../Data_main/rasters/NetGW_irrigation/WesternUS',
+    process_netGWIrr_data(netGW_dir=PROJECT_ROOT / 'Data_main/rasters/NetGW_irrigation/original',
+                          output_dir=PROJECT_ROOT / 'Data_main/rasters/NetGW_irrigation/WesternUS',
                           skip_processing=skip_process_netGW)
 
     # OpenET ensemble processing
     dynamic_gs_sum_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
                                           2021, 2022, 2023),
-                               growing_season_dir='../../Data_main/rasters/Growing_season',
-                               monthly_input_dir='../../Data_main/rasters/OpenET_ensemble/WestUS_monthly',
-                               gs_output_dir='../../Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
+                               growing_season_dir=PROJECT_ROOT / 'Data_main/rasters/Growing_season',
+                               monthly_input_dir=PROJECT_ROOT / 'Data_main/rasters/OpenET_ensemble/WestUS_monthly',
+                               gs_output_dir=PROJECT_ROOT / 'Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
                                sum_keyword='OpenET', skip_processing=skip_ET_processing)
 
     # RET processing
     dynamic_gs_sum_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
                                           2021, 2022, 2023),
-                               growing_season_dir='../../Data_main/rasters/Growing_season',
-                               monthly_input_dir='../../Data_main/rasters/RET/WestUS_monthly',
-                               gs_output_dir='../../Data_main/rasters/RET/WestUS_growing_season',
+                               growing_season_dir=PROJECT_ROOT / 'Data_main/rasters/Growing_season',
+                               monthly_input_dir=PROJECT_ROOT / 'Data_main/rasters/RET/WestUS_monthly',
+                               gs_output_dir=PROJECT_ROOT / 'Data_main/rasters/RET/WestUS_growing_season',
                                sum_keyword='RET', skip_processing=skip_gridmet_RET_processing)
 
     # GRIDMET precipitation data processing
     dynamic_gs_sum_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
                                           2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
                                           2021, 2022, 2023),
-                               growing_season_dir='../../Data_main/rasters/Growing_season',
-                               monthly_input_dir='../../Data_main/rasters/Precip/WestUS_monthly',
-                               gs_output_dir='../../Data_main/rasters/Precip/WestUS_growing_season',
+                               growing_season_dir=PROJECT_ROOT / 'Data_main/rasters/Growing_season',
+                               monthly_input_dir=PROJECT_ROOT / 'Data_main/rasters/Precip/WestUS_monthly',
+                               gs_output_dir=PROJECT_ROOT / 'Data_main/rasters/Precip/WestUS_growing_season',
                                sum_keyword='Precip', skip_processing=skip_gridmet_precip_processing)
 
     # GRIDMET max temperature data processing
     dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
                                            2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
                                            2021, 2022, 2023),
-                                growing_season_dir='../../Data_main/rasters/Growing_season',
-                                monthly_input_dir='../../Data_main/rasters/Tmax/WestUS_monthly',
-                                gs_output_dir='../../Data_main/rasters/Tmax/WestUS_growing_season',
+                                growing_season_dir=PROJECT_ROOT / 'Data_main/rasters/Growing_season',
+                                monthly_input_dir=PROJECT_ROOT / 'Data_main/rasters/Tmax/WestUS_monthly',
+                                gs_output_dir=PROJECT_ROOT / 'Data_main/rasters/Tmax/WestUS_growing_season',
                                 mean_keyword='Tmax', skip_processing=skip_gridmet_tmax_processing)
 
     # GRIDMET max relative humidity data processing
     dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
                                            2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
                                            2021, 2022, 2023),
-                                growing_season_dir='../../Data_main/rasters/Growing_season',
-                                monthly_input_dir='../../Data_main/rasters/maxRH/WestUS_monthly',
-                                gs_output_dir='../../Data_main/rasters/maxRH/WestUS_growing_season',
+                                growing_season_dir=PROJECT_ROOT / 'Data_main/rasters/Growing_season',
+                                monthly_input_dir=PROJECT_ROOT / 'Data_main/rasters/maxRH/WestUS_monthly',
+                                gs_output_dir=PROJECT_ROOT / 'Data_main/rasters/maxRH/WestUS_growing_season',
                                 mean_keyword='maxRH', skip_processing=skip_gridmet_maxRH_processing)
 
     # GRIDMET min relative humidity data processing
     dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
                                            2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
                                            2021, 2022, 2023),
-                                growing_season_dir='../../Data_main/rasters/Growing_season',
-                                monthly_input_dir='../../Data_main/rasters/minRH/WestUS_monthly',
-                                gs_output_dir='../../Data_main/rasters/minRH/WestUS_growing_season',
+                                growing_season_dir=PROJECT_ROOT / 'Data_main/rasters/Growing_season',
+                                monthly_input_dir=PROJECT_ROOT / 'Data_main/rasters/minRH/WestUS_monthly',
+                                gs_output_dir=PROJECT_ROOT / 'Data_main/rasters/minRH/WestUS_growing_season',
                                 mean_keyword='minRH', skip_processing=skip_gridmet_minRH_processing)
 
     # GRIDMET wind velocity data processing
     dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
                                            2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
                                            2021, 2022, 2023),
-                                growing_season_dir='../../Data_main/rasters/Growing_season',
-                                monthly_input_dir='../../Data_main/rasters/windVel/WestUS_monthly',
-                                gs_output_dir='../../Data_main/rasters/windVel/WestUS_growing_season',
+                                growing_season_dir=PROJECT_ROOT / 'Data_main/rasters/Growing_season',
+                                monthly_input_dir=PROJECT_ROOT / 'Data_main/rasters/windVel/WestUS_monthly',
+                                gs_output_dir=PROJECT_ROOT / 'Data_main/rasters/windVel/WestUS_growing_season',
                                 mean_keyword='windVel', skip_processing=skip_gridmet_windVel_processing)
 
     # GRIDMET shortwave radiation data processing
     dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
                                            2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
                                            2021, 2022, 2023),
-                                growing_season_dir='../../Data_main/rasters/Growing_season',
-                                monthly_input_dir='../../Data_main/rasters/shortRad/WestUS_monthly',
-                                gs_output_dir='../../Data_main/rasters/shortRad/WestUS_growing_season',
+                                growing_season_dir=PROJECT_ROOT / 'Data_main/rasters/Growing_season',
+                                monthly_input_dir=PROJECT_ROOT / 'Data_main/rasters/shortRad/WestUS_monthly',
+                                gs_output_dir=PROJECT_ROOT / 'Data_main/rasters/shortRad/WestUS_growing_season',
                                 mean_keyword='shortRad', skip_processing=skip_gridmet_shortRad_processing)
 
     # GRIDMET vapor pressure deficit data processing
     dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
                                            2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
                                            2021, 2022, 2023),
-                                growing_season_dir='../../Data_main/rasters/Growing_season',
-                                monthly_input_dir='../../Data_main/rasters/vpd/WestUS_monthly',
-                                gs_output_dir='../../Data_main/rasters/vpd/WestUS_growing_season',
+                                growing_season_dir=PROJECT_ROOT / 'Data_main/rasters/Growing_season',
+                                monthly_input_dir=PROJECT_ROOT / 'Data_main/rasters/vpd/WestUS_monthly',
+                                gs_output_dir=PROJECT_ROOT / 'Data_main/rasters/vpd/WestUS_growing_season',
                                 mean_keyword='vpd', skip_processing=skip_gridmet_vpd_processing)
 
     # DAYMET sun hour data processing
     dynamic_gs_mean_of_variable(year_list=(2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
                                            2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020,
                                            2021, 2022, 2023),
-                                growing_season_dir='../../Data_main/rasters/Growing_season',
-                                monthly_input_dir='../../Data_main/rasters/sunHr/WestUS_monthly',
-                                gs_output_dir='../../Data_main/rasters/sunHr/WestUS_growing_season',
+                                growing_season_dir=PROJECT_ROOT / 'Data_main/rasters/Growing_season',
+                                monthly_input_dir=PROJECT_ROOT / 'Data_main/rasters/sunHr/WestUS_monthly',
+                                gs_output_dir=PROJECT_ROOT / 'Data_main/rasters/sunHr/WestUS_growing_season',
                                 mean_keyword='sunHr', skip_processing=skip_daymet_sunHr_processing)
 
     # HUC12 SW rasterization
     create_HUC12_SW_irrigation_rasters(
-        HUC12_SW_shape='../../Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_with_Annual_SW.shp',
-        output_dir='../../Data_main/rasters/HUC12_SW',
+        HUC12_SW_shape=PROJECT_ROOT / 'Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_with_Annual_SW.shp',
+        output_dir=PROJECT_ROOT / 'Data_main/rasters/HUC12_SW',
         resolution=model_res, ref_raster=WestUS_raster,
         skip_processing=skip_HUC12_SW_processing)
 
     # Canal density raster processing
     create_canal_density_raster(
-        canal_shapefile='../../Data_main/shapefiles/Surface_water_shapes/NHD/NHD_CanalDitch.shp',
-        output_dir='../../Data_main/rasters/Canal_density',
+        canal_shapefile=PROJECT_ROOT / 'Data_main/shapefiles/Surface_water_shapes/NHD/NHD_CanalDitch.shp',
+        output_dir=PROJECT_ROOT / 'Data_main/rasters/Canal_density',
         ref_raster=WestUS_raster, resolution=model_res,
         skip_processing=skip_create_canal_density_raster)
 
     # Distance from canal raster processing
     create_distance_canal_raster(
-        canal_shapefile='../../Data_main/shapefiles/Surface_water_shapes/NHD/NHD_CanalDitch.shp',
-        output_dir='../../Data_main/rasters/Canal_distance',
+        canal_shapefile=PROJECT_ROOT / 'Data_main/shapefiles/Surface_water_shapes/NHD/NHD_CanalDitch.shp',
+        output_dir=PROJECT_ROOT / 'Data_main/rasters/Canal_distance',
         ref_raster=WestUS_raster, resolution=model_res,
         skip_processing=skip_create_canal_distance_raster)
 
@@ -1357,9 +1358,9 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
                                2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016,
                                2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024),
         year_with_partial_extent=None,
-        input_dir_irrmapper='../../Data_main/Rasters/Irrigation_Frac_IrrMapper',
-        input_dir_lanid='../../Data_main/Rasters/Irrigation_Frac_LANID',
-        merged_output_dir='../../Data_main/Rasters/Irrigated_cropland/Irrigated_Frac',
+        input_dir_irrmapper=PROJECT_ROOT / 'Data_main/Rasters/Irrigation_Frac_IrrMapper',
+        input_dir_lanid=PROJECT_ROOT / 'Data_main/Rasters/Irrigation_Frac_LANID',
+        merged_output_dir=PROJECT_ROOT / 'Data_main/Rasters/Irrigated_cropland/Irrigated_Frac',
         merge_keyword='Irrigated_Frac', monthly_data=False,
         ref_raster=WestUS_raster,
         skip_processing=skip_irr_frac_data_processing)
@@ -1367,11 +1368,11 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
     # process irrigated cropland data (2000-2023)
     # 2000-2020 data was processed int he Peff paper
     classify_irrigated_cropland(years=list(range(2000, 2024)),
-                                irrigated_fraction_dir='../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac',
-                                irrigated_cropland_output_dir='../../Data_main/rasters/Irrigated_cropland',
+                                irrigated_fraction_dir=PROJECT_ROOT / 'Data_main/rasters/Irrigated_cropland/Irrigated_Frac',
+                                irrigated_cropland_output_dir=PROJECT_ROOT / 'Data_main/rasters/Irrigated_cropland',
                                 irr_fraction_threshold_others=0.13,  # 13%
                                 irr_fraction_threshold_BasinRange=0.01,  # 1%
-                                basin_range_shp='../../Data_main/shapefiles/Basin_Range_aquifer/Basin_RangeFill_extent.shp',
+                                basin_range_shp=PROJECT_ROOT / 'Data_main/shapefiles/Basin_Range_aquifer/Basin_RangeFill_extent.shp',
                                 skip_processing=skip_irr_cropland_classification)
 
     # convert USGS HUC12 GW use % data to annual rasters
@@ -1382,21 +1383,21 @@ def run_all_preprocessing(skip_stateID_raster_creation=False,
 
         for year in years_of_usgs:
             shapefile_to_raster(
-                input_shape='../../Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_Avg_GW_use_perc.shp',
-                output_dir='../../Data_main/rasters/USGS_GW_%',
+                input_shape=PROJECT_ROOT / 'Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_Avg_GW_use_perc.shp',
+                output_dir=PROJECT_ROOT / 'Data_main/rasters/USGS_GW_%',
                 raster_name=f'GW_perc_{year}.tif', use_attr=True,
                 attribute=f'avg_gw_%')
 
     # modify and reclassify GW_perc raster
-    reclassify_GW_use_perc_rasters(GW_use_perc_dir='../../Data_main/rasters/USGS_GW_%',
-                                   westUS_ROI='../../Data_main/ref_shapes/WestUS_ROI.shp',
-                                   final_pumping_prediction_dir='../../Data_main/rasters/pumping_prediction/ML/v11',
-                                   output_dir='../../Data_main/rasters/USGS_GW_%/reclassified',
+    reclassify_GW_use_perc_rasters(GW_use_perc_dir=PROJECT_ROOT / 'Data_main/rasters/USGS_GW_%',
+                                   westUS_ROI=PROJECT_ROOT / 'Data_main/ref_shapes/WestUS_ROI.shp',
+                                   final_pumping_prediction_dir=PROJECT_ROOT / 'Data_main/rasters/pumping_prediction/ML/v11',
+                                   output_dir=PROJECT_ROOT / 'Data_main/rasters/USGS_GW_%/reclassified',
                                    skip_processing=skip_modify_USGS_GW_perc)
 
     # rasterize USGS HUC12 Irrigation Efficiency data
     create_Irr_eff_rasters(
-        HUC12_Irr_Eff_shape='../../Data_main/shapefiles/USGS_WaterUse\HUC12_WestUS_with_Irr_Eff.shp',
-        output_dir='../../Data_main/rasters/HUC12_Irr_Eff',
+        HUC12_Irr_Eff_shape=PROJECT_ROOT / 'Data_main/shapefiles/USGS_WaterUse/HUC12_WestUS_with_Irr_Eff.shp',
+        output_dir=PROJECT_ROOT / 'Data_main/rasters/HUC12_Irr_Eff',
         resolution=model_res, ref_raster=WestUS_raster,
         skip_processing=skip_process_USGS_Irr_Eff)

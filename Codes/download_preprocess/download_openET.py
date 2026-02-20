@@ -13,10 +13,11 @@ import geopandas as gpd
 from datetime import datetime
 from multiprocessing import cpu_count
 from multiprocessing.pool import ThreadPool
+from pathlib import Path
 
-from os.path import dirname, abspath
-
-sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
+# Project root directory (works regardless of cwd)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from Codes.utils.system_ops import makedirs
 from Codes.utils.raster_ops import clip_resample_reproject_raster, mosaic_rasters_from_directory
@@ -41,9 +42,9 @@ from Codes.utils.raster_ops import clip_resample_reproject_raster, mosaic_raster
 
 no_data_value = -9999
 model_res = 0.01976293625031605786  # in deg, ~2 km
-WestUS_shape = '../../Data_main/ref_shapes/WestUS_states.shp'
-WestUS_raster = '../../Data_main/ref_rasters/Western_US_refraster_2km.tif'
-GEE_merging_refraster_large_grids = '../../Data_main/ref_rasters/GEE_merging_refraster_larger_grids.tif'
+WestUS_shape = PROJECT_ROOT / 'Data_main/ref_shapes/WestUS_states.shp'
+WestUS_raster = PROJECT_ROOT / 'Data_main/ref_rasters/Western_US_refraster_2km.tif'
+GEE_merging_refraster_large_grids = PROJECT_ROOT / 'Data_main/ref_rasters/GEE_merging_refraster_larger_grids.tif'
 
 
 def get_openet_gee_dict(data_name):

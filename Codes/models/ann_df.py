@@ -4,16 +4,17 @@
 # Fahim.Hasan@colostate.edu
 
 import os
+import sys
 import numpy as np
 import pandas as pd
 from glob import glob
 import dask.dataframe as ddf
 from sklearn.model_selection import train_test_split
+from pathlib import Path
 
-import sys
-from os.path import dirname, abspath
-
-sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
+# Project root directory (works regardless of cwd)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from Codes.utils.system_ops import makedirs
 from Codes.utils.ML_ops import create_annual_dataframes_for_pumping_prediction
@@ -336,25 +337,25 @@ if __name__ == '__main__':
 
     # predictor data paths
     data_path_dict = {
-        'target': '../../Data_main/pumping/rasters/WestUS_pumping',
-        # 'netGW_Irr': '../../Data_main/rasters/NetGW_irrigation/WesternUS',
-        'peff': '../../Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
-        # 'SW_Irr': '../../Data_main/rasters/SW_irrigation',
-        'ret': '../../Data_main/rasters/RET/WestUS_growing_season',
-        'precip': '../../Data_main/rasters/Precip/WestUS_growing_season',
-        'tmax': '../../Data_main/rasters/Tmax/WestUS_growing_season',
-        'ET': '../../Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
-        'irr_crop_frac': '../../Data_main/rasters/Irrigated_cropland/Irrigated_Frac',
-        'maxRH': '../../Data_main/rasters/maxRH/WestUS_growing_season',
-        'minRH': '../../Data_main/rasters/minRH/WestUS_growing_season',
-        'shortRad': '../../Data_main/rasters/shortRad/WestUS_growing_season',
-        'vpd': '../../Data_main/rasters/vpd/WestUS_growing_season',
-        'sunHr': '../../Data_main/rasters/sunHr/WestUS_growing_season',
-        'FC': '../../Data_main/rasters/Field_capacity/WestUS',
-        'Canal_density': '../../Data_main/rasters/Canal_density',
-        'Canal_distance': '../../Data_main/rasters/Canal_distance',
-        'pixelID': '../../Data_main/ref_rasters/pixelID',
-        'stateID': '../../Data_main/ref_rasters/stateID'
+        'target': PROJECT_ROOT / 'Data_main/pumping/rasters/WestUS_pumping',
+        # 'netGW_Irr': PROJECT_ROOT / 'Data_main/rasters/NetGW_irrigation/WesternUS',
+        'peff': PROJECT_ROOT / 'Data_main/rasters/Effective_precip_prediction_WestUS/v19_grow_season_scaled',
+        # 'SW_Irr': PROJECT_ROOT / 'Data_main/rasters/SW_irrigation',
+        'ret': PROJECT_ROOT / 'Data_main/rasters/RET/WestUS_growing_season',
+        'precip': PROJECT_ROOT / 'Data_main/rasters/Precip/WestUS_growing_season',
+        'tmax': PROJECT_ROOT / 'Data_main/rasters/Tmax/WestUS_growing_season',
+        'ET': PROJECT_ROOT / 'Data_main/rasters/OpenET_ensemble/WestUS_growing_season',
+        'irr_crop_frac': PROJECT_ROOT / 'Data_main/rasters/Irrigated_cropland/Irrigated_Frac',
+        'maxRH': PROJECT_ROOT / 'Data_main/rasters/maxRH/WestUS_growing_season',
+        'minRH': PROJECT_ROOT / 'Data_main/rasters/minRH/WestUS_growing_season',
+        'shortRad': PROJECT_ROOT / 'Data_main/rasters/shortRad/WestUS_growing_season',
+        'vpd': PROJECT_ROOT / 'Data_main/rasters/vpd/WestUS_growing_season',
+        'sunHr': PROJECT_ROOT / 'Data_main/rasters/sunHr/WestUS_growing_season',
+        'FC': PROJECT_ROOT / 'Data_main/rasters/Field_capacity/WestUS',
+        'Canal_density': PROJECT_ROOT / 'Data_main/rasters/Canal_density',
+        'Canal_distance': PROJECT_ROOT / 'Data_main/rasters/Canal_distance',
+        'pixelID': PROJECT_ROOT / 'Data_main/ref_rasters/pixelID',
+        'stateID': PROJECT_ROOT / 'Data_main/ref_rasters/stateID'
     }
 
     datasets_to_include = data_path_dict.keys()  # datasets to include in the main dataframe
@@ -374,7 +375,7 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
 
     # create dataframe
-    dataframe_parquet_path = f'../../Model_run/ANN_model/Model_csv/dataframe.parquet'
+    dataframe_parquet_path = PROJECT_ROOT / 'Model_run/ANN_model/Model_csv/dataframe.parquet'
 
     create_train_test_dataframe(years_list=years_list,
                                 yearly_data_path_dict=annual_data_path_dict,
@@ -385,15 +386,15 @@ if __name__ == '__main__':
                                 skip_processing=skip_df_creation)
 
     split_train_val_test_set_v2(data_parquet=dataframe_parquet_path,
-                                output_dir=f'../../Model_run/ANN_model/Model_csv',
+                                output_dir=PROJECT_ROOT / 'Model_run/ANN_model/Model_csv',
                                 train_size=0.7, val_size=0.15, test_size=0.15,
                                 random_state=42, skip_processing=skip_train_val_test_split)
 
     # ------------------------------------------------------------------------------------------------------------------
     # Calculating standardization statistics
     # ------------------------------------------------------------------------------------------------------------------
-    train_csv = f'../../Model_run/ANN_model/Model_csv/train.csv'
-    standardized_output_dir = f'../../Model_run/ANN_model/Model_csv/standardized'
+    train_csv = PROJECT_ROOT / 'Model_run/ANN_model/Model_csv/train.csv'
+    standardized_output_dir = PROJECT_ROOT / 'Model_run/ANN_model/Model_csv/standardized'
 
     mean_dict, std_dict = \
         calc_scaling_statistics(train_csv=train_csv, features_to_exclude=exclude_columns_in_scaling,
@@ -403,10 +404,10 @@ if __name__ == '__main__':
     # ------------------------------------------------------------------------------------------------------------------
     # Standardizing train-val-test
     # ------------------------------------------------------------------------------------------------------------------
-    train_csv = f'../../Model_run/ANN_model/Model_csv/train.csv'
-    val_csv = f'../../Model_run/ANN_model/Model_csv/val.csv'
-    test_csv = f'../../Model_run/ANN_model/Model_csv/test.csv'
-    standardized_output_dir = f'../../Model_run/ANN_model/Model_csv/standardized'
+    train_csv = PROJECT_ROOT / 'Model_run/ANN_model/Model_csv/train.csv'
+    val_csv = PROJECT_ROOT / 'Model_run/ANN_model/Model_csv/val.csv'
+    test_csv = PROJECT_ROOT / 'Model_run/ANN_model/Model_csv/test.csv'
+    standardized_output_dir = PROJECT_ROOT / 'Model_run/ANN_model/Model_csv/standardized'
 
     standardize_train_val_test(split_csv=train_csv, mean_dict=mean_dict, std_dict=std_dict,
                                exclude_features_from_standardizing=exclude_columns_in_scaling,
@@ -435,19 +436,19 @@ if __name__ == '__main__':
     datasets_to_include = list(data_path_dict.keys())  # datasets to include in the main dataframe
     datasets_to_include.remove('target')
 
-    annual_dataframes_dir = f'../../Model_run/ANN_model/Model_csv/annual_csv'
+    annual_dataframes_dir = PROJECT_ROOT / 'Model_run/ANN_model/Model_csv/annual_csv'
 
     create_annual_dataframes_for_pumping_prediction(years_list=list(range(2000, 2024)),
                                                     yearly_data_path_dict=annual_data_path_dict,
                                                     static_data_path_dict=static_data_path_dict,
                                                     datasets_to_include=datasets_to_include,
-                                                    irrigated_cropland_dir='../../Data_main/rasters/Irrigated_cropland',
+                                                    irrigated_cropland_dir=PROJECT_ROOT / 'Data_main/rasters/Irrigated_cropland',
                                                     output_dir=annual_dataframes_dir,
                                                     skip_processing=skip_annual_df_creation)
 
     # Standardization
     annual_dataframes = glob(os.path.join(annual_dataframes_dir, '*.csv'))
-    output_dir = f'../../Model_run/ANN_model/Model_csv/annual_csv/standardized'
+    output_dir = PROJECT_ROOT / 'Model_run/ANN_model/Model_csv/annual_csv/standardized'
 
     for csv in annual_dataframes:
         standardize_annual_df(annual_csv=csv, mean_dict=mean_dict, std_dict=std_dict,

@@ -267,7 +267,7 @@ def main(model_version, model_prediction_dir, basinwise_output_dir, compiled_out
 
     """
     # for actual prediction
-    # process_aldl_basins(model_version, model_prediction_dir, basinwise_output_dir, model, process_CIs=collect_CIs)
+    process_all_basins(model_version, model_prediction_dir, basinwise_output_dir, model, process_CIs=collect_CIs)
 
     # compiling annual csv
     compile_all_basin_summaries(basinwise_output_dir, compiled_output_csv, model, collect_CIs=collect_CIs,)

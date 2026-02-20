@@ -24,18 +24,6 @@ from Codes.utils.raster_ops import clip_resample_reproject_raster, mosaic_raster
 
 # ***************************** earth engine authentication *****************************
 
-# # if ee.Authenticate() shows gcloud error even after gcloud has been installed, use
-# # earthengine authenticate --auth_mode=notebook
-# # source: https://gis.stackexchange.com/questions/445457/gcloud-command-not-found-when-authenticating-google-earth-engine
-# # this happens due to earthengine-api version
-
-# # if ee.Authenticate() doesn't work and you don't have gcloud installed, first, you will need to install gcloud
-# # follow this link to install it for your respective operating system- https://cloud.google.com/sdk/docs/install
-# # after gcloud has been installed, follow this video link to authenticate you gcloud project
-# # https://www.youtube.com/watch?v=k-8qFh8EfFA this link was helpful for installing gcloud
-
-# # Once gcloud and earth engine have been authenticated, no need to run the authentication process again. Just start from ee.initialize()
-
 # ee.Authenticate()
 
 # ***************************************************************************************

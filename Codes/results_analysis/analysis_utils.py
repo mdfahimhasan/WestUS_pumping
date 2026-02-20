@@ -791,12 +791,12 @@ def compile_prediction_CI(basin_code, years, basin_shp,
     ####################################################################################################################
     # Step 2: Compile pixelwise CSV
     ####################################################################################################################
-    extract_dict = {'year': [], 'upper_CI': [], 'lower_CI': []}
+    extract_dict = {'year': [], 'q975': [], 'q025': []}
 
     for year in years:
         # loading low and high CI array
-        low_arr = read_raster_arr_object(os.path.join(basin_output_dir, f'lower_ci_{year}.tif'), get_file=False).flatten()
-        high_arr = read_raster_arr_object(os.path.join(basin_output_dir, f'upper_ci_{year}.tif'), get_file=False).flatten()
+        low_arr = read_raster_arr_object(os.path.join(basin_output_dir, f'q025_{year}.tif'), get_file=False).flatten()
+        high_arr = read_raster_arr_object(os.path.join(basin_output_dir, f'q975_{year}.tif'), get_file=False).flatten()
 
         # replacing nodata of as zero
         # this will help gather predicted pumping data even if actual pumping is zero and vice versa.
@@ -807,8 +807,8 @@ def compile_prediction_CI(basin_code, years, basin_shp,
         year_list = [year] * len(low_arr)
 
         extract_dict['year'].extend(year_list)
-        extract_dict['lower_CI'].extend(list(low_arr))
-        extract_dict['upper_CI'].extend(list(high_arr))
+        extract_dict['q025'].extend(list(low_arr))
+        extract_dict['q975'].extend(list(high_arr))
 
     # converting dictionary to dataframe and saving to csv
     df = pd.DataFrame(extract_dict)
@@ -856,20 +856,20 @@ def compile_prediction_CI(basin_code, years, basin_shp,
     yearly_df = pixel_df.groupby('year').sum().reset_index()
 
     # calculating total volume
-    yearly_df['lower_ci_m3'] = yearly_df['lower_CI'] * area_mm2_single_pixel / 1e9
-    yearly_df['lower_ci_AF'] = yearly_df['lower_ci_m3'] / 1233.48
+    yearly_df['q025_m3'] = yearly_df['q025'] * area_mm2_single_pixel / 1e9
+    yearly_df['q025_AF'] = yearly_df['q025_m3'] / 1233.48
 
-    yearly_df['upper_ci_m3'] = yearly_df['upper_CI'] * area_mm2_single_pixel / 1e9
-    yearly_df['upper_ci_AF'] = yearly_df['upper_ci_m3'] / 1233.48
+    yearly_df['q975_m3'] = yearly_df['q975'] * area_mm2_single_pixel / 1e9
+    yearly_df['q975_AF'] = yearly_df['q975_m3'] / 1233.48
 
     # calculating area-averaged mean actual + predicted pumping (in mm)
     # AF >> mm3 >> mean mm
-    yearly_df['mean lower_ci_mm'] = yearly_df['lower_ci_AF'] * 1233481837547.5 / basin_area_dict[basin_code]
-    yearly_df['mean upper_ci_mm'] = yearly_df['upper_ci_AF'] * 1233481837547.5 / basin_area_dict[basin_code]
+    yearly_df['mean q025_mm'] = yearly_df['q025_AF'] * 1233481837547.5 / basin_area_dict[basin_code]
+    yearly_df['mean q975_mm'] = yearly_df['q975_AF'] * 1233481837547.5 / basin_area_dict[basin_code]
 
     yearly_df['basin_code'] = basin_code
 
-    yearly_df = yearly_df[['year', 'basin_code', 'mean lower_ci_mm', 'mean upper_ci_mm']]
+    yearly_df = yearly_df[['year', 'basin_code', 'mean q025_mm', 'mean q975_mm']]
 
     # saving
     basinscale_csv = os.path.join(os.path.dirname(basin_output_dir), f'basinscale_CI_{basin_code}.csv')

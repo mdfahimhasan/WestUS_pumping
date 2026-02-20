@@ -96,11 +96,11 @@ def jitter_params(base_params_dict, seed):
     return params
 
 
-def predict_annual_mean_stdv(N_bootstrap, trained_model_dir, predictor_csv_and_nan_pos_dir,
-                             exclude_columns, output_dir, irr_eff_dir, ref_raster=WestUS_raster,
-                             skip_processing=False):
+def predict_annual_mean_stdv_CIS(N_bootstrap, trained_model_dir, predictor_csv_and_nan_pos_dir,
+                                 exclude_columns, output_dir, irr_eff_dir, ref_raster=WestUS_raster,
+                                 skip_processing=False):
     '''
-    Predict annual mean and stdv using the bootstrapped models.
+    Predict annual mean, stdv, and empirical 95% CI (q025, q975) using the bootstrapped models.
 
     :param N_bootstrap: Number of bootstrapped models.
     :param trained_model_dir: File path of directory with trained bootstrapped models.
@@ -110,7 +110,7 @@ def predict_annual_mean_stdv(N_bootstrap, trained_model_dir, predictor_csv_and_n
     :param irr_eff_dir: File path of directory with irrigation efficiency rasters.
     :param ref_raster: File path of the reference raster.
     :param skip_processing: Boolean flag to skip processing and use existing results. Default is False.
-    
+
     '''
     if not skip_processing:
         # load all trained models and store them in a list
@@ -129,7 +129,7 @@ def predict_annual_mean_stdv(N_bootstrap, trained_model_dir, predictor_csv_and_n
         ref_shape = ref_arr.shape
 
         for year in range(2000, 2024):  # for years 2000 to 2023
-            print(f"Generating bootstrapped model's mean + stdv estimates for year {year}...")
+            print(f"Generating bootstrapped model's mean + stdv + CI estimates for year {year}...")
 
             # loading input variable dataframe and nan position dict
             # also filtering out excluded columns
@@ -143,7 +143,7 @@ def predict_annual_mean_stdv(N_bootstrap, trained_model_dir, predictor_csv_and_n
             # empty storage list to add prediction array of that year using each model
             predictions = []
 
-            # the prediction is consumptive use.need irrigation efficiency to convert it back to pumping.
+            # the prediction is consumptive use. need irrigation efficiency to convert it back to pumping.
             irr_eff_file = glob(os.path.join(irr_eff_dir, f'*{year}.tif'))[0]
             irr_eff_arr = read_raster_arr_object(irr_eff_file, get_file=False)
 
@@ -152,9 +152,9 @@ def predict_annual_mean_stdv(N_bootstrap, trained_model_dir, predictor_csv_and_n
                 pred_arr = model.predict(df)
                 pred_arr = np.array(pred_arr)
 
-                # converting consumptive use prediction back to pumping
+                # converting consumptive use prediction to pumping: pumping = consumptive_use / irr_eff
                 irr_eff_arr_shaped = irr_eff_arr.reshape(pred_arr.shape)
-                pred_arr = np.where(~np.isnan(irr_eff_arr_shaped) & ~np.isnan(pred_arr), irr_eff_arr_shaped * pred_arr, np.nan)
+                pred_arr = np.where(~np.isnan(irr_eff_arr_shaped) & ~np.isnan(pred_arr), pred_arr / irr_eff_arr_shaped, np.nan)
 
                 # mask nodata per model (same as original function, but use np.nan here)
                 nan_pos_dict = pickle.load(open(nan_pos_dict_path, "rb"))
@@ -167,136 +167,37 @@ def predict_annual_mean_stdv(N_bootstrap, trained_model_dir, predictor_csv_and_n
             # stack -> (N_bootstrap, n_samples)
             preds_stack = np.vstack(predictions)
 
-            # calculate mean and stdv
+            # calculate mean, stdv, and empirical 95% CI quantiles
             mean_arr = np.nanmean(preds_stack, axis=0)
             stdv_arr = np.nanstd(preds_stack, axis=0)
+            q025_arr = np.nanpercentile(preds_stack, 2.5, axis=0)
+            q975_arr = np.nanpercentile(preds_stack, 97.5, axis=0)
 
-            # reshaping mean and stdv array to original raster shape
+            # reshaping arrays to original raster shape
             mean_arr = mean_arr.reshape(ref_shape)
             stdv_arr = stdv_arr.reshape(ref_shape)
+            q025_arr = q025_arr.reshape(ref_shape)
+            q975_arr = q975_arr.reshape(ref_shape)
 
             # replacing np.nan with -9999
             mean_arr[np.isnan(mean_arr)] = -9999
             stdv_arr[np.isnan(stdv_arr)] = -9999
+            q025_arr[np.isnan(q025_arr)] = -9999
+            q975_arr[np.isnan(q975_arr)] = -9999
 
-            # write mean and stdv rasters to array
-            mean_output_tif = os.path.join(output_dir, f'mean_{year}.tif')
-            write_array_to_raster(mean_arr, ref_file, ref_file.transform, mean_output_tif, nodata=-9999)
-
-            stdv_output_tif = os.path.join(output_dir, f'stdv_{year}.tif')
-            write_array_to_raster(stdv_arr, ref_file, ref_file.transform, stdv_output_tif, nodata=-9999)
+            # write rasters
+            write_array_to_raster(mean_arr, ref_file, ref_file.transform,
+                                  os.path.join(output_dir, f'mean_{year}.tif'), nodata=-9999)
+            write_array_to_raster(stdv_arr, ref_file, ref_file.transform,
+                                  os.path.join(output_dir, f'stdv_{year}.tif'), nodata=-9999)
+            write_array_to_raster(q025_arr, ref_file, ref_file.transform,
+                                  os.path.join(output_dir, f'q025_{year}.tif'), nodata=-9999)
+            write_array_to_raster(q975_arr, ref_file, ref_file.transform,
+                                  os.path.join(output_dir, f'q975_{year}.tif'), nodata=-9999)
     else:
         pass
 
 
-def predict_total_mean_stdv_CV(N_bootstrap, trained_model_dir, predictor_csv_and_nan_pos_dir,
-                               exclude_columns, output_dir, ref_raster=WestUS_raster,
-                               skip_processing=False):
-    if not skip_processing:
-        # load all trained models and store them in a list
-        models = []
-
-        for n in range(N_bootstrap):
-            # loading trained model
-            model_Name = f'bootstrap_{n}.joblib'
-            trained_model = joblib.load(os.path.join(trained_model_dir, model_Name))
-            models.append(trained_model)
-
-        print(f'Loaded all trained ({len(models)}) models..\n')
-
-        # ref raster array load and shape extraction
-        ref_arr, ref_file = read_raster_arr_object(ref_raster)
-        ref_shape = ref_arr.shape
-
-        for year in range(2000, 2021):  # for years 2000 to 2020
-            print(f"Generating bootstrapped model's mean + stdv estimates for year {year}...")
-
-            # loading input variable dataframe and nan position dict
-            # also filtering out excluded columns
-            predictor_csv = glob(os.path.join(predictor_csv_and_nan_pos_dir, f'*{year}.csv'))[0]
-            nan_pos_dict_path = glob(os.path.join(predictor_csv_and_nan_pos_dir, f'*{year}.pkl'))[0]
-
-            df = pd.read_csv(predictor_csv)
-            df = df.drop(columns=exclude_columns)
-            df = reindex_df(df)
-
-            # empty storage list to add prediction array of that year using each model
-            predictions = []
-
-            # generating prediction raster with each trained model
-            for model in models:
-                pred_arr = model.predict(df)
-                pred_arr = np.array(pred_arr)
-
-                # mask nodata per model (same as original function, but use np.nan here)
-                nan_pos_dict = pickle.load(open(nan_pos_dict_path, "rb"))
-                for _, nan_pos in nan_pos_dict.items():
-                    pred_arr[nan_pos] = np.nan
-
-                # adding in storage list
-                predictions.append(pred_arr)
-
-        # stack -> (N_bootstrap, n_samples)
-        preds_stack = np.vstack(predictions)
-
-        # calculate mean and stdv
-        mean_arr = np.nanmean(preds_stack, axis=0)
-        stdv_arr = np.nanstd(preds_stack, axis=0)
-
-        # reshaping mean and stdv array to original raster shape
-        mean_arr = mean_arr.reshape(ref_shape)
-        stdv_arr = stdv_arr.reshape(ref_shape)
-
-        # replacing np.nan with -9999
-        mean_arr[np.isnan(mean_arr)] = -9999
-        stdv_arr[np.isnan(stdv_arr)] = -9999
-
-        # write mean and stdv rasters to array
-        mean_output_tif = os.path.join(output_dir, f'mean_all.tif')
-        write_array_to_raster(mean_arr, ref_file, ref_file.transform, mean_output_tif, nodata=-9999)
-
-        stdv_output_tif = os.path.join(output_dir, f'stdv_all.tif')
-        write_array_to_raster(stdv_arr, ref_file, ref_file.transform, stdv_output_tif, nodata=-9999)
-
-        # # calculating coef. of variation
-        coef_variation_arr = np.where((mean_arr != -9999) & (stdv_arr != -9999),
-                                       stdv_arr / mean_arr, -9999)
-
-        coef_var_raster = os.path.join(output_dir, f'coef_variance.tif')
-        write_array_to_raster(coef_variation_arr, ref_file, ref_file.transform,
-                              coef_var_raster)
-
-    else:
-        pass
-
-
-def create_uncertainty_bounds(model_prediction_dir, stdv_dir, output_dir,
-                              skip_processing=False):
-    """
-    Calculates upper and lower 95% CI of model predicted pumping.
-
-    :param model_prediction_dir: Path of directory with model predicted pumping rasters (the main prediction rasters).
-    :param stdv_dir: Path of directory with standard deviation rasters.
-    :param output_dir: Path of output directory.
-    :param skip_processing: Set to True to skip processing of this function.
-
-    :return: None.
-    """
-    if not skip_processing:
-        print('\nCalculating lower and upper CI of predicted pumping...')
-
-        for year in list(range(2000, 2024)):
-            # loading data for the year
-            pred_pumping, file = read_raster_arr_object(glob(os.path.join(model_prediction_dir, f'*{year}.tif'))[0])
-            stdv = read_raster_arr_object(glob(os.path.join(stdv_dir, f'stdv_{year}.tif'))[0], get_file=False)
-
-            # calculating the lower and upper bounds
-            low_CI = np.where((pred_pumping != -9999) & (stdv != -9999), pred_pumping - 1.96 * stdv, -9999)
-            high_CI = np.where((pred_pumping != -9999) & (stdv != -9999), pred_pumping + 1.96 * stdv, -9999)
-
-            # save
-            write_array_to_raster(low_CI, file, file.transform, os.path.join(output_dir, f'low_{year}.tif'))
-            write_array_to_raster(high_CI, file, file.transform, os.path.join(output_dir, f'high_{year}.tif'))
 
 
 ########################################################################################################################
@@ -322,13 +223,11 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------------------------------------------
     # flags
     # --------------------------------------------------------------------------------------------------------------
-    model_version = 'v11'                           ##########
+    model_version = 'v11'                            ##########
 
-    skip_bootstrap_dataset = False                  ##########
-    skip_train_bootstrap_models = False             ##########
-    skip_create_annual_predictions = False          ##########
-    skip_annual_calculate_low_high_CI = False       ##########
-    skip_total_mean_stdv_cv = False                 ##########
+    skip_bootstrap_dataset = False                   ##########
+    skip_train_bootstrap_models = False              ##########
+    skip_create_annual_man_stdv_CIs = False          ##########
 
     # control arguments
     n_bootstrap = 100
@@ -359,7 +258,7 @@ if __name__ == '__main__':
     # directories
     bootstrap_data_dir = PROJECT_ROOT / f'Model_run/ML_model/Model_csv/boostrap'
     save_model_to_dir = PROJECT_ROOT / f'Model_run/ML_model/Model_trained/bootstrapped'
-    mean_stdv_output_dir = PROJECT_ROOT / f'Data_main/rasters/pumping_prediction/ML_uncertainty/{model_version}/mean_stdv'
+    mean_stdv_output_dir = PROJECT_ROOT / f'Data_main/rasters/pumping_prediction/ML_uncertainty/{model_version}/'
 
     # base param dict (from the trained model)
     # hyperparameters from tuned model
@@ -403,37 +302,13 @@ if __name__ == '__main__':
                         verbose=False)
 
     # --------------------------------------------------------------------------------------------------------------
-    # predict annual mean and stdv
+    # predict annual mean, stdv, and CIs
     # --------------------------------------------------------------------------------------------------------------
-    predict_annual_mean_stdv(N_bootstrap=n_bootstrap, trained_model_dir=saved_model_dir,
-                             predictor_csv_and_nan_pos_dir=input_csv_and_nan_pos_dir,
-                             exclude_columns=columns_to_exclude,
-                             output_dir=mean_stdv_output_dir,
-                             irr_eff_dir=irr_eff_dir,
-                             ref_raster=WestUS_raster,
-                             skip_processing=skip_create_annual_predictions)
+    predict_annual_mean_stdv_CIS(N_bootstrap=n_bootstrap, trained_model_dir=saved_model_dir,
+                                 predictor_csv_and_nan_pos_dir=input_csv_and_nan_pos_dir,
+                                 exclude_columns=columns_to_exclude,
+                                 output_dir=mean_stdv_output_dir,
+                                 irr_eff_dir=irr_eff_dir,
+                                 ref_raster=WestUS_raster,
+                                 skip_processing=skip_create_annual_man_stdv_CIs)
 
-    # --------------------------------------------------------------------------------------------------------------
-    # Calculate annual lower and upper CI
-    # --------------------------------------------------------------------------------------------------------------
-
-    # directories
-    predicted_pumping_dir = PROJECT_ROOT / f'Data_main/rasters/pumping_prediction/ML/{model_version}/WestUS_pumping'
-    low_high_CI_output_dir = PROJECT_ROOT / f'Data_main/rasters/pumping_prediction/ML_uncertainty/{model_version}'
-
-    # calculate lower and upper 95% CI
-    create_uncertainty_bounds(model_prediction_dir=predicted_pumping_dir,
-                              stdv_dir=mean_stdv_output_dir,
-                              output_dir=low_high_CI_output_dir,
-                              skip_processing=skip_annual_calculate_low_high_CI)
-
-    # --------------------------------------------------------------------------------------------------------------
-    # predict total mean and stdv + coefficient of variation
-    # --------------------------------------------------------------------------------------------------------------
-
-    predict_total_mean_stdv_CV(N_bootstrap=n_bootstrap, trained_model_dir=saved_model_dir,
-                               predictor_csv_and_nan_pos_dir=input_csv_and_nan_pos_dir,
-                               exclude_columns=columns_to_exclude,
-                               output_dir=mean_stdv_output_dir,
-                               ref_raster=WestUS_raster,
-                               skip_processing=skip_total_mean_stdv_cv)

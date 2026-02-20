@@ -23,30 +23,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from Codes.utils.system_ops import makedirs
 from Codes.utils.raster_ops import clip_resample_reproject_raster, mosaic_rasters_from_directory
 
-# ***************************** gcloud and earth engine authentication *****************************
-
-# # first, we need to install and authenticate gcloud. use the link https://cloud.google.com/sdk/docs/install to install
-# # gcloud for windows/linux
-# # Once, installed gcloud need to be authenticated. For windows, I used the instructions from the following link to authenticate
-# # and set gcloud project - https://www.youtube.com/watch?v=k-8qFh8EfFA
-# # For linux, I used the instructions from the following link to download and install gcloud - https://cloud.google.com/sdk/docs/install#linux
-# # After installation in linux, I used the following commands to authenticate and set project
-# #   >> gcloud auth login --no-launch-browser  (it will give a link > copy the link in windows browser > paste the generated code in linux command line > authentication will be completed)
-# #   >> gcloud config set project project_name  (this will set the project, but first a project has to be created in gcloud following the instructions in this link - https://www.youtube.com/watch?v=k-8qFh8EfFA)
-
-
-# # if ee.Authenticate() shows gcloud error even after gcloud has been installed or
-# # it shows local host error when trying to authenticate from linux commandline,
-# # use the following command
-# # earthengine authenticate --auth_mode=notebook
-# # source: https://gis.stackexchange.com/questions/445457/gcloud-command-not-found-when-authenticating-google-earth-engine
-# # This command works for both windows in linux. In linux, once the environment is activated, no need to start python.
-# # instead, use the command in the command line > **copy the link in windows browser** > paste the verification code in linux command line again to complete verification.
-# # The errors are stemming from earthengine-api version which is associated with python version.
-# # previously, in linux, earthengine authenticate --quiet command used to work.
-
-# # # Once gcloud and earth engine have been authenticated, no need to run the authentication process again.
-# # # Just start from ee.Initialize(project='ee-fahim', opt_url='https://earthengine-highvolume.googleapis.com')
+# ***************************** earth engine authentication *****************************
 
 # ee.Authenticate()
 

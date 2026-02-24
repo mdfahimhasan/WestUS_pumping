@@ -150,7 +150,7 @@ https://www.hydroshare.org/resource/cce80224863c4933a94c51a25c4ff8f3/
 ```
 
 **Dataset Citation:**
-Hasan, M. F., Smith, R. G., Davenport, F. V., & Majumdar, S. (2026). *Dataset: Historical groundwater pumping estimates for major agricultural basins of the Western United States, HydroShare, https://doi.org/10.4211/hs.cce80224863c4933a94c51a25c4ff8f3
+Hasan, M. F., Smith, R. G., Davenport, F. V., & Majumdar, S. (2026). Dataset: Historical groundwater pumping estimates for major agricultural basins of the Western United States, HydroShare, https://doi.org/10.4211/hs.cce80224863c4933a94c51a25c4ff8f3
 
 ## Manuscipt citation
 - Hasan, M. F., Smith, R. G., Davenport, F. V., Majumdar, S. (2026). Extending Historical Groundwater Pumping Estimates for Major Agricultural Basins of the Western United States with Machine Learning and Satellite Products. In Prep. for Journal of Hydrology.

@@ -141,7 +141,8 @@ projects/ee-westus-pumping/assets/westus_pumping
 Sample code for visualization and data download is available at:  
 https://code.earthengine.google.com/a439de4785b9123e7255c3471ff8ed15
 
-**HydroShare repository:** 
+**HydroShare repository:**
+
 The annual groundwater pumping/total irrigation estimates (2000-2023) can also be downloaded from the following HydroShare repository.
 ```
 https://www.hydroshare.org/resource/cce80224863c4933a94c51a25c4ff8f3/

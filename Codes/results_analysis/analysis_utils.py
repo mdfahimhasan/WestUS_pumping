@@ -3,6 +3,7 @@
 # Colorado State university
 # Fahim.Hasan@colostate.edu
 
+from curses import raw
 import os
 import sys
 import numpy as np
@@ -10,6 +11,7 @@ import pandas as pd
 from glob import glob
 import geopandas as gpd
 from pathlib import Path
+from rasterio.mask import mask
 
 # Project root directory (works regardless of cwd)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -628,7 +630,269 @@ def count_num_irrigated_pixels(basin_pixel_year_dicts, output_csv):
     count_df = pd.DataFrame(count_dict)
 
     count_df.to_csv(output_csv, index=False)
+    
 
+def count_irrigated_hectares(basin_dicts, output_csv):
+    """
+    Count the number of irrigated hectares for the basins of interest.
+
+    Parameters
+    ----------
+    basin_dicts : dict
+        Dictionary containing basins as keys. Each basin entry must include:
+            - 'state' : str
+                State where the basin is located (e.g., 'Kansas', 'Colorado', 'Arizona').
+            - 'years' : list of int
+                List of years to analyze.
+            - 'reported_csv_path' : str (for Kansas)
+                File path to the CSV file containing reported irrigated acres data for Kansas basins.
+            - 'reported_cropland_dir' : str (for Colorado)
+                Directory containing CSV files with reported irrigated cropland data for Colorado basins.
+            - 'shp' : str
+                File path to the shapefile of the basin boundary.
+            - 'irrigated_fraction_dir' : str
+                Directory containing raster files of remotely sensed irrigated fraction for the basin.
+            - For Arizona basins, the dictionary should include:
+                - 'AMA_INA_shp' : str
+                    File path to the shapefile of Arizona's AMA and INA boundaries.
+                - 'NASS_records_csv' : str
+                    File path to the CSV file containing NASS records of irrigated acres in Arizona.
+            - For Diamond Valley, Nevada, the dictionary should include:
+                - 'reported_csv_path' : str
+                    File path to the CSV file containing in-situ measured field-level pumping data for Diamond Valley.
+                
+        Example:
+                   {'GMD3': {'state': 'Kansas',
+                            'years': list(range(2000, 2024)), 
+                            'reported_csv_path': PROJECT_ROOT / 'Data_main/pumping/Kansas/pumping_acres_KS.csv',
+                            'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/GMD3.shp',
+                            'irrigated_fraction_dir': PROJECT_ROOT / 'Data_main/rasters/irrigated_cropland/irrigated_frac'},
+                   'GMD4': {'state': 'Kansas',
+                            'years': list(range(2000, 2024)), 
+                            'reported_csv_path': PROJECT_ROOT / 'Data_main/pumping/Kansas/pumping_acres_KS.csv',
+                            'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/GMD4.shp',
+                            'irrigated_fraction_dir': PROJECT_ROOT / 'Data_main/rasters/irrigated_cropland/irrigated_frac'},
+                    'RPB': {'state': 'Colorado',
+                            'years': [2010, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023],
+                            'reported_cropland_dir': PROJECT_ROOT / 'Data_main/pumping/Colorado/raw/irrigated_lands/Div 1_republican',
+                            'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Republican_Basin.shp',
+                            'irrigated_fraction_dir': PROJECT_ROOT / 'Data_main/rasters/irrigated_cropland/irrigated_frac'},
+                    'SLV': {'state': 'Colorado',
+                            'years': [2002, 2005, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023],
+                            'reported_cropland_dir': PROJECT_ROOT / 'Data_main/pumping/Colorado/raw/irrigated_lands/Div 3_rio grande',
+                            'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Rio_Grande_Basin.shp',
+                            'irrigated_fraction_dir': PROJECT_ROOT / 'Data_main/rasters/irrigated_cropland/irrigated_frac'},
+                    'Arizona': {'years': [2012, 2017, 2022],
+                                'AMA_INA_shp': PROJECT_ROOT / 'Data_main/shapefiles/AMA_and_INA_AZ/AZ_AMA_INA.shp',
+                                'NASS_records_csv': PROJECT_ROOT / 'Data_main/pumping/NASS_irrigated_acres.csv',
+                                'irrigated_fraction_dir': PROJECT_ROOT / 'Data_main/rasters/irrigated_cropland/irrigated_frac'},
+                    'DV': {'years': [2018, 2019, 2020, 2021, 2022],
+                           'reported_csv_path': PROJECT_ROOT / 'Data_main/pumping/Nevada/raw/Diamond Valley/joined_data/dv_joined_et_pumping_data_all.csv',
+                           'shp': PROJECT_ROOT / 'Data_main/shapefiles/Basins_of_interest/Diamond_Valley_Basin.shp',
+                           'irrigated_fraction_dir': PROJECT_ROOT / 'Data_main/rasters/irrigated_cropland/irrigated_frac'
+                           }
+                    }
+                    
+    output_csv : str
+        File path where the resulting summary table (basin, year, irrigated hectares)
+        will be saved as a CSV.
+    
+    return: Ext
+    """
+    
+    # Empty dataframe to collect all extracted data
+    irr_df = pd.DataFrame()
+    
+    for basin, info in basin_dicts.items():
+        if basin in ['GMD3', 'GMD4']:
+            if 'reported_csv_path' not in info or 'shp' not in info or 'irrigated_fraction_dir' not in info:
+                raise ValueError(f"Basin dict - '{basin}' must contain 'reported_csv_path', 'shp', and 'irrigated_fraction_dir' keys for Kansas.")
+
+            else:
+                # aggregating reported irrigated acres data for the basin
+                df = pd.read_csv(info['reported_csv_path'])
+                df = df.dropna(subset=['gmd'])
+                df['basin']= 'GMD' + df['gmd'].astype(int).astype(str)
+                df = df[df['basin'] == basin]
+
+                basin_df = df.groupby('Year')['Acres'].sum().reset_index()
+                basin_df = basin_df.rename(columns={'Year': 'year', 'Acres': 'reported_irrigated_acres'})
+
+                # empty column to store remotely sensed irrigated acres
+                basin_df['RS_irrigated_acres'] = np.nan
+                
+                # aggregating remotely sensed irrigated hectares for the basin
+                for year in info['years']:
+                    irrigated_fraction_raster = list(info['irrigated_fraction_dir'].glob(f'*{year}*.tif'))[0]
+                    irrigated_fraction_arr, irr_file = read_raster_arr_object(irrigated_fraction_raster, get_file=True)
+
+                    # masking the remotely sensed irrigated fraction raster with the basin shapefile
+                    shp_extent = gpd.read_file(info['shp'])
+                    shp_extent = shp_extent.to_crs(crs=irr_file.crs)
+                    geoms = [geom.__geo_interface__ for geom in shp_extent.geometry]  # GeoJSON format
+                    
+                    masked_arr, mask_transform = mask(dataset=irr_file, shapes=geoms, filled=True,
+                                      crop=True, invert=False, all_touched=False)
+                
+                    masked_arr[masked_arr < 0.13] = np.nan  # Kansas uses a 13% irrigated threshold for irrigated cropland classification
+             
+                        
+                    acres_per_2km_pixel = 1087
+                    irr_acres_rs = np.where(~np.isnan(masked_arr), masked_arr * acres_per_2km_pixel, np.nan)
+                    irr_acres_rs = np.nansum(irr_acres_rs) # summing up irrigated acres for the basin in a year
+                    
+                    basin_df.loc[basin_df['year'] == year, 'RS_irrigated_acres'] = irr_acres_rs
+                    basin_df['basin'] = basin
+                    
+        elif basin in ['RPB', 'SLV']:
+            if 'reported_cropland_dir' not in info or 'shp' not in info or 'irrigated_fraction_dir' not in info:
+                raise ValueError(f"Basin dict - '{basin}' must contain 'reported_cropland_dir', 'shp', and 'irrigated_fraction_dir' keys for Colorado.")
+            
+            else:
+                basin_df = pd.DataFrame({'year': info['years'], 'reported_irrigated_acres': np.nan, 'RS_irrigated_acres': np.nan, 'basin': basin})
+                
+                for year in info['years']:
+                    # basin shapefile geometry for masking
+                    shp_extent = gpd.read_file(info['shp'])
+                    shp_extent = shp_extent.to_crs('epsg:4326')
+                    geoms = [geom.__geo_interface__ for geom in shp_extent.geometry]  # GeoJSON format
+
+                    # loading reported irrigated cropland shapefile for the year
+                    reported_cropland_shp = list(info['reported_cropland_dir'].glob(f'*{year}*.shp'))[0]
+                    reported_cropland_gdf = gpd.read_file(reported_cropland_shp)
+                    reported_cropland_gdf = reported_cropland_gdf.to_crs('epsg:4326')
+                    reported_cropland_gdf = reported_cropland_gdf.clip(shp_extent)  # clipping to the basin extent
+                      
+                    reported_cropland_gdf = reported_cropland_gdf.to_crs('epsg:26913') # converting to a projected crs (UTM 13N) for accurate area calculation
+                    
+                    # summing the reported area of total cropland
+                    reported_cropland_gdf['area_sqkm'] = reported_cropland_gdf['geometry'].area / (1000 * 1000)
+                    total_reported_cropland_sqkm = reported_cropland_gdf['area_sqkm'].sum()
+                    total_reported_cropland_acres = total_reported_cropland_sqkm * 247.105  # converting sqkm to acres
+                    
+                    basin_df.loc[basin_df['year'] == year, 'reported_irrigated_acres'] = total_reported_cropland_acres
+                    
+                    # masking the remotely sensed irrigated fraction raster with the basin shapefile
+                    irrigated_fraction_raster = list(info['irrigated_fraction_dir'].glob(f'*{year}*.tif'))[0]
+                    irrigated_fraction_arr, irr_file = read_raster_arr_object(irrigated_fraction_raster, get_file=True)
+                    
+                    masked_arr, mask_transform = mask(dataset=irr_file, shapes=geoms, filled=True,
+                                      crop=True, invert=False, all_touched=False)
+                
+                    masked_arr[masked_arr < 0.13] = np.nan  # Colorado uses a 13% irrigated threshold for irrigated cropland classification
+             
+                    # counting remotely sensed irrigated acres
+                    acres_per_2km_pixel = 1087
+                    irr_acres_rs = np.where(~np.isnan(masked_arr), masked_arr * acres_per_2km_pixel, np.nan)
+                    irr_acres_rs = np.nansum(irr_acres_rs) # summing up irrigated acres for the basin in a year
+                    
+                    basin_df.loc[basin_df['year'] == year, 'RS_irrigated_acres'] = irr_acres_rs
+                    basin_df['basin'] = basin
+                    
+        elif basin == 'Arizona':
+            # ADWR doesn't have a reported irrigated area dataset for Arizona, so we use USDA NASS records
+            if 'NASS_records_csv' not in info or 'AMA_INA_shp' not in info or 'irrigated_fraction_dir' not in info:
+                raise ValueError(f"Basin dict - '{basin}' must contain 'NASS_records_csv', 'AMA_INA_shp', and 'irrigated_fraction_dir' keys for Arizona.")
+            
+            else:
+                basin_df = pd.DataFrame({'year': info['years'], 'reported_irrigated_acres': np.nan, 'RS_irrigated_acres': np.nan, 'basin': basin})
+                
+                # loading AMA and INA shapefile for masking
+                shp_extent = gpd.read_file(info['AMA_INA_shp'])
+                shp_extent = shp_extent.to_crs('epsg:4326')
+                geoms = [geom.__geo_interface__ for geom in shp_extent.geometry]  # GeoJSON format
+                
+                counties_in_AMA_INA  = ['MARICOPA',
+                                        'PINAL',
+                                        'PIMA',
+                                        'YAVAPAI',
+                                        'SANTA CRUZ',
+                                        'COCHISE',
+                                        'LAPAZ',
+                                        'NAVAJO',
+                                        'MOHAVE',
+                                        'YUMA'
+                                    ]
+                
+                for year in info['years']:
+                    # loading NASS records for irrigated acres in Arizona
+                    nass_df = pd.read_csv(info['NASS_records_csv'])
+                    nass_df = nass_df[nass_df['State'] == 'ARIZONA']
+                    nass_df = nass_df[nass_df['Year'] == year]
+                    nass_df = nass_df[nass_df['County'].isin(counties_in_AMA_INA)]  # filtering for counties in AMA and INA
+                    nass_df['Value'] = (nass_df['Value']
+                                        .astype(str)
+                                        .str.replace(',', '', regex=False)
+                                        .str.strip()
+                                        )
+                    nass_df['Value'] = pd.to_numeric(nass_df['Value'], errors='coerce')  # (D) → NaN
+                    
+                    basin_df.loc[basin_df['year'] == year, 'reported_irrigated_acres'] = nass_df['Value'].sum()  # summing up irrigated acres for the basin in a year
+                    
+                    # masking the remotely sensed irrigated fraction raster with the basin shapefile
+                    irrigated_fraction_raster = list(info['irrigated_fraction_dir'].glob(f'*{year}*.tif'))[0]
+                    irrigated_fraction_arr, irr_file = read_raster_arr_object(irrigated_fraction_raster, get_file=True)
+                    
+                    masked_arr, mask_transform = mask(dataset=irr_file, shapes=geoms, filled=True,
+                                    crop=True, invert=False, all_touched=False)
+                
+                    masked_arr[masked_arr < 0.1] = np.nan  # Arizona uses a 1% irrigated threshold for irrigated cropland classification
+            
+                    # counting remotely sensed irrigated acres
+                    acres_per_2km_pixel = 1087
+                    irr_acres_rs = np.where(~np.isnan(masked_arr), masked_arr * acres_per_2km_pixel, np.nan)
+                    irr_acres_rs = np.nansum(irr_acres_rs) # summing up irrigated acres for the basin in a year
+                    
+                    basin_df.loc[basin_df['year'] == year, 'RS_irrigated_acres'] = irr_acres_rs
+                    basin_df['basin'] = basin
+        
+        elif basin == 'DV':
+            if 'reported_csv_path' not in info or 'shp' not in info or 'irrigated_fraction_dir' not in info:
+                raise ValueError(f"Basin dict - '{basin}' must contain 'reported_csv_path', 'shp', and 'irrigated_fraction_dir' keys for Nevada.")
+            
+            else: 
+                # loading shapefile for masking
+                shp_extent = gpd.read_file(info['shp'])
+                shp_extent = shp_extent.to_crs('epsg:4326')
+                geoms = [geom.__geo_interface__ for geom in shp_extent.geometry]  # GeoJSON format
+                
+                # aggregating reported irrigated acres data for the basin
+                df = pd.read_csv(info['reported_csv_path'])
+                annual_df = df.groupby('year')['area_m2'].sum().reset_index()
+                annual_df['reported_irrigated_acres'] = annual_df['area_m2'] * 0.000247105  # converting m2 to acres
+                basin_df = annual_df[['year', 'reported_irrigated_acres']]
+                
+                basin_df['RS_irrigated_acres'] = np.nan
+            
+                for year in info['years']:
+                    # masking the remotely sensed irrigated fraction raster with the basin shapefile
+                    irrigated_fraction_raster = list(info['irrigated_fraction_dir'].glob(f'*{year}*.tif'))[0]
+                    irrigated_fraction_arr, irr_file = read_raster_arr_object(irrigated_fraction_raster, get_file=True)
+                    
+                    masked_arr, mask_transform = mask(dataset=irr_file, shapes=geoms, filled=True,
+                                    crop=True, invert=False, all_touched=False)
+                
+                    masked_arr[masked_arr < 0.1] = np.nan  # Arizona uses a 1% irrigated threshold for irrigated cropland classification
+            
+                    # counting remotely sensed irrigated acres
+                    acres_per_2km_pixel = 1087
+                    irr_acres_rs = np.where(~np.isnan(masked_arr), masked_arr * acres_per_2km_pixel, np.nan)
+                    irr_acres_rs = np.nansum(irr_acres_rs) # summing up irrigated acres for the basin in a year
+                    
+                    basin_df.loc[basin_df['year'] == year, 'RS_irrigated_acres'] = irr_acres_rs
+                    basin_df['basin'] = basin
+                            
+        # concatenating extracted data to the info_df
+        irr_df = pd.concat([irr_df, basin_df], ignore_index=True)
+
+    # acres to hectares conversion
+    irr_df['reported_irrigated_hectares'] = irr_df['reported_irrigated_acres'] * 0.404686
+    irr_df['RS_irrigated_hectares'] = irr_df['RS_irrigated_acres'] * 0.404686
+    irr_df.dropna(inplace=True)
+    
+    irr_df.to_csv(PROJECT_ROOT / output_csv, index=False)                 
+                                                   
+    return irr_df
 
 def compile_prediction_CI(basin_code, years, basin_shp,
                           prediction_CI_dir, basin_output_dir):

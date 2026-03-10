@@ -1,0 +1,38 @@
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+
+# IDEs
+.idea/
+.vscode/
+.virtual_documents/
+
+# Claude
+.claude/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data (large files — keep out of version control)
+*.tif
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.qmd
+*.csv
+*.nc
+*.h5
+*.hdf5
+
+# Model outputs
+*.pth
+*.pkl
+*.joblib

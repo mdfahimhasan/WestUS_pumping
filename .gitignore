@@ -1,0 +1,247 @@
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+.virtual_documents/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Large/binary data files (ignored by default)
+*.pdf
+*.tif
+*.tiff
+*.csv
+
+# Shapefile-related extensions
+*.shp
+*.dbf
+*.shx
+*.prj
+*.cpg
+*.qmd
+*.sbn
+*.sbx
+*.shp.xml
+
+# Aux files
+*.aux.xml
+
+# ---------------------------------------------------------------------------
+# Exceptions: files already committed — keep tracking these
+# ---------------------------------------------------------------------------
+
+# Reference rasters
+!Data_main/ref_rasters/GEE_merging_refraster_larger_grids.tif
+!Data_main/ref_rasters/Western_US_ROI_refraster_2km.tif
+!Data_main/ref_rasters/Western_US_refraster_2km.tif
+
+# CSVs
+!Data_main/pumping/Arizona/Final/SW_Pinal.csv
+!Data_main/pumping/Nevada/Final/pod_pumping_data.csv
+!Data_main/pumping/Nevada/raw/Diamond Valley/joined_data/dv_joined_et_pumping_data_all.csv
+!Data_main/pumping/Utah/from Soheil/processed_Soheil/gw_withdrawals_beryl.csv
+!Data_main/pumping/Utah/from Soheil/processed_Soheil/gw_withdrawals_cedar.csv
+!Data_main/pumping/Utah/from Soheil/processed_Soheil/gw_withdrawals_parowan.csv
+
+# Shapefiles — Arizona Final
+!Data_main/pumping/Arizona/Final/pumping_AZ_v0.cpg
+!Data_main/pumping/Arizona/Final/pumping_AZ_v0.dbf
+!Data_main/pumping/Arizona/Final/pumping_AZ_v0.prj
+!Data_main/pumping/Arizona/Final/pumping_AZ_v0.shp
+!Data_main/pumping/Arizona/Final/pumping_AZ_v0.shx
+!Data_main/pumping/Arizona/Final/pumping_AZ_v1.cpg
+!Data_main/pumping/Arizona/Final/pumping_AZ_v1.dbf
+!Data_main/pumping/Arizona/Final/pumping_AZ_v1.prj
+!Data_main/pumping/Arizona/Final/pumping_AZ_v1.qmd
+!Data_main/pumping/Arizona/Final/pumping_AZ_v1.shp
+!Data_main/pumping/Arizona/Final/pumping_AZ_v1.shx
+
+# Shapefiles — Arizona major irrig zones
+!Data_main/pumping/Arizona/major_irrig_zones/major_irrig_zones_AZ.cpg
+!Data_main/pumping/Arizona/major_irrig_zones/major_irrig_zones_AZ.dbf
+!Data_main/pumping/Arizona/major_irrig_zones/major_irrig_zones_AZ.prj
+!Data_main/pumping/Arizona/major_irrig_zones/major_irrig_zones_AZ.qmd
+!Data_main/pumping/Arizona/major_irrig_zones/major_irrig_zones_AZ.shp
+!Data_main/pumping/Arizona/major_irrig_zones/major_irrig_zones_AZ.shx
+
+# Shapefiles — Colorado major irrig zones
+!Data_main/pumping/Colorado/major_irrig_zones/major_irrig_zones_CO.cpg
+!Data_main/pumping/Colorado/major_irrig_zones/major_irrig_zones_CO.dbf
+!Data_main/pumping/Colorado/major_irrig_zones/major_irrig_zones_CO.prj
+!Data_main/pumping/Colorado/major_irrig_zones/major_irrig_zones_CO.shp
+!Data_main/pumping/Colorado/major_irrig_zones/major_irrig_zones_CO.shx
+
+# Shapefiles — Colorado Well IDs
+!Data_main/pumping/Colorado/raw/pumping/Well_ID/Well_ID_CO_v1.cpg
+!Data_main/pumping/Colorado/raw/pumping/Well_ID/Well_ID_CO_v1.dbf
+!Data_main/pumping/Colorado/raw/pumping/Well_ID/Well_ID_CO_v1.prj
+!Data_main/pumping/Colorado/raw/pumping/Well_ID/Well_ID_CO_v1.shp
+!Data_main/pumping/Colorado/raw/pumping/Well_ID/Well_ID_CO_v1.shx
+
+# Shapefiles — Nevada Final
+!Data_main/pumping/Nevada/Final/pod_pumping.cpg
+!Data_main/pumping/Nevada/Final/pod_pumping.dbf
+!Data_main/pumping/Nevada/Final/pod_pumping.prj
+!Data_main/pumping/Nevada/Final/pod_pumping.shp
+!Data_main/pumping/Nevada/Final/pod_pumping.shx
+
+# Shapefiles — Nevada Diamond Valley pod
+!Data_main/pumping/Nevada/raw/Diamond Valley/pod/dv_pod.cpg
+!Data_main/pumping/Nevada/raw/Diamond Valley/pod/dv_pod.dbf
+!Data_main/pumping/Nevada/raw/Diamond Valley/pod/dv_pod.prj
+!Data_main/pumping/Nevada/raw/Diamond Valley/pod/dv_pod.qmd
+!Data_main/pumping/Nevada/raw/Diamond Valley/pod/dv_pod.shp
+!Data_main/pumping/Nevada/raw/Diamond Valley/pod/dv_pod.shx
+
+# Shapefiles — ref_shapes
+!Data_main/ref_shapes/WestUS_ROI.cpg
+!Data_main/ref_shapes/WestUS_ROI.dbf
+!Data_main/ref_shapes/WestUS_ROI.prj
+!Data_main/ref_shapes/WestUS_ROI.qmd
+!Data_main/ref_shapes/WestUS_ROI.shp
+!Data_main/ref_shapes/WestUS_ROI.shx
+!Data_main/ref_shapes/WestUS_county.cpg
+!Data_main/ref_shapes/WestUS_county.dbf
+!Data_main/ref_shapes/WestUS_county.prj
+!Data_main/ref_shapes/WestUS_county.qmd
+!Data_main/ref_shapes/WestUS_county.sbn
+!Data_main/ref_shapes/WestUS_county.sbx
+!Data_main/ref_shapes/WestUS_county.shp
+!Data_main/ref_shapes/WestUS_county.shx
+!Data_main/ref_shapes/WestUS_county_projected.cpg
+!Data_main/ref_shapes/WestUS_county_projected.dbf
+!Data_main/ref_shapes/WestUS_county_projected.prj
+!Data_main/ref_shapes/WestUS_county_projected.qmd
+!Data_main/ref_shapes/WestUS_county_projected.shp
+!Data_main/ref_shapes/WestUS_county_projected.shx
+!Data_main/ref_shapes/WestUS_gee_grid_for30m_IrrMapper.cpg
+!Data_main/ref_shapes/WestUS_gee_grid_for30m_IrrMapper.dbf
+!Data_main/ref_shapes/WestUS_gee_grid_for30m_IrrMapper.prj
+!Data_main/ref_shapes/WestUS_gee_grid_for30m_IrrMapper.qmd
+!Data_main/ref_shapes/WestUS_gee_grid_for30m_IrrMapper.shp
+!Data_main/ref_shapes/WestUS_gee_grid_for30m_IrrMapper.shx
+!Data_main/ref_shapes/WestUS_gee_grid_for30m_LANID.cpg
+!Data_main/ref_shapes/WestUS_gee_grid_for30m_LANID.dbf
+!Data_main/ref_shapes/WestUS_gee_grid_for30m_LANID.prj
+!Data_main/ref_shapes/WestUS_gee_grid_for30m_LANID.qmd
+!Data_main/ref_shapes/WestUS_gee_grid_for30m_LANID.shp
+!Data_main/ref_shapes/WestUS_gee_grid_for30m_LANID.shx
+!Data_main/ref_shapes/WestUS_gee_grid_large.cpg
+!Data_main/ref_shapes/WestUS_gee_grid_large.dbf
+!Data_main/ref_shapes/WestUS_gee_grid_large.prj
+!Data_main/ref_shapes/WestUS_gee_grid_large.shp
+!Data_main/ref_shapes/WestUS_gee_grid_large.shx
+!Data_main/ref_shapes/WestUS_states.cpg
+!Data_main/ref_shapes/WestUS_states.dbf
+!Data_main/ref_shapes/WestUS_states.prj
+!Data_main/ref_shapes/WestUS_states.qmd
+!Data_main/ref_shapes/WestUS_states.shp
+!Data_main/ref_shapes/WestUS_states.shx
+
+# Shapefiles — Basins of interest
+!Data_main/shapefiles/Basins_of_interest/Beryl_Valley.cpg
+!Data_main/shapefiles/Basins_of_interest/Beryl_Valley.dbf
+!Data_main/shapefiles/Basins_of_interest/Beryl_Valley.prj
+!Data_main/shapefiles/Basins_of_interest/Beryl_Valley.qmd
+!Data_main/shapefiles/Basins_of_interest/Beryl_Valley.shp
+!Data_main/shapefiles/Basins_of_interest/Beryl_Valley.shx
+!Data_main/shapefiles/Basins_of_interest/Cedar_Valley.cpg
+!Data_main/shapefiles/Basins_of_interest/Cedar_Valley.dbf
+!Data_main/shapefiles/Basins_of_interest/Cedar_Valley.prj
+!Data_main/shapefiles/Basins_of_interest/Cedar_Valley.qmd
+!Data_main/shapefiles/Basins_of_interest/Cedar_Valley.shp
+!Data_main/shapefiles/Basins_of_interest/Cedar_Valley.shx
+!Data_main/shapefiles/Basins_of_interest/Diamond_Valley_Basin.cpg
+!Data_main/shapefiles/Basins_of_interest/Diamond_Valley_Basin.dbf
+!Data_main/shapefiles/Basins_of_interest/Diamond_Valley_Basin.prj
+!Data_main/shapefiles/Basins_of_interest/Diamond_Valley_Basin.qmd
+!Data_main/shapefiles/Basins_of_interest/Diamond_Valley_Basin.shp
+!Data_main/shapefiles/Basins_of_interest/Diamond_Valley_Basin.shx
+!Data_main/shapefiles/Basins_of_interest/Douglas_AMA.cpg
+!Data_main/shapefiles/Basins_of_interest/Douglas_AMA.dbf
+!Data_main/shapefiles/Basins_of_interest/Douglas_AMA.prj
+!Data_main/shapefiles/Basins_of_interest/Douglas_AMA.qmd
+!Data_main/shapefiles/Basins_of_interest/Douglas_AMA.shp
+!Data_main/shapefiles/Basins_of_interest/Douglas_AMA.shx
+!Data_main/shapefiles/Basins_of_interest/GMD3.cpg
+!Data_main/shapefiles/Basins_of_interest/GMD3.dbf
+!Data_main/shapefiles/Basins_of_interest/GMD3.prj
+!Data_main/shapefiles/Basins_of_interest/GMD3.qmd
+!Data_main/shapefiles/Basins_of_interest/GMD3.shp
+!Data_main/shapefiles/Basins_of_interest/GMD3.shx
+!Data_main/shapefiles/Basins_of_interest/GMD4.cpg
+!Data_main/shapefiles/Basins_of_interest/GMD4.dbf
+!Data_main/shapefiles/Basins_of_interest/GMD4.prj
+!Data_main/shapefiles/Basins_of_interest/GMD4.qmd
+!Data_main/shapefiles/Basins_of_interest/GMD4.shp
+!Data_main/shapefiles/Basins_of_interest/GMD4.shx
+!Data_main/shapefiles/Basins_of_interest/Harquahala_INA.cpg
+!Data_main/shapefiles/Basins_of_interest/Harquahala_INA.dbf
+!Data_main/shapefiles/Basins_of_interest/Harquahala_INA.prj
+!Data_main/shapefiles/Basins_of_interest/Harquahala_INA.qmd
+!Data_main/shapefiles/Basins_of_interest/Harquahala_INA.shp
+!Data_main/shapefiles/Basins_of_interest/Harquahala_INA.shx
+!Data_main/shapefiles/Basins_of_interest/Parowan_Valley.cpg
+!Data_main/shapefiles/Basins_of_interest/Parowan_Valley.dbf
+!Data_main/shapefiles/Basins_of_interest/Parowan_Valley.prj
+!Data_main/shapefiles/Basins_of_interest/Parowan_Valley.qmd
+!Data_main/shapefiles/Basins_of_interest/Parowan_Valley.shp
+!Data_main/shapefiles/Basins_of_interest/Parowan_Valley.shx
+!Data_main/shapefiles/Basins_of_interest/Phoenix_AMA.cpg
+!Data_main/shapefiles/Basins_of_interest/Phoenix_AMA.dbf
+!Data_main/shapefiles/Basins_of_interest/Phoenix_AMA.prj
+!Data_main/shapefiles/Basins_of_interest/Phoenix_AMA.qmd
+!Data_main/shapefiles/Basins_of_interest/Phoenix_AMA.shp
+!Data_main/shapefiles/Basins_of_interest/Phoenix_AMA.shx
+!Data_main/shapefiles/Basins_of_interest/Pinal_AMA.cpg
+!Data_main/shapefiles/Basins_of_interest/Pinal_AMA.dbf
+!Data_main/shapefiles/Basins_of_interest/Pinal_AMA.prj
+!Data_main/shapefiles/Basins_of_interest/Pinal_AMA.qmd
+!Data_main/shapefiles/Basins_of_interest/Pinal_AMA.shp
+!Data_main/shapefiles/Basins_of_interest/Pinal_AMA.shx
+!Data_main/shapefiles/Basins_of_interest/Republican_Basin.cpg
+!Data_main/shapefiles/Basins_of_interest/Republican_Basin.dbf
+!Data_main/shapefiles/Basins_of_interest/Republican_Basin.prj
+!Data_main/shapefiles/Basins_of_interest/Republican_Basin.qmd
+!Data_main/shapefiles/Basins_of_interest/Republican_Basin.shp
+!Data_main/shapefiles/Basins_of_interest/Republican_Basin.shx
+!Data_main/shapefiles/Basins_of_interest/Rio_Grande_Basin.cpg
+!Data_main/shapefiles/Basins_of_interest/Rio_Grande_Basin.dbf
+!Data_main/shapefiles/Basins_of_interest/Rio_Grande_Basin.prj
+!Data_main/shapefiles/Basins_of_interest/Rio_Grande_Basin.qmd
+!Data_main/shapefiles/Basins_of_interest/Rio_Grande_Basin.shp
+!Data_main/shapefiles/Basins_of_interest/Rio_Grande_Basin.shx
+!Data_main/shapefiles/Basins_of_interest/SantaCruz_AMA.cpg
+!Data_main/shapefiles/Basins_of_interest/SantaCruz_AMA.dbf
+!Data_main/shapefiles/Basins_of_interest/SantaCruz_AMA.prj
+!Data_main/shapefiles/Basins_of_interest/SantaCruz_AMA.qmd
+!Data_main/shapefiles/Basins_of_interest/SantaCruz_AMA.shp
+!Data_main/shapefiles/Basins_of_interest/SantaCruz_AMA.shx
+!Data_main/shapefiles/Basins_of_interest/South_Platte_Basin.cpg
+!Data_main/shapefiles/Basins_of_interest/South_Platte_Basin.dbf
+!Data_main/shapefiles/Basins_of_interest/South_Platte_Basin.prj
+!Data_main/shapefiles/Basins_of_interest/South_Platte_Basin.qmd
+!Data_main/shapefiles/Basins_of_interest/South_Platte_Basin.shp
+!Data_main/shapefiles/Basins_of_interest/South_Platte_Basin.shx
+!Data_main/shapefiles/Basins_of_interest/South_Platte_Basin_comparison_extent.cpg
+!Data_main/shapefiles/Basins_of_interest/South_Platte_Basin_comparison_extent.dbf
+!Data_main/shapefiles/Basins_of_interest/South_Platte_Basin_comparison_extent.prj
+!Data_main/shapefiles/Basins_of_interest/South_Platte_Basin_comparison_extent.qmd
+!Data_main/shapefiles/Basins_of_interest/South_Platte_Basin_comparison_extent.shp
+!Data_main/shapefiles/Basins_of_interest/South_Platte_Basin_comparison_extent.shx
+!Data_main/shapefiles/Basins_of_interest/Tucson_AMA.cpg
+!Data_main/shapefiles/Basins_of_interest/Tucson_AMA.dbf
+!Data_main/shapefiles/Basins_of_interest/Tucson_AMA.prj
+!Data_main/shapefiles/Basins_of_interest/Tucson_AMA.qmd
+!Data_main/shapefiles/Basins_of_interest/Tucson_AMA.shp
+!Data_main/shapefiles/Basins_of_interest/Tucson_AMA.shx

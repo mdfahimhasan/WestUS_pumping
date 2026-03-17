@@ -21,6 +21,37 @@ __pycache__/
 *.tif
 *.tiff
 *.csv
+*.xlsx
+*.xls
+*.txt
+*.jpg
+*.jpeg
+*.png
+*.parquet
+*.pptx
+*.docx
+*.atx
+*.gdbtable
+*.gdbtablx
+*.gdbindexes
+*.horizon
+*.freelist
+*.spx
+*.xml
+*.ovr
+*.mp4
+*.fix
+*.rtf
+*.qgz
+*.tfw
+*.joblib
+
+# BIL raster format
+*.bil
+*.hdr
+*.blw
+*.stx
+*.aux
 
 # Shapefile-related extensions
 *.shp
@@ -39,6 +70,12 @@ __pycache__/
 # ---------------------------------------------------------------------------
 # Exceptions: files already committed — keep tracking these
 # ---------------------------------------------------------------------------
+
+# Images
+!readme_figs/CSU-Signature-C-357-617.png
+!readme_figs/NASA-Logo-Large.png
+!readme_figs/Official-DRI-Logo-for-Web.png
+!readme_figs/model_prediciton.png
 
 # Reference rasters
 !Data_main/ref_rasters/GEE_merging_refraster_larger_grids.tif

@@ -139,7 +139,7 @@ projects/ee-westus-pumping/assets/westus_pumping
 > **Note:** The dataset represents groundwater pumping in groundwater-dominated basins, but total irrigation in conjunctive basins (where significant surface water irrigation is supplemented by groundwater supply). The groundwater-dominated vs conjunctive basin classification can be visualized by the `GW_use_binary` asset, provided in the following GEE code snippet.
 
 Sample code for visualization and data download from GEE is available at:  
-https://code.earthengine.google.com/a439de4785b9123e7255c3471ff8ed15
+https://code.earthengine.google.com/5f5f1dcc3840126545e6860015c982e8
 
 
 **HydroShare repository:**

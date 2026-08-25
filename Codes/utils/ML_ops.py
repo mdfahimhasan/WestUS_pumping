@@ -22,12 +22,18 @@ from pathlib import Path
 import shap
 import lightgbm as lgb
 from lightgbm import LGBMRegressor
+import xgboost as xgb
+from xgboost import XGBRegressor
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import OneHotEncoder
 from hyperopt import hp, tpe, Trials, fmin, STATUS_OK
 from sklearn.inspection import permutation_importance
 from sklearn.metrics import make_scorer, root_mean_squared_error
 from sklearn.inspection import PartialDependenceDisplay as PDisp
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import train_test_split, cross_val_score, KFold
+
+# supported model types for train_model()/bayes_hyperparam_opt() - keep in sync with those functions
+SUPPORTED_MODEL_TYPES = ('lightgbm', 'xgboost', 'random_forest')
 
 # Project root directory (works regardless of cwd)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -127,10 +133,10 @@ def create_train_test_dataframe(years_list, yearly_data_path_dict,
         if 'irr_crop_frac' in train_test_ddf.columns:
             train_test_ddf = train_test_ddf[train_test_ddf['irr_crop_frac'] >= 0.02]
 
-        if '.parquet' in output_parquet:
+        if '.parquet' in str(output_parquet):
             train_test_ddf.to_parquet(output_parquet, write_index=False)
 
-        elif '.csv' in output_parquet:
+        elif '.csv' in str(output_parquet):
             train_test_df = train_test_ddf.compute()
             train_test_df.to_csv(output_parquet, index=False)
 
@@ -318,17 +324,19 @@ def split_train_val_test_set_v2(data_parquet, pred_attr, exclude_columns, output
         return x_train, x_test, y_train, y_test
 
 
-def objective_func_bayes(params, train_set, iteration_csv, n_fold):
+def objective_func_bayes(params, train_set, iteration_csv, n_fold, model_type='lightgbm'):
     """
-    Objective function for Bayesian optimization using Hyperopt and LightGBM.
+    Objective function for Bayesian optimization using Hyperopt.
 
     **** Bayesian optimization doesn't directly optimize the objective function. Instead, it builds a probabilistic
     model (a surrogate) to predict promising regions. In our case its the TPE in bayes_hyperparam_opt() function.
 
     :param params: Hyperparameter space to use while optimizing.
-    :param train_set: A LGBM dataset. Constructed within the bayes_hyperparam_opt() func using x_train and y_train.
+    :param train_set: A dataframe with predictors + target as the last column. Constructed within the
+                      bayes_hyperparam_opt() func using x_train and y_train.
     :param iteration_csv: Filepath of a csv where hyperparameter iteration step will be stored.
     :param n_fold: KFold cross validation number. Usually 5 or 10.
+    :param model_type: One of 'lightgbm', 'xgboost', 'random_forest'. Default 'lightgbm'.
 
     :return : A dictionary after each iteration holding rmse, params, run_time, etc.
     """
@@ -337,49 +345,90 @@ def objective_func_bayes(params, train_set, iteration_csv, n_fold):
 
     start = timer()
 
-    # converting the train_set (dataframe) to LightGBM Dataset
-    train_set = lgb.Dataset(train_set.iloc[:, :-1], label=train_set.iloc[:, -1])
+    x = train_set.iloc[:, :-1]
+    y = train_set.iloc[:, -1]
 
-    # retrieve the boosting type and subsample (if not present set subsample to 1)
-    subsample = params['boosting_type'].get('subsample', 1)
-    params['subsample'] = subsample
-    params['boosting_type'] = params['boosting_type']['boosting_type']
+    if model_type == 'lightgbm':
+        # converting the train_set (dataframe) to LightGBM Dataset
+        lgb_train_set = lgb.Dataset(x, label=y)
 
-    # inserting a new parameter in the dictionary to handle 'goss'
-    # the new version of LIGHTGBM handles 'goss' as 'boosting_type' = 'gdbt' & 'data_sample_strategy' = 'goss'
-    if params['boosting_type'] == 'goss':
-        params['boosting_type'] = 'gbdt'
-        params['data_sample_strategy'] = 'goss'
+        # retrieve the boosting type and subsample (if not present set subsample to 1)
+        subsample = params['boosting_type'].get('subsample', 1)
+        params['subsample'] = subsample
+        params['boosting_type'] = params['boosting_type']['boosting_type']
 
-    # ensure integer type for integer hyperparameters
-    for parameter_name in ['n_estimators', 'num_leaves', 'min_child_samples', 'max_depth', 'max_drop']:
-        params[parameter_name] = int(params[parameter_name])
+        # inserting a new parameter in the dictionary to handle 'goss'
+        # the new version of LIGHTGBM handles 'goss' as 'boosting_type' = 'gdbt' & 'data_sample_strategy' = 'goss'
+        if params['boosting_type'] == 'goss':
+            params['boosting_type'] = 'gbdt'
+            params['data_sample_strategy'] = 'goss'
 
-    # callbacks
-    callbacks = [
-        # lgb.early_stopping(stopping_rounds=50),
-        lgb.log_evaluation(period=0)
-    ]
+        # ensure integer type for integer hyperparameters
+        for parameter_name in ['n_estimators', 'num_leaves', 'min_child_samples', 'max_depth', 'max_drop']:
+            params[parameter_name] = int(params[parameter_name])
 
-    # perform n_fold cross validation
-    # ** not using num_boost_round and early stopping as we are providing n_estimators in the param_space **
-    cv_results = lgb.cv(params, train_set,
-                        # num_boost_round=10000,
-                        nfold=n_fold,
-                        stratified=False, metrics='rmse', seed=50,
-                        callbacks=callbacks)
+        # callbacks
+        callbacks = [
+            # lgb.early_stopping(stopping_rounds=50),
+            lgb.log_evaluation(period=0)
+        ]
+
+        # perform n_fold cross validation
+        # ** not using num_boost_round and early stopping as we are providing n_estimators in the param_space **
+        cv_results = lgb.cv(params, lgb_train_set,
+                            # num_boost_round=10000,
+                            nfold=n_fold,
+                            stratified=False, metrics='rmse', seed=50,
+                            callbacks=callbacks)
+
+        # best score extraction
+        # the try-except block was inserted because of two versions of LIGHTGBM is desktop and server. The server
+        # version used keyword 'valid rmse-mean' while the desktop version was using 'rmse-mean'
+        try:
+            best_rmse = np.min(cv_results[
+                                   'valid rmse-mean'])  # valid rmse-mean stands for mean RMSE value across all the folds for each boosting round
+
+        except:
+            best_rmse = np.min(cv_results['rmse-mean'])
+
+    elif model_type == 'xgboost':
+        # ensure integer type for integer hyperparameters
+        for parameter_name in ['n_estimators', 'max_depth', 'min_child_weight']:
+            if parameter_name in params:
+                params[parameter_name] = int(params[parameter_name])
+
+        n_estimators = params.pop('n_estimators')  # used as num_boost_round, not a booster param
+
+        dtrain = xgb.DMatrix(x, label=y)
+        xgb_params = dict(params)
+        xgb_params.update({'objective': 'reg:squarederror', 'eval_metric': 'rmse'})
+
+        cv_results = xgb.cv(xgb_params, dtrain, num_boost_round=n_estimators,
+                            nfold=n_fold, seed=50, metrics='rmse', verbose_eval=False)
+
+        best_rmse = np.min(cv_results['test-rmse-mean'])
+
+        params['n_estimators'] = n_estimators  # restore for logging/return below
+
+    elif model_type == 'random_forest':
+        # ensure integer type for integer hyperparameters (max_depth may be None - hp.choice handles that)
+        for parameter_name in ['n_estimators', 'min_samples_leaf', 'min_samples_split']:
+            if parameter_name in params:
+                params[parameter_name] = int(params[parameter_name])
+        if params.get('max_depth') is not None:
+            params['max_depth'] = int(params['max_depth'])
+
+        rf = RandomForestRegressor(random_state=0, n_jobs=-1, **params)
+        kf = KFold(n_splits=n_fold, shuffle=True, random_state=50)
+        rmse_scorer = make_scorer(root_mean_squared_error, greater_is_better=False)
+        neg_rmse_scores = cross_val_score(rf, x, y, cv=kf, scoring=rmse_scorer, n_jobs=1)
+
+        best_rmse = float(np.mean(-neg_rmse_scores))
+
+    else:
+        raise ValueError(f"model_type must be one of {SUPPORTED_MODEL_TYPES}; got '{model_type}'")
 
     run_time = timer() - start
-
-    # best score extraction
-    # the try-except block was inserted because of two versions of LIGHTGBM is desktop and server. The server
-    # version used keyword 'valid rmse-mean' while the desktop version was using 'rmse-mean'
-    try:
-        best_rmse = np.min(cv_results[
-                               'valid rmse-mean'])  # valid rmse-mean stands for mean RMSE value across all the folds for each boosting round
-
-    except:
-        best_rmse = np.min(cv_results['rmse-mean'])
 
     # result of each iteration will be store in the iteration_csv
     makedirs([os.path.dirname(iteration_csv)])
@@ -401,7 +450,8 @@ def objective_func_bayes(params, train_set, iteration_csv, n_fold):
             'iteration': ITERATION, 'train_time': run_time, 'status': STATUS_OK}
 
 
-def bayes_hyperparam_opt(x_train, y_train, iteration_csv, n_fold=10, max_evals=1000, skip_processing=False):
+def bayes_hyperparam_opt(x_train, y_train, iteration_csv, n_fold=10, max_evals=1000,
+                         model_type='lightgbm', skip_processing=False):
     """
     Hyperparameter optimization using Bayesian optimization method.
 
@@ -424,37 +474,62 @@ def bayes_hyperparam_opt(x_train, y_train, iteration_csv, n_fold=10, max_evals=1
     :param iteration_csv: Filepath of a csv where hyperparameter iteration step will be stored.
     :param n_fold : Number of folds in K Fold CV. Default set to 10.
     :param max_evals : Maximum number of evaluations during hyperparameter optimization. Default set to 1000.
+    :param model_type: One of 'lightgbm', 'xgboost', 'random_forest'. Default 'lightgbm'. Selects both the
+                       search space used below and the estimator used inside objective_func_bayes().
     :param skip_processing: Set to True to skip hyperparameter tuning. Default set to False.
 
     :return : Best hyperparameters' dictionary.
     """
     if not skip_processing:
-        print(f'performing bayesian hyperparameter optimization...')
+        print(f'performing bayesian hyperparameter optimization for model_type={model_type}...')
+
+        if model_type not in SUPPORTED_MODEL_TYPES:
+            raise ValueError(f"model_type must be one of {SUPPORTED_MODEL_TYPES}; got '{model_type}'")
 
         # merging x_train and y_train into a single dataset
         train_set = pd.concat([x_train, y_train], axis=1)
 
-        # creating hyperparameter space for LGBM models
-        param_space = {'boosting_type': hp.choice('boosting_type',
-                                                  [
-                                                      {
-                                                          'boosting_type': 'dart',
-                                                          'subsample': hp.uniform('dart_subsample', 0.5, 0.8)
-                                                      },
-                                                  ]),
-                       'drop_rate': hp.uniform('drop_rate', 0.05, 0.3),  # 5–30% dropout rate
-                       'max_drop': hp.quniform('max_drop', 10, 80, 5),  # number of trees that can be dropped
-                       'skip_drop': hp.uniform('skip_drop', 0.4, 0.7),  # probability to skip dropout in an iteration
-                       'n_estimators': hp.quniform('n_estimators', 200, 400, 25),
-                       'max_depth': hp.uniform('max_depth', 4, 8),
-                       'learning_rate': hp.loguniform('learning_rate', np.log(0.005), np.log(0.02)),
-                       'colsample_bytree': hp.uniform('colsample_bytree', 0.6, 0.8),
-                       'colsample_bynode': hp.uniform('colsample_bynode', 0.6, 0.8),
-                       'path_smooth': hp.uniform('path_smooth', 0.5, 0.8),
-                       'num_leaves': hp.quniform('num_leaves', 15, 50, 5),
-                       'min_child_samples': hp.quniform('min_child_samples', 50, 100, 5),
-                       'force_col_wise': True  # set to False to choose between colum/row-wise parallelization
-                       }
+        # creating hyperparameter space based on model_type
+        if model_type == 'lightgbm':
+            param_space = {'boosting_type': hp.choice('boosting_type',
+                                                      [
+                                                          {
+                                                              'boosting_type': 'dart',
+                                                              'subsample': hp.uniform('dart_subsample', 0.5, 0.8)
+                                                          },
+                                                      ]),
+                           'drop_rate': hp.uniform('drop_rate', 0.05, 0.3),  # 5–30% dropout rate
+                           'max_drop': hp.quniform('max_drop', 10, 80, 5),  # number of trees that can be dropped
+                           'skip_drop': hp.uniform('skip_drop', 0.4, 0.7),  # probability to skip dropout in an iteration
+                           'n_estimators': hp.quniform('n_estimators', 200, 400, 25),
+                           'max_depth': hp.uniform('max_depth', 4, 8),
+                           'learning_rate': hp.loguniform('learning_rate', np.log(0.005), np.log(0.02)),
+                           'colsample_bytree': hp.uniform('colsample_bytree', 0.6, 0.8),
+                           'colsample_bynode': hp.uniform('colsample_bynode', 0.6, 0.8),
+                           'path_smooth': hp.uniform('path_smooth', 0.5, 0.8),
+                           'num_leaves': hp.quniform('num_leaves', 15, 50, 5),
+                           'min_child_samples': hp.quniform('min_child_samples', 50, 100, 5),
+                           'force_col_wise': True  # set to False to choose between colum/row-wise parallelization
+                           }
+
+        elif model_type == 'xgboost':
+            param_space = {'n_estimators': hp.quniform('xgb_n_estimators', 200, 800, 50),
+                           'max_depth': hp.quniform('xgb_max_depth', 3, 10, 1),
+                           'learning_rate': hp.loguniform('xgb_learning_rate', np.log(0.005), np.log(0.1)),
+                           'subsample': hp.uniform('xgb_subsample', 0.5, 1.0),
+                           'colsample_bytree': hp.uniform('xgb_colsample_bytree', 0.5, 1.0),
+                           'min_child_weight': hp.quniform('xgb_min_child_weight', 1, 20, 1),
+                           'reg_alpha': hp.loguniform('xgb_reg_alpha', np.log(1e-4), np.log(10)),
+                           'reg_lambda': hp.loguniform('xgb_reg_lambda', np.log(1e-4), np.log(10)),
+                           }
+
+        elif model_type == 'random_forest':
+            param_space = {'n_estimators': hp.quniform('rf_n_estimators', 200, 800, 50),
+                           'max_depth': hp.choice('rf_max_depth', [None, 5, 10, 15, 20, 25]),
+                           'max_features': hp.uniform('rf_max_features', 0.3, 1.0),
+                           'min_samples_leaf': hp.quniform('rf_min_samples_leaf', 1, 20, 1),
+                           'min_samples_split': hp.quniform('rf_min_samples_split', 2, 20, 1),
+                           }
 
         # optimization algorithm
         tpe_algorithm = tpe.suggest  # stand for Tree-structured Parzen Estimator. A surrogate (probabilistic) model
@@ -471,7 +546,7 @@ def bayes_hyperparam_opt(x_train, y_train, iteration_csv, n_fold=10, max_evals=1
 
         # creating a wrapper function to bring all arguments of objective_func_bayes() under a single argument
         def objective_wrapper(params):
-            return objective_func_bayes(params, train_set, iteration_csv, n_fold)
+            return objective_func_bayes(params, train_set, iteration_csv, n_fold, model_type=model_type)
 
         # implementation of Sequential model-based optimization (SMBO)
         global ITERATION
@@ -500,6 +575,7 @@ def bayes_hyperparam_opt(x_train, y_train, iteration_csv, n_fold=10, max_evals=1
 
 
 def train_model(x_train, y_train, params_dict,
+                model_type='lightgbm',
                 categorical_columns=None,
                 load_model=False, save_model=False,
                 save_folder=None, model_save_name=None,
@@ -507,7 +583,7 @@ def train_model(x_train, y_train, params_dict,
                 iteration_csv=None, n_fold=10, max_evals=1000,
                 verbose=True):
     """
-    Train a LightGBM regressor model with given hyperparameters.
+    Train a regressor model (LightGBM, XGBoost, or Random Forest) with given hyperparameters.
 
     *******
     # To run the model without saving/loading the trained model, use load_model=False, save_model=False, save_folder=None,
@@ -519,9 +595,9 @@ def train_model(x_train, y_train, params_dict,
     *******
 
     :param x_train, y_train : x_train (predictor) and y_train (target) arrays from split_train_test_ratio() function.
-    :param params_dict : ML model param dictionary. Currently supports LGBM model 'gbdt', 'goss', and 'dart'.
-                  **** when tuning hyperparameters set params_dict=None.
-                    For LGBM the dictionary should be like the following with user defined values-
+    :param params_dict : ML model param dictionary, matching model_type.
+                  **** when tuning hyperparameters set params_dict=None (it gets overwritten by the tuned dict).
+                    For model_type='lightgbm' (LGBM 'gbdt', 'goss', or 'dart') the dictionary should look like-
                     param_dict = {'boosting_type': 'gbdt',
                                   'subsample': 0.7,
                                   'drop_rate': 0.2,
@@ -536,7 +612,19 @@ def train_model(x_train, y_train, params_dict,
                                   'num_leaves': 70,
                                   'path_smooth': 0.2,
                                   }
+                    For model_type='xgboost', pass keyword arguments accepted by xgboost.XGBRegressor, e.g.-
+                    param_dict = {'objective': 'reg:squarederror', 'tree_method': 'hist',
+                                  'n_estimators': 400, 'max_depth': 6, 'learning_rate': 0.02,
+                                  'subsample': 0.65, 'colsample_bytree': 0.65, 'min_child_weight': 5}
+                    For model_type='random_forest', pass keyword arguments accepted by
+                    sklearn.ensemble.RandomForestRegressor, e.g.-
+                    param_dict = {'n_estimators': 400, 'max_depth': None, 'max_features': 0.65,
+                                  'min_samples_leaf': 5, 'min_samples_split': 10}
+    :param model_type: One of 'lightgbm', 'xgboost', 'random_forest'. Default 'lightgbm' (preserves prior behavior).
     :param categorical_columns: List of categorical column names to convert to 'category' dtype. Default set to None.
+                                Note: native pandas 'category' dtype handling at fit() time (categorical_feature=...)
+                                is currently only wired up for model_type='lightgbm'; for 'xgboost'/'random_forest',
+                                one-hot encode or otherwise preprocess categorical columns before calling train_model().
     :param load_model : Set to True if want to load saved model. Default set to False.
     :param save_model : Set to True if want to save model. Default set to False.
     :param save_folder : Filepath of folder to save model. Default set to None for save_model=False..
@@ -547,12 +635,15 @@ def train_model(x_train, y_train, params_dict,
     :param max_evals : Maximum number of evaluations during hyperparameter optimization. Default set to 1000.
     :param verbose : Set to False to skip printing model metrics.
 
-    :return: trained LGBM regression model.
+    :return: trained regression model (LGBMRegressor, XGBRegressor, or RandomForestRegressor instance).
     """
     global reg_model
 
+    if model_type not in SUPPORTED_MODEL_TYPES:
+        raise ValueError(f"model_type must be one of {SUPPORTED_MODEL_TYPES}; got '{model_type}'")
+
     if not load_model:
-        print(f'Training model...')
+        print(f'Training {model_type} model...')
         start_time = timeit.default_timer()
 
         # provision to include categorical data
@@ -564,13 +655,20 @@ def train_model(x_train, y_train, params_dict,
         if not skip_tune_hyperparameters:
             params_dict = bayes_hyperparam_opt(x_train, y_train, iteration_csv,
                                                n_fold=n_fold, max_evals=max_evals,
+                                               model_type=model_type,
                                                skip_processing=skip_tune_hyperparameters)
 
         # Configuring the regressor with the parameters
-        reg_model = LGBMRegressor(tree_learner='serial', random_state=0,
-                                  deterministic=True, n_jobs=-1, **params_dict)
+        if model_type == 'lightgbm':
+            reg_model = LGBMRegressor(tree_learner='serial', random_state=0,
+                                      deterministic=True, n_jobs=-1, **params_dict)
+        elif model_type == 'xgboost':
+            reg_model = XGBRegressor(random_state=0, n_jobs=-1, **params_dict)
+            
+        elif model_type == 'random_forest':
+            reg_model = RandomForestRegressor(random_state=0, n_jobs=-1, **params_dict)
 
-        if categorical_columns is not None:
+        if categorical_columns is not None and model_type == 'lightgbm':
             trained_model = reg_model.fit(x_train, y_train,
                                           categorical_feature=categorical_columns)
         else:

@@ -58,7 +58,7 @@ def calculate_r2(Y_pred, Y_obsv):
 
 def calculate_metrics(predictions, targets):
     """
-    Calculates regression metrics: RMSE, MAE, R², Normalized RMSE, and Normalized MAE.
+    Calculates regression metrics: RMSE, MAE, R², Normalized RMSE, Normalized MAE, and PBIAS.
 
     :param predictions: array-like or list. Predicted values.
     :param targets: array-like or list. True target values.
@@ -69,6 +69,7 @@ def calculate_metrics(predictions, targets):
         - 'R2': Coefficient of Determination
         - 'Normalized RMSE': RMSE divided by the mean of targets
         - 'Normalized MAE': MAE divided by the mean of targets
+        - 'PBIAS': Percent Bias
     """
     if isinstance(predictions, list):
         predictions = np.array(predictions)
@@ -81,12 +82,14 @@ def calculate_metrics(predictions, targets):
 
     normalized_rmse = rmse / np.mean(targets)
     normalized_mae = mae / np.mean(targets)
+    pbias = 100 * np.sum(predictions - targets) / np.sum(targets)
 
     return {'RMSE': rmse,
             'MAE': mae,
             'R2': r2,
             'Normalized RMSE': normalized_rmse,
-            'Normalized MAE': normalized_mae}
+            'Normalized MAE': normalized_mae,
+            'PBIAS': pbias}
 
 
 def calc_outlier_ranges_IQR(data, axis=None, decrease_lower_range_by=None, increase_upper_range_by=None):

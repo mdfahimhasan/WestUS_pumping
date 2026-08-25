@@ -78,6 +78,7 @@ if __name__ == '__main__':
     # flags
     # --------------------------------------------------------------------------------------------------------------
     model_version = 'v11'  ######
+    model_type = 'lightgbm'  ###### one of 'lightgbm' (production/DART), 'xgboost', 'random_forest'
 
     skip_df_creation = True                             ######
     skip_train_test_split = True                        ######
@@ -147,6 +148,7 @@ if __name__ == '__main__':
     makedirs([save_model_to_dir])
 
     lgbm_reg_trained = train_model(x_train=x_train, y_train=y_train, params_dict=lgbm_param_dict,
+                                   model_type=model_type,
                                    load_model=load_model, save_model=save_model, save_folder=save_model_to_dir,
                                    model_save_name=model_name, categorical_columns=None,
                                    skip_tune_hyperparameters=skip_hyperparam_tune,

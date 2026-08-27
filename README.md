@@ -134,7 +134,7 @@ __Key packages:__
 This repository includes the in-situ pumping datasets and associated shapefiles used to process and train the ML model. The `Data_main/pumping/` folder contains state-level pumping records from Arizona, Colorado, Kansas, Nevada, and Utah, along with reference rasters, shapefiles, and basin boundaries required for data processing and model implementation.
 
 **Direct download:**  
-The annual groundwater pumping/total irrigation estimates (2000-2023) are available in the following GitHub directory for direct download. Users can directly download it and open using any GIS software such as QGIS.
+The annual groundwater pumping/total irrigation estimates (2000-2023) are available in the following GitHub directory for direct download. Users can directly download it and open using any GIS software such as QGIS. 
 ```
 https://github.com/mdfahimhasan/WestUS_pumping/tree/main/Data_main/rasters/pumping_prediction/ML/v11
 ```

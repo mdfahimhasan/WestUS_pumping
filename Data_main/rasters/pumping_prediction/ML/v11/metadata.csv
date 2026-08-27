@@ -1,0 +1,31 @@
+id_no,xsize,ysize,num_bands
+WestUS_pumping_2000,1342,819,1
+WestUS_pumping_2001,1342,819,1
+WestUS_pumping_2002,1342,819,1
+WestUS_pumping_2003,1342,819,1
+WestUS_pumping_2004,1342,819,1
+WestUS_pumping_2005,1342,819,1
+WestUS_pumping_2006,1342,819,1
+WestUS_pumping_2007,1342,819,1
+WestUS_pumping_2008,1342,819,1
+WestUS_pumping_2009,1342,819,1
+WestUS_pumping_2010,1342,819,1
+WestUS_pumping_2011,1342,819,1
+WestUS_pumping_2012,1342,819,1
+WestUS_pumping_2013,1342,819,1
+WestUS_pumping_2014,1342,819,1
+WestUS_pumping_2015,1342,819,1
+WestUS_pumping_2016,1342,819,1
+WestUS_pumping_2017,1342,819,1
+WestUS_pumping_2018,1342,819,1
+WestUS_pumping_2019,1342,819,1
+WestUS_pumping_2020,1342,819,1
+WestUS_pumping_2021,1342,819,1
+WestUS_pumping_2022,1342,819,1
+WestUS_pumping_2023,1342,819,1
+,,,
+,,,
+data type,Float32,,
+format,GeoTIFF,,
+crs,EPSG:4269 - NAD83,,
+pixel size,"0.01976293625031605786,-0.01976293625063938603",,

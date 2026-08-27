@@ -1182,6 +1182,7 @@ def plot_shap_interaction_plot(model_version, trained_model_path, use_samples, f
             plt.gca().set_xlabel(feature, fontsize=18)
             plt.xticks(fontsize=13)
             plt.yticks(fontsize=13)
+            plt.ylim([-70, 100])
 
             plt.savefig(os.path.join(save_plot_dir, f'{feature}.png'), dpi=400, bbox_inches='tight')
 

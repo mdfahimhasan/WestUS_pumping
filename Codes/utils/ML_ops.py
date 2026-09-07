@@ -754,10 +754,12 @@ def test_model(trained_model, x_test, y_test, prediction_csv_path, categorical_c
     r2 = metrics_dict['R2']
     nrmse = metrics_dict['Normalized RMSE']
     nmae = metrics_dict['Normalized MAE']
+    pbias = metrics_dict['PBIAS']
 
     print(
         f"RMSE: {rmse:.4f}, MAE: {mae:.4f},\n"
-        f"NRMSE: {nrmse:.4f}, NMAE: {nmae:.4f}, R²: {r2:.4f}\n"
+        f"NRMSE: {nrmse:.4f}, NMAE: {nmae:.4f},\n"
+        f"PBIAS: {pbias:.4f}, R²: {r2:.4f}\n"
     )
 
     # saving test prediction
